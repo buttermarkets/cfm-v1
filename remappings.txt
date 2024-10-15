@@ -1,2 +1,2 @@
-forge-std/=lib/forge-std/src/
-Contract.sol/=src/Contract.sol/
+@openzeppelin-contracts-5.0.2/=dependencies/@openzeppelin-contracts-5.0.2/
+forge-std-1.9.3/=dependencies/forge-std-1.9.3/
