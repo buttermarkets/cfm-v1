@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Original work by Gnosis
-// Adapted by Butter
+// This contract is based on the Conditional Token Framework by Gnosis.
+// Documentation: <https://docs.gnosis.io/conditionaltokens/>
+// Repository: <https://github.com/gnosis/conditional-tokens-contracts>
+// Note: This contract is a port of the original work, with minor modifications for compatibility with the latest EVM and toolchain.
 
 pragma solidity ^0.8.0;
 
