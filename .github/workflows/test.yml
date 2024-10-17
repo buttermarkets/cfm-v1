@@ -34,6 +34,11 @@ jobs:
           forge fmt --check
         id: fmt
 
+      - name: Install smart contract dependencies
+        run: |
+          forge soldeer install
+        id: soldeer
+
       - name: Run Forge build
         run: |
           forge build --sizes
