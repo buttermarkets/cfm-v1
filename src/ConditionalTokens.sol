@@ -7,10 +7,6 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
-import "@openzeppelin-contracts-5.0.2/interfaces/IERC165.sol";
-import "@openzeppelin-contracts-5.0.2/utils/introspection/ERC165.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC1155/IERC1155.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC1155/extensions/ERC1155Burnable.sol";
 
 library CTHelpers {
