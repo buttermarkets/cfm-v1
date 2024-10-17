@@ -14,7 +14,7 @@ contract ConditionalTokensTest is Test {
         owner = address(this);
         user1 = address(0x1);
         user2 = address(0x2);
-        conditionalTokens = new ConditionalTokens("URI");
+        conditionalTokens = new ConditionalTokens();
 
         // If you're using a mock ERC20 token, initialize it here
         // mockERC20 = new MockERC20("Mock Token", "MTK", 18);

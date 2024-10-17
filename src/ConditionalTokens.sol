@@ -8,6 +8,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC1155/extensions/ERC1155Burnable.sol";
+import "./SafeMath.sol";
 
 library CTHelpers {
     /// @dev Constructs a condition ID from an oracle, a question ID, and the outcome slot count for the question.
@@ -50,6 +51,7 @@ library CTHelpers {
             // z=z+z; z=x+z; y=y+z; x=x+y; z=x+x; t=x+z; t=t+t; t=t+t; z=z+t; y=y+z; z=y+y;
             // x=x+z; y=y+x; x=x+y; y=y+x; x=x+y; y=y+x; z=y+y; t=y+z; z=y+t; z=z+z; z=z+z;
             // z=t+z; x=x+z; y=y+x; x=x+y; y=y+x; x=x+y; z=x+x; z=x+z; y=y+z; x=x+y; x=x+x;
+            // x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x;
             // x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x;
             // x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x;
             // x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x; x=x+x;
@@ -353,6 +355,44 @@ library CTHelpers {
             x := mulmod(x, x, p)
             x := mulmod(x, x, p)
             x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
+            x := mulmod(x, x, p)
             y := mulmod(y, x, p)
         }
     }
@@ -411,26 +451,9 @@ library CTHelpers {
 }
 
 contract ConditionalTokens is ERC1155Burnable {
-    /**
-     * @dev Sets a new URI for all token types, by relying on the token type ID
-     * substitution mechanism
-     * https://eips.ethereum.org/EIPS/eip-1155#metadata[defined in the ERC].
-     *
-     * By this mechanism, any occurrence of the `\{id\}` substring in either the
-     * URI or any of the values in the JSON file at said URI will be replaced by
-     * clients with the token type ID.
-     *
-     * For example, the `https://token-cdn-domain/\{id\}.json` URI would be
-     * interpreted by clients as
-     * `https://token-cdn-domain/000000000000000000000000000000000000000000000000000000000004cce0.json`
-     * for token type ID 0x4cce0.
-     *
-     * See {uri}.
-     *
-     * Because these URIs cannot be meaningfully represented by the {URI} event,
-     * this function emits no events.
-     */
-    constructor(string memory uri) ERC1155(uri) {}
+    using SafeMath for uint256;
+
+    constructor() ERC1155("") {}
 
     /// @dev Emitted upon the successful preparation of a condition.
     /// @param conditionId The condition's ID. This ID may be derived from the other three parameters via ``keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount))``.
@@ -509,7 +532,7 @@ contract ConditionalTokens is ERC1155Burnable {
         uint256 den = 0;
         for (uint256 i = 0; i < outcomeSlotCount; i++) {
             uint256 num = payouts[i];
-            den = den + num;
+            den = den.add(num);
 
             require(payoutNumerators[conditionId][i] == 0, "payout numerator already set");
             payoutNumerators[conditionId][i] = num;
@@ -660,13 +683,13 @@ contract ConditionalTokens is ERC1155Burnable {
             uint256 payoutNumerator = 0;
             for (uint256 j = 0; j < outcomeSlotCount; j++) {
                 if (indexSet & (1 << j) != 0) {
-                    payoutNumerator = payoutNumerator + payoutNumerators[conditionId][j];
+                    payoutNumerator = payoutNumerator.add(payoutNumerators[conditionId][j]);
                 }
             }
 
             uint256 payoutStake = balanceOf(msg.sender, positionId);
             if (payoutStake > 0) {
-                totalPayout = totalPayout + (payoutStake * payoutNumerator / den);
+                totalPayout = totalPayout.add(payoutStake.mul(payoutNumerator).div(den));
                 _burn(msg.sender, positionId, payoutStake);
             }
         }

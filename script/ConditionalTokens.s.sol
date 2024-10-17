@@ -9,7 +9,7 @@ contract DeployConditionalTokens is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        ConditionalTokens conditionalTokens = new ConditionalTokens("URI");
+        ConditionalTokens conditionalTokens = new ConditionalTokens();
 
         console.log("ConditionalTokens deployed at:", address(conditionalTokens));
 
