@@ -23,8 +23,6 @@ contract ConditionalTokensTest is Test {
         assertEq(conditionalTokens.balanceOf(owner, 1), 0);
     }
 
-
-
     function testTransfer(uint256 mintAmount, uint256 transferAmount) public {
         vm.assume(mintAmount > 0 && mintAmount <= type(uint256).max);
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
@@ -114,7 +112,11 @@ contract ConditionalTokensTest is Test {
         conditionalTokens.safeTransferFrom(address(this), user2, positionId, transferAmount, "");
     }
 
-    function testFailTransferFromInsufficientAllowance(uint256 mintAmount, uint256 approveAmount, uint256 transferAmount) public {
+    function testFailTransferFromInsufficientAllowance(
+        uint256 mintAmount,
+        uint256 approveAmount,
+        uint256 transferAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount < type(uint256).max);
         vm.assume(approveAmount > 0 && approveAmount < mintAmount);
         vm.assume(transferAmount > approveAmount);

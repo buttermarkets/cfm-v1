@@ -415,7 +415,6 @@ library CTHelpers {
 }
 
 contract ConditionalTokens is ERC1155Burnable {
-
     /**
      * @dev Sets a new URI for all token types, by relying on the token type ID
      * substitution mechanism
