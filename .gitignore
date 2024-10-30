@@ -15,3 +15,5 @@ docs/
 
 # Soldeer dependencies
 dependencies/
+
+.DS_Store
