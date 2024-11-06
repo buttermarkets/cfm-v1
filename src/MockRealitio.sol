@@ -38,6 +38,10 @@ contract MockRealitio is IRealitio {
         return results[questionId];
     }
 
+    function resultForOnceSettled(bytes32 questionId) external view returns (bytes32) {
+        return results[questionId];
+    }
+
     function setContentHash(bytes32 questionId, bytes32 contentHash) external onlyOwners {
         contentHashes[questionId] = contentHash;
     }
