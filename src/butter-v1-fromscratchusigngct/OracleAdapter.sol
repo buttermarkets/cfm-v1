@@ -15,9 +15,7 @@ uint256 constant REALITY_SINGLE_SELECT_TEMPLATE = 2;
 uint256 constant REALITY_MULTI_SELECT_TEMPLATE = 3;
 bytes32 constant INVALID_RESULT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-
-interface ClientInterface {
-}
+interface ClientInterface {}
 
 interface OracleInterface is IRealitio {
     function askQuestionWithMinBond(
