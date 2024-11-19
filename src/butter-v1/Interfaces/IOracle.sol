@@ -2,7 +2,10 @@
 pragma solidity 0.8.20;
 
 interface IOracle {
-    function encodeScalarQuestion(string memory question, string memory conditionOutcomeName) external pure returns (string memory);
+    function encodeScalarQuestion(string memory question, string memory conditionOutcomeName)
+        external
+        pure
+        returns (string memory);
     function encodeMultiCategoricalQuestion(string memory question, string[] calldata outcomes)
         external
         pure

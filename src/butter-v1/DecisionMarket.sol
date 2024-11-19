@@ -39,7 +39,9 @@ contract DecisionMarket is IMarket {
         );
 
         for (uint256 i = 0; i < _decisionMarketQuestion.outcomes.length; i++) {
-            ConditionalScalarMarket newMarket = new ConditionalScalarMarket(oracle, conditionalTokens, childQuestion, _decisionMarketQuestion.outcomes[i]);
+            ConditionalScalarMarket newMarket = new ConditionalScalarMarket(
+                oracle, conditionalTokens, childQuestion, _decisionMarketQuestion.outcomes[i]
+            );
             outcomes[outcomeCount] = newMarket;
             outcomeCount++;
         }
