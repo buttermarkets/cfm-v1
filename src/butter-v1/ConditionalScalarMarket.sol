@@ -16,7 +16,12 @@ contract ConditionalScalarMarket is IMarket {
 
     bool public isResolved;
 
-    constructor(IOracle _oracle, ConditionalTokens _conditionalTokens, ScalarQuestion memory _question, string memory _parentConditionName) {
+    constructor(
+        IOracle _oracle,
+        ConditionalTokens _conditionalTokens,
+        ScalarQuestion memory _question,
+        string memory _parentConditionName
+    ) {
         oracle = _oracle;
         conditionalTokens = _conditionalTokens;
 
@@ -25,7 +30,9 @@ contract ConditionalScalarMarket is IMarket {
         outcomes[1] = _question.upperBound;
 
         conditionalTokens.prepareCondition(
-            address(oracle), keccak256(abi.encode(oracle.encodeScalarQuestion(_question.text, _parentConditionName))), outcomes.length
+            address(oracle),
+            keccak256(abi.encode(oracle.encodeScalarQuestion(_question.text, _parentConditionName))),
+            outcomes.length
         );
 
         //oracle.prepareQuestion();

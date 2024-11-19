@@ -23,19 +23,23 @@ contract OracleAdapter is IOracle {
         oracle = _oracle;
     }
 
-    function encodeScalarQuestion(string memory question, string memory conditionOutcomeName) public pure returns (string memory) {
+    function encodeScalarQuestion(string memory question, string memory conditionOutcomeName)
+        public
+        pure
+        returns (string memory)
+    {
         bytes memory separator = abi.encodePacked(unicode"\u241f");
-        
+
         // Replace %s placeholder with conditionOutcomeName
         bytes memory questionBytes = bytes(question);
         bytes memory nameBytes = bytes(conditionOutcomeName);
         bytes memory result = new bytes(questionBytes.length + nameBytes.length - 2); // -2 for %s
-        
-        uint j = 0;
+
+        uint256 j = 0;
         bool replaced = false;
-        for(uint i = 0; i < questionBytes.length; i++) {
-            if (i < questionBytes.length-1 && questionBytes[i] == '%' && questionBytes[i+1] == 's') {
-                for(uint k = 0; k < nameBytes.length; k++) {
+        for (uint256 i = 0; i < questionBytes.length; i++) {
+            if (i < questionBytes.length - 1 && questionBytes[i] == "%" && questionBytes[i + 1] == "s") {
+                for (uint256 k = 0; k < nameBytes.length; k++) {
                     result[j++] = nameBytes[k];
                 }
                 i++; // Skip 's'
@@ -44,7 +48,7 @@ contract OracleAdapter is IOracle {
                 result[j++] = questionBytes[i];
             }
         }
-        
+
         require(replaced, "Question must contain %s placeholder");
         string memory formattedQuestion = string(result);
 
