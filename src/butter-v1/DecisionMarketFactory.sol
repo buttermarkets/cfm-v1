@@ -14,7 +14,7 @@ contract DecisionMarketFactory {
     // Mapping from market ID to DecisionMarket contract
     mapping(uint256 => DecisionMarket) public markets;
 
-    constructor(IOracle _oracle, address _conditionalTokens) {
+    constructor(IOracle _oracle, ConditionalTokens _conditionalTokens) {
         oracle = _oracle;
         conditionalTokens = ConditionalTokens(_conditionalTokens);
     }
@@ -25,12 +25,5 @@ contract DecisionMarketFactory {
         DecisionMarket newMarket = new DecisionMarket(oracle, conditionalTokens, _question, _childQuestion);
         markets[marketCount] = newMarket;
         marketCount++;
-    }
-
-    /// @notice Retrieves the address of a specific DecisionMarket
-    /// @param marketId The ID of the market
-    /// @return The address of the DecisionMarket contract
-    function getMarket(uint256 marketId) external view returns (DecisionMarket) {
-        return markets[marketId];
     }
 }

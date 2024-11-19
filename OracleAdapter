@@ -1,12 +1,8 @@
-// SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
 import "../IRealitio.sol";
 import "./interfaces/IOracle.sol";
 import "./ConditionalScalarMarket.sol";
-
-// Employing the adapter software-design-pattern here. The adapter component implements both client (CFM) interface
-// and service (Reality) interface and translates incoming and outgoing calls between client and service.
 
 bytes32 constant REALITY_INVALID_RESULT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
@@ -28,18 +24,47 @@ contract OracleAdapter is IOracle {
         csm = _csm;
     }
 
-    function encodeScalarQuestion(string memory question) public pure returns (string memory) {
+    function encodeScalarQuestion(string memory question) public pure override returns (string memory) {
         bytes memory separator = abi.encodePacked(unicode"\u241f");
 
         return string(abi.encodePacked(question, separator, "funding", separator, "en"));
     }
 
-    function encodeMultiCategoricalQuestion(string memory question) public pure returns (string memory) {
-        revert("Not implemented yet");
+    function encodeMultiCategoricalQuestion(string memory question, string[] calldata outcomes) public pure override returns (string memory) {
+        bytes memory separator = abi.encodePacked(unicode"\u241f");
+
+        bytes memory encodedOutcomes = abi.encodePacked('"', outcomes[0], '"');
+
+        for (uint256 i = 1; i < outcomes.length; i++) {
+            encodedOutcomes = abi.encodePacked(encodedOutcomes, ',"', outcomes[i], '"');
+        }
+
+        return string(abi.encodePacked(question, separator, encodedOutcomes, separator, "funding", separator, "en"));
     }
 
-    function askQuestion() public {
-        revert("Not implemented yet");
+    function prepareQuestion(
+        address arbitrator,
+        string memory encodedQuestion,
+        uint256 templateId,
+        uint32 openingTime,
+        uint32 questionTimeout,
+        uint256 minBond
+    ) public override returns (bytes32) {
+        bytes32 content_hash = keccak256(abi.encodePacked(templateId, openingTime, encodedQuestion));
+
+        bytes32 question_id = keccak256(
+            abi.encodePacked(
+                content_hash, arbitrator, questionTimeout, minBond, address(oracle), address(this), uint256(0)
+            )
+        );
+
+        if (oracle.getTimeout(question_id) != 0) {
+            return question_id;
+        }
+
+        return oracle.askQuestionWithMinBond(
+            templateId, encodedQuestion, arbitrator, questionTimeout, openingTime, 0, minBond
+        );
     }
 
     function resolveMultiCategoricalMarket(bytes32 questionId, uint256 numOutcomes) internal {
@@ -86,4 +111,4 @@ contract OracleAdapter is IOracle {
 
         csm.conditionalTokens().reportPayouts(questionId, payouts);
     }
-}
+} 

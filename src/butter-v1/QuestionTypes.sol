@@ -9,7 +9,7 @@ enum QuestionType {
 
 struct MultiCategoricalQuestion {
     string text;
-    uint256 numberOfOutcomes;
+    string[] outcomes;
 }
 
 struct ScalarQuestion {

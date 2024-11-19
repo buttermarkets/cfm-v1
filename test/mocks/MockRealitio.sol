@@ -1,12 +1,13 @@
 pragma solidity ^0.8.0;
 
-import "./IRealitio.sol";
+import "../../src/IRealitio.sol";
 
 contract MockRealitio is IRealitio {
     mapping(address => bool) public owners;
     mapping(bytes32 => bytes32) private contentHashes;
     mapping(bytes32 => uint32) private openingTimestamps;
     mapping(bytes32 => bytes32) private results;
+    mapping(bytes32 => uint32) private timeouts;
 
     constructor() {
         owners[msg.sender] = true;
@@ -52,5 +53,30 @@ contract MockRealitio is IRealitio {
 
     function setResult(bytes32 questionId, bytes32 result) external onlyOwners {
         results[questionId] = result;
+    }
+
+    function getTimeout(bytes32 questionId) external view returns (uint32) {
+        return timeouts[questionId];
+    }
+
+    function setTimeout(bytes32 questionId, uint32 timeout) external onlyOwners {
+        timeouts[questionId] = timeout;
+    }
+
+    function askQuestionWithMinBond(
+        uint256 template_id,
+        string memory question,
+        address arbitrator,
+        uint32 timeout,
+        uint32 opening_ts,
+        uint256 nonce,
+        uint256 min_bond
+    ) external payable returns (bytes32) {
+        // Mock implementation - could return a deterministic hash or store question details
+        bytes32 questionId =
+            keccak256(abi.encodePacked(template_id, question, arbitrator, timeout, opening_ts, nonce, min_bond));
+        timeouts[questionId] = timeout;
+        openingTimestamps[questionId] = opening_ts;
+        return questionId;
     }
 }
