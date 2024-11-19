@@ -4,4 +4,4 @@ enabled = true
 
 [dependencies]
 "@openzeppelin-contracts" = "5.0.2"
-forge-std = { version = "1.9.3", url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_3_30-09-2024_08:27:09_forge-std-1.9.zip" }
+forge-std = { version = "1.9.4", url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_4_25-10-2024_14:36:59_forge-std-1.9.zip" }
