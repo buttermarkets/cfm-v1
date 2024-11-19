@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std-1.9.3/src/Script.sol";
+import "forge-std-1.9.4/src/Script.sol";
 import "../src/ConditionalTokens.sol";
 import "../src/FPMMDeterministicFactory.sol";
 import "../src/RealitioProxy.sol";

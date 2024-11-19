@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 // Import Foundry's Test library
-import "forge-std-1.9.3/src/Test.sol";
+import "forge-std-1.9.4/src/Test.sol";
 
 // Import the contracts to be tested
 import "src/butter-v1/DecisionMarketFactory.sol";
