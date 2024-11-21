@@ -26,6 +26,9 @@ contract DecisionMarket is IMarket {
         childQuestion = _childQuestion;
         question = _decisionMarketQuestion.text;
 
+        // FIXME: Still missing: oracle question `prepareQuestion`.
+
+        // TODO: Check that this is safe, see Seer codebase: https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295
         conditionalTokens.prepareCondition(
             address(oracle),
             keccak256(
@@ -47,12 +50,14 @@ contract DecisionMarket is IMarket {
         }
     }
 
+    // Process for a resolver: call submitAnswer on Reality then resolve here
     function resolve(bytes32 questionId, uint256 numOutcomes) external {
         // TODO Validate questionID
         uint256 answer = uint256(oracle.resultForOnceSettled(questionId));
         uint256[] memory payouts = new uint256[](numOutcomes + 1);
 
         if (answer == uint256(oracle.getInvalidValue())) {
+            // FIXME: remove the INVALID_RESULT case
             // the last outcome is INVALID_RESULT.
             payouts[numOutcomes] = 1;
         } else {

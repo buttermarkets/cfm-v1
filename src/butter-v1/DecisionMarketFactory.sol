@@ -19,6 +19,10 @@ contract DecisionMarketFactory {
         conditionalTokens = ConditionalTokens(_conditionalTokens);
     }
 
+    // This could expect and parameters. But this would create tight coupling
+    // with Reality.
+    // Another approach is to make OracleAdapter plug into different templates
+    // (or redeploy different OracleAdapter when not happy with the template.
     function createMarket(MultiCategoricalQuestion calldata _question, ScalarQuestion calldata _childQuestion)
         external
     {

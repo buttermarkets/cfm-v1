@@ -9,6 +9,11 @@ pragma solidity ^0.8.0;
 import "./IRealitio.sol";
 import "./IConditionalTokens.sol";
 
+// INGREDIENT FILE ///////////////////////////////////////////////////////////
+
+/// This was just used to think about how to write the resolve function in other
+/// contracts.
+/// Resolve should not be here, rather in the market, according to Ferit.
 contract RealitioProxy {
     IConditionalTokens public conditionalTokens;
     IRealitio public realitio;

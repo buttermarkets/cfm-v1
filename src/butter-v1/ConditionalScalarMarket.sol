@@ -35,9 +35,12 @@ contract ConditionalScalarMarket is IMarket {
             outcomes.length
         );
 
-        //oracle.prepareQuestion();
+        // FIXME: oracle.prepareQuestion();
+
+        // FIXME: This would call FixedProductMarketMakerFactory
     }
 
+    // TODO: arguments aren't needed
     function resolve(bytes32 questionId, uint256 low, uint256 high) external {
         // TODO Validate questionID
         uint256 answer = uint256(oracle.resultForOnceSettled(questionId));

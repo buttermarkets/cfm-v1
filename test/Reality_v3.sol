@@ -1,6 +1,9 @@
+/* solhint-disable */
 // SPDX-License-Identifier: GPL-3.0-only
 
 pragma solidity ^0.8.6;
+
+/// This is a kinda mock of Reality_v3
 
 contract BalanceHolder {
     mapping(address => uint256) public balanceOf;

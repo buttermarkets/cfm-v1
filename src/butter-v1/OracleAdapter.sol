@@ -71,12 +71,14 @@ contract OracleAdapter is IOracle {
         return string(abi.encodePacked(question, separator, encodedOutcomes, separator, "funding", separator, "en"));
     }
 
+    // TODO This needs to be verified:
+    /// @dev This is the only function known by higher level contracts.
     function prepareQuestion(
-        address arbitrator,
-        string memory encodedQuestion,
+        address arbitrator, // should be Kleros
+        string memory encodedQuestion, // this is coming from the other function
         uint256 templateId,
         uint32 openingTime,
-        uint32 questionTimeout,
+        uint32 questionTimeout, // 3.5?
         uint256 minBond
     ) public returns (bytes32) {
         bytes32 content_hash = keccak256(abi.encodePacked(templateId, openingTime, encodedQuestion));
@@ -91,11 +93,17 @@ contract OracleAdapter is IOracle {
             return question_id;
         }
 
+        /// @dev This would need to call UMA if we used UMA.
+        // TODO: We should rather use the return value of this function call as a
+        // question identifier in prepareCondition.
+        // See https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295
         return oracle.askQuestionWithMinBond(
             templateId, encodedQuestion, arbitrator, questionTimeout, openingTime, 0, minBond
         );
     }
 
+    /// @dev This is not-reverting only when the question is finalized in Reality.
+    // TODO: We'd need to QA the functioning of this.
     function resultForOnceSettled(bytes32 questionID) public view returns (bytes32) {
         return oracle.resultForOnceSettled(questionID);
     }

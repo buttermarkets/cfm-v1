@@ -20,6 +20,7 @@ library CeilDiv {
     }
 }
 
+// TODO: no need to wrap in ERC20 if we don't use it.
 contract FixedProductMarketMaker is ERC20, ERC1155Holder {
     constructor() ERC20("", "") {}
 
