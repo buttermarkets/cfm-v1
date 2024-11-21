@@ -83,10 +83,16 @@ The system follows these general steps:
 # Todo:
 
 [ ] Structure comments in FIXME/TODO
+[ ] What to do about INVALID?
 [ ] Finish oracle integration & prepareQuestion
+    [ ] Create template in Reality
+        3 placeholders: "What will be the %s of %s?"
+            - "success rate/TVL?"
+            - Project name
     [ ] Put templateIds in OracleAdapter and not in DecisionMarket
     [ ] Collision problems
 [ ] Integrate FPMM OR use erc20 wrapper
+    [ ] First figure out if 1155 works well with Metamask
     [ ] 1 FPMM factory call in ScalarMarket constructor
     [ ]  if wrapping: contract which translates conditions between client and
       contract → see Router contract in Seer
