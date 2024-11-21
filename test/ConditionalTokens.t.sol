@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std-1.9.4/src/Test.sol";
+import "forge-std/src/Test.sol";
 
-import "../src/ConditionalTokens.sol";
+import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 
 contract ConditionalTokensTest is Test {
     ConditionalTokens public conditionalTokens;
@@ -22,7 +22,7 @@ contract ConditionalTokensTest is Test {
         // mockERC20.mint(address(this), 1000000 * 10**18);
     }
 
-    function testInitialState() public {
+    function testInitialState() public view {
         assertEq(conditionalTokens.balanceOf(owner, 0), 0);
         assertEq(conditionalTokens.balanceOf(user1, 0), 0);
         assertEq(conditionalTokens.balanceOf(owner, 1), 0);
@@ -35,10 +35,10 @@ contract ConditionalTokensTest is Test {
         conditionalTokens.prepareCondition(address(this), questionId, outcomeSlotCount);
         bytes32 conditionId = conditionalTokens.getConditionId(address(this), questionId, outcomeSlotCount);
 
-        // Create a position ID
-        uint256 indexSet = 1; // Representing the first outcome
-        bytes32 collectionId = conditionalTokens.getCollectionId(bytes32(0), conditionId, indexSet);
-        uint256 positionId = conditionalTokens.getPositionId(IERC20(address(this)), collectionId);
+        //// Create a position ID
+        //uint256 indexSet = 1; // Representing the first outcome
+        //bytes32 collectionId = conditionalTokens.getCollectionId(bytes32(0), conditionId, indexSet);
+        //uint256 positionId = conditionalTokens.getPositionId(IERC20(address(this)), collectionId);
 
         // Increase the gas limit for this test
         vm.txGasPrice(0);

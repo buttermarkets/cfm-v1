@@ -1,112 +1,111 @@
-# Butter Conditional Funding Markets Smart Contracts
+# conditional funding markets (CFM)
 
-## Codebase Structure
+## mechansim: flat-cfm
 
-Main contracts live under `src/butter-v1`. Any other contract is either there for reference, or might come useful at some point, or can be useful for testing purposes.
+The mechanism implemented here is a simplified version of
+[CFMs](https://community.ggresear.ch/t/conditional-funding-markets/27) called
+["Flat CFM"](https://butterd.notion.site/cfm-v1-mech-v0-2-Flat-CFM-13657e477193802f8abce08cd13aa979?pvs=74).
 
-Many contracts that live under `src` are contracts from Gnosis Conditional Tokens that are merely ported versions of originals with minor modifications for compatibility with the latest EVM and toolchain.
+## codebase status and caveats
 
-## The Design
+Core contracts are in a stable state in terms of functionality and state
+management.
 
-`IMarket` is he API of market contracts. 
+We still plan on doing the following changes:
 
-`IOracle` is the API of oracle contracts. It might make more sense to call this IOracleAdapter, since it's an API of adapter contracts in practice.
+- Refactorings to ease testing.
+- Improve tests.
+- Add events.
+- Add deployment scripts.
+- Natspecs.
+- Implement some gas savings.
 
-`DecisionMarketFactory` creates `DecisionMarket`s and does the bookkeeping. 
+## codebase structure
 
-`DecisionMarket` represents the condition of funding. It's a market but it won't be traded. It creates a `ConditionalScalarMarket` for each outcome it has. It prepares an oracle question and condition (as in `ConditionalTokens`) during construction. 
+- `src/*`: Main contracts.
+- `src/interfaces/*`: Interfaces to external contracts.
+- `src/vendor/<github org name>/<github repo name>/*`: External contracts,
+  ported to 8.20.0 as directly as possible.
 
-`ConditionalScalarMarket` represents the scalar market which is on the condition of parent `DecisionMarket`. This will be traded. It prepares an oracle question and condition (as in `ConditionalTokens`) during construction. 
 
-`ConditionalTokens` is the core contract that manages the creation and redemption of conditional tokens. It's a port of Gnosis Conditional Tokens framework with minor modifications for compatibility with the latest EVM and toolchain.
+## design
 
-`OracleAdapter` implements `IOracle` and oracle specific logic. In the current state it is implementing Reality.ETH.
+`DecisionMarket` represents the condition of funding. It's a market but it won't
+be traded. It creates a `ConditionalScalarMarket` for each outcome it has. It
+prepares an oracle question and condition (as in `ConditionalTokens`) during
+construction. 
 
-`QuestionTypes` defines the structure for different types of questions that can create markets: scalar questions with upper/lower bounds and multicategorical questions.
+`ConditionalScalarMarket` represents the scalar market which is on the condition
+of parent `DecisionMarket`. This will be traded. It prepares an oracle question
+and condition (as in `ConditionalTokens`) during construction. 
+
+`ConditionalTokens` is the core contract that manages the creation and
+redemption of conditional tokens. It's a port of Gnosis Conditional Tokens
+framework. We also rely on `Wrapped1155Factory` which enables wrapping 1155 outcome tokens in ERC20s so we can trade them on any AMM.  
+Both these contracts were ported it to 8.20.0 with minor modifications for
+compatibility. We expect to deploy them on chain whenever the network we choose
+doesn't have a canonical deployment (for now, only mainnet and Gnosis Chain
+have some). We use these contracts for testing purposes as well.
+
+`CFMRealityAdapter` implements an adapter pattern to access RealityETH from our
+contracts, with a normalized interface (we want to later enable oracle
+agnosticity).
+
+`QuestionTypes` defines basic data types for CFM decision questions, scalar
+questions and nested conditional tokens.
 
 The system follows these general steps:
-1. `DecisionMarketFactory` creates a new market `DecisionMarket` with specified parameters. And this automatically creates `ConditionalScalarMarket`s for each outcome.
-2. Each market prepares condition through ConditionalTokens and prepares question on oracle.
-3. Users split their collateral into scalar outcome tokens and can trade positions on scalar markets. (TODO)
-4. Oracle provides result. (Incomplete, needs to be verified for completeness and security)
-5. Market resolves and calculates payouts. (Incomplete, needs to be verified completeness and security)
-6. Users can redeem their positions for payouts (TODO. Depending on market making strategy, FPMM contract can be used, or we can use 3rd party AMMs introduce a middleman between `ConditionalTokens` and client which handles token wrapping during splits and merges, similar to how Seer handles this.)
+
+1. `DecisionMarketFactory` creates a new `DecisionMarket` with specified
+   parameters. And this automatically creates `ConditionalScalarMarket`s for
+   each outcome.
+1. The `DecisionMarket` prepares their condition through `ConditionalTokens` and
+   submits and oracle question via `CFMRealityAdapter`.
+1. Each `ConditionalScalarMarket` prepares their condition through
+   `ConditionalTokens` and submits an oracle question via `CFMRealityAdapter`.
+   Within a given `DecisionMarket`, each of these will have similar questions
+   implemented by a common Reality template with a varying project name.
+1. Users split their collateral into decision outcome tokens, then split again
+   into scalar outcome tokens. These tokens are ERC20s and can be traded on
+   AMMs.
+1. When the oracle provides an answer to the decision question, the
+   `DecisionMarket` can be resolved and calculates payouts.
+1. When the oracle provides an answer to the conditional scalar questions (all
+   together), all `ConditionalScalarMarket`s can be resolved and calculate
+   payouts.
+1. Users can redeem their positions for payouts.
 
 Things to consider:
-- To prevent tight-coupling and have oracle modularity, markets do not know implementation details of Reality.ETH, and instead all Reality details go into `OracleAdapter` contract. Considering `OracleAdapter` actually implements Reality oracle, it makes sense to call this contract `RealityAdapter` instead.
-- In this application there are many tokens therefore user has to approve many token transaction. If possible these should be eliminated, perhaps via a custom logic in `ERC20.transfer()´ function. At very least, we can use gasless token approvals to improve UX. 
-- The question ID is important and can be an attack vector if it's not carefully considered. See: https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295 for example.
-- We can use contract cloning pattern to reduce gas costs since the system is deploying almost identical contracts many times.
-- There is a logic for string interpolation in `OracleAdapter` to encode a Reality question, and this complexity can be eliminated by creating a [Reality template](https://github.com/RealityETH/reality-eth-monorepo/blob/9e3e75d026269e8fee8eef8230bd3957c9bf2fb0/packages/contracts/development/contracts/RealityETH-4.0.sol#L120) and using it instead. 
+
+- To prevent tight-coupling and have oracle modularity, markets do not know
+  implementation details of Reality.ETH, and instead all Reality details go into
+  `RealityAdapter` contract.
+- In this application there are many tokens therefore user has to approve many
+  token transaction. If possible these should be eliminated, perhaps via a
+  custom logic in `ERC20.transfer()` function. At very least, we can use gasless
+  token approvals to improve UX. 
+- The question ID is important and can be an attack vector if it's not carefully
+  considered. See:
+  https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295
+  for example. We believe the code mitigates any such issue.
+- We can use contract cloning pattern to reduce gas costs since the system is
+  deploying almost identical contracts many times.
 
 
+## oracle: invalid case
 
+Reality can return
+['invalid'](https://realityeth.github.io/docs/html/contracts.html?highlight=invalid)
+in case the question can't be answered.
 
-## Toolkit: Foundry & Soldeer
+At the projects outcome level, an invalid case means CFM contracts can't figure
+whether any project has succeeded in getting funded. Hence, it is equivalent to
+the fact that none of the outcomes was returned by the oracle, ie that no
+project got funded.
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-[Soldeer](https://soldeer.xyz/) is used for Solidity dependencies.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+At the individual project level with a scalar outcome, invalid means that CFM's
+scalar markets can't know how to reward traders. It thus means that the market
+should return collateral deposits as-is, hence allow merging of tokens but not
+redemption.  
+This is imperfect as traders might feel abused as some of them will make a loss
+(or a profit) in case this happens.

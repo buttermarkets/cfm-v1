@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std-1.9.4/src/Script.sol";
-import "../src/ConditionalTokens.sol";
+import "forge-std/src/Script.sol";
+import "../src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 
 contract DeployConditionalTokens is Script {
     function run() external {
