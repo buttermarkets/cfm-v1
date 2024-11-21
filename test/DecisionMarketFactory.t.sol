@@ -14,7 +14,8 @@ import "src/ConditionalTokens.sol";
 // Import interfaces if necessary
 import "src/butter-v1/interfaces/IOracle.sol";
 import "src/butter-v1/interfaces/IMarket.sol";
-import "src/Reality_v3.sol"; // Updated import
+
+import "./Reality_v3.sol"; // Updated import
 
 contract DecisionMarketFactoryTest is Test {
     DecisionMarketFactory public factory;
