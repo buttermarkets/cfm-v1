@@ -82,7 +82,7 @@ The system follows these general steps:
 
 # Todo:
 
-[ ] Structure comments in FIXME/TODO
+[x] Structure comments in FIXME/TODO
 [ ] What to do about INVALID?
 [ ] Finish oracle integration & prepareQuestion
     [ ] Create template in Reality
