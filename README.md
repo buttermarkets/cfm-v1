@@ -35,8 +35,8 @@ The system follows these general steps:
 Things to consider:
 - To prevent tight-coupling and have oracle modularity, markets do not know implementation details of Reality.ETH, and instead all Reality details go into `OracleAdapter` contract. Considering `OracleAdapter` actually implements Reality oracle, it makes sense to call this contract `RealityAdapter` instead.
 - In this application there are many tokens therefore user has to approve many token transaction. If possible these should be eliminated, perhaps via a custom logic in `ERC20.transfer()´ function. At very least, we can use gasless token approvals to improve UX. 
-- The questiond ID is important and can be an attack vector if it's not carefully considered. See: https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295 for example.
-- We can contract cloning pattern to reduce gas costs since the system is deploying almost identical contracts many times.
+- The question ID is important and can be an attack vector if it's not carefully considered. See: https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295 for example.
+- We can use contract cloning pattern to reduce gas costs since the system is deploying almost identical contracts many times.
 - There is a logic for string interpolation in `OracleAdapter` to encode a Reality question, and this complexity can be eliminated by creating a [Reality template](https://github.com/RealityETH/reality-eth-monorepo/blob/9e3e75d026269e8fee8eef8230bd3957c9bf2fb0/packages/contracts/development/contracts/RealityETH-4.0.sol#L120) and using it instead. 
 
 
