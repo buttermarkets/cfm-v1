@@ -1,52 +1,42 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+// TODO: use explicit imports
 import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
 import "./QuestionTypes.sol";
-import "./interfaces/IOracle.sol";
-import "./interfaces/IMarket.sol";
+import "./interfaces/ICFMOracleAdapter.sol";
+import "./interfaces/IDecisionMarket.sol";
 import "../ConditionalTokens.sol";
 
-contract ConditionalScalarMarket is IMarket {
+contract ConditionalScalarMarket is IDecisionMarket {
     string public marketName;
-    uint256[2] public outcomes;
-    IOracle public immutable oracle;
+    ICFMOracleAdapter public immutable oracleAdapter;
     ConditionalTokens public immutable conditionalTokens;
-    ScalarQuestion question;
 
     bool public isResolved;
 
     constructor(
-        IOracle _oracle,
+        ICFMOracleAdapter _oracleAdapter,
         ConditionalTokens _conditionalTokens,
-        ScalarQuestion memory _question,
-        string memory _parentConditionName
+        CFMConditionalQuestionParams memory _conditionalQuestionParams,
+        string memory _outcomeName
     ) {
-        oracle = _oracle;
+        oracleAdapter = _oracleAdapter;
         conditionalTokens = _conditionalTokens;
 
-        question = _question;
-        outcomes[0] = _question.lowerBound;
-        outcomes[1] = _question.upperBound;
+        bytes32 metricQuestionId = oracleAdapter.askMetricQuestion(_conditionalQuestionParams, _outcomeName);
 
-        conditionalTokens.prepareCondition(
-            address(oracle),
-            keccak256(abi.encode(oracle.encodeScalarQuestion(_question.text, _parentConditionName))),
-            outcomes.length
-        );
+        conditionalTokens.prepareCondition(address(oracleAdapter), metricQuestionId, 2);
 
-        // FIXME: oracle.prepareQuestion();
-
-        // FIXME: This would call FixedProductMarketMakerFactory
+        // TODO: This would call FixedProductMarketMakerFactory
     }
 
-    // TODO: arguments aren't needed
+    // FIXME: arguments aren't needed
     function resolve(bytes32 questionId, uint256 low, uint256 high) external {
-        // TODO Validate questionID
-        uint256 answer = uint256(oracle.resultForOnceSettled(questionId));
+        uint256 answer = uint256(oracleAdapter.resultForOnceSettled(questionId));
         uint256[] memory payouts = new uint256[](3);
 
-        if (answer == uint256(oracle.getInvalidValue())) {
+        if (answer == uint256(oracleAdapter.getInvalidValue())) {
             // the last outcome is INVALID_RESULT.
             payouts[2] = 1;
         } else if (answer <= low) {
@@ -64,4 +54,8 @@ contract ConditionalScalarMarket is IMarket {
     function getResolved() public view returns (bool) {
         return isResolved;
     }
+
+    //function deriveConditionId(uint256 conditionalQuestionId) private view returns (bytes32) {
+    //    return keccak256(abi.encode(conditionalQuestionId, address(oracle), question.minValue, question.maxValue));
+    //}
 }

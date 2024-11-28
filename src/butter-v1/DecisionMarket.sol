@@ -1,62 +1,62 @@
-// DecisionMarket.sol
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "./ConditionalScalarMarket.sol";
-import "./interfaces/IOracle.sol";
-import "./interfaces/IMarket.sol";
+import {ICFMOracleAdapter} from "./interfaces/ICFMOracleAdapter.sol";
+import "./interfaces/IDecisionMarket.sol";
 import "../ConditionalTokens.sol";
 
-contract DecisionMarket is IMarket {
-    IOracle public oracle;
+// TODO this is more a Flat CFM than a Decision Market. Think about making this a bit
+// more generic and Flat CFM being a special case. For now, how CFMDecisionQuestion is strcutured is
+// specific to 'flat', and ConditionalQuestionParams is specific to 'funding markets'.
+// => Say Decision{,Question} (but this needs to be potentially plural) and
+// Conditional{,Question}. This should happen in an abstract DecisionMarket
+// contract that is implemented by this one.
+contract CFMDecisionMarket is IDecisionMarket {
+    ICFMOracleAdapter public oracleAdapter;
     ConditionalTokens public conditionalTokens;
     mapping(uint256 => ConditionalScalarMarket) public outcomes;
     uint256 public outcomeCount;
-    string public question;
-    ScalarQuestion childQuestion;
     bool public isResolved;
 
+    // TODO: move side effects to factory?
     constructor(
-        IOracle _oracle,
+        ICFMOracleAdapter _oracleAdapter,
         ConditionalTokens _conditionalTokens,
-        MultiCategoricalQuestion memory _decisionMarketQuestion,
-        ScalarQuestion memory _childQuestion
+        CFMDecisionQuestionParams memory _decisionQuestionParams,
+        CFMConditionalQuestionParams memory _conditionalQuestionParams
     ) {
-        oracle = _oracle;
+        oracleAdapter = _oracleAdapter;
         conditionalTokens = ConditionalTokens(_conditionalTokens);
-        childQuestion = _childQuestion;
-        question = _decisionMarketQuestion.text;
 
-        // FIXME: Still missing: oracle question `prepareQuestion`.
+        // FIXME: how to make it so that the oracle returns an outcome from a
+        // list of outcomes?
+        // FIXME store decisionQuestionId and refactor resolve
+        //bytes32 decisionQuestionParams =
+        //    oracle.formatDecisionQuestionParams(_decisionQuestion.roundName, _decisionQuestion.outcomeNames);
+        bytes32 decisionQuestionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);
+        //bytes32 decisionConditionId = deriveConditionId(decisionQuestionId);
 
-        // TODO: Check that this is safe, see Seer codebase: https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295
         conditionalTokens.prepareCondition(
-            address(oracle),
-            keccak256(
-                abi.encode(
-                    oracle.encodeMultiCategoricalQuestion(
-                        _decisionMarketQuestion.text, _decisionMarketQuestion.outcomes
-                    )
-                )
-            ),
-            _decisionMarketQuestion.outcomes.length
+            address(oracleAdapter), decisionQuestionId, _decisionQuestionParams.outcomeNames.length
         );
 
-        for (uint256 i = 0; i < _decisionMarketQuestion.outcomes.length; i++) {
-            ConditionalScalarMarket newMarket = new ConditionalScalarMarket(
-                oracle, conditionalTokens, childQuestion, _decisionMarketQuestion.outcomes[i]
+        for (uint256 i = 0; i < _decisionQuestionParams.outcomeNames.length; i++) {
+            outcomes[outcomeCount] = new ConditionalScalarMarket(
+                oracleAdapter, conditionalTokens, _conditionalQuestionParams, _decisionQuestionParams.outcomeNames[i]
             );
-            outcomes[outcomeCount] = newMarket;
             outcomeCount++;
         }
     }
 
     // Process for a resolver: call submitAnswer on Reality then resolve here
-    function resolve(bytes32 questionId, uint256 numOutcomes) external {
+    // FIXME: no arguments needed
+    function resolve(bytes32 decisionQuestionId, uint256 numOutcomes) external {
         // TODO Validate questionID
-        uint256 answer = uint256(oracle.resultForOnceSettled(questionId));
+        uint256 answer = uint256(oracleAdapter.resultForOnceSettled(decisionQuestionId));
         uint256[] memory payouts = new uint256[](numOutcomes + 1);
 
-        if (answer == uint256(oracle.getInvalidValue())) {
+        if (answer == uint256(oracleAdapter.getInvalidValue())) {
             // FIXME: remove the INVALID_RESULT case
             // the last outcome is INVALID_RESULT.
             payouts[numOutcomes] = 1;
@@ -74,10 +74,14 @@ contract DecisionMarket is IMarket {
             }
         }
 
-        conditionalTokens.reportPayouts(questionId, payouts);
+        conditionalTokens.reportPayouts(decisionQuestionId, payouts);
     }
 
     function getResolved() public view returns (bool) {
         return isResolved;
     }
+
+    //function deriveConditionId(uint256 decisionQuestionId) private view returns (bytes32) {
+    //    return keccak256(abi.encode(decisionQuestionId, address(_oracle), _decisionQuestion.outcomeNames.length));
+    //}
 }
