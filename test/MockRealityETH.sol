@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: MIT
+/* solhint-disable var-name-mixedcase, no-unused-vars */
+pragma solidity ^0.8.20;
+
+import {IRealityETH} from "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
+
+contract MockRealityETH is IRealityETH {
+    function claimWinnings(
+        bytes32 question_id,
+        bytes32[] calldata history_hashes,
+        address[] calldata addrs,
+        uint256[] calldata bonds,
+        bytes32[] calldata answers
+    ) external override {
+        // Mock implementation
+    }
+
+    function getFinalAnswerIfMatches(bytes32, bytes32, address, uint32, uint256)
+        external
+        pure
+        override
+        returns (bytes32)
+    {
+        return bytes32(0);
+    }
+
+    function getBounty(bytes32) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function getArbitrator(bytes32) external pure override returns (address) {
+        return address(0);
+    }
+
+    function getBond(bytes32) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function claimMultipleAndWithdrawBalance(
+        bytes32[] calldata question_ids,
+        uint256[] calldata lengths,
+        bytes32[] calldata hist_hashes,
+        address[] calldata addrs,
+        uint256[] calldata bonds,
+        bytes32[] calldata answers
+    ) external override {
+        // Mock implementation
+    }
+
+    function withdraw() external override {
+        // Mock implementation
+    }
+
+    function submitAnswerReveal(bytes32 question_id, bytes32 answer, uint256 nonce, uint256 bond) external override {
+        // Mock implementation
+    }
+
+    function setQuestionFee(uint256 fee) external override {
+        // Mock implementation
+    }
+
+    function template_hashes(uint256) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function getContentHash(bytes32) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function question_claims(bytes32)
+        external
+        pure
+        override
+        returns (address payee, uint256 last_bond, uint256 queued_funds)
+    {
+        return (address(0), 0, 0);
+    }
+
+    function fundAnswerBounty(bytes32 question_id) external payable override {
+        // Mock implementation
+    }
+
+    function arbitrator_question_fees(address) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function balanceOf(address) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function askQuestion(
+        uint256 template_id,
+        string calldata question,
+        address arbitrator,
+        uint32 timeout,
+        uint32 opening_ts,
+        uint256 nonce
+    ) external payable override returns (bytes32) {
+        return keccak256(abi.encodePacked(template_id, question, arbitrator, timeout, opening_ts, nonce));
+    }
+
+    function submitAnswer(bytes32 question_id, bytes32 answer, uint256 max_previous) external payable override {
+        // Mock implementation
+    }
+
+    function submitAnswerFor(bytes32 question_id, bytes32 answer, uint256 max_previous, address answerer)
+        external
+        payable
+        override
+    {
+        // Mock implementation
+    }
+
+    function isFinalized(bytes32) external pure override returns (bool) {
+        return false;
+    }
+
+    function getHistoryHash(bytes32) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function commitments(bytes32)
+        external
+        pure
+        override
+        returns (uint32 reveal_ts, bool is_revealed, bytes32 revealed_answer)
+    {
+        return (0, false, bytes32(0));
+    }
+
+    function createTemplate(string calldata) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function getBestAnswer(bytes32) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function isPendingArbitration(bytes32) external pure override returns (bool) {
+        return false;
+    }
+
+    function questions(bytes32)
+        external
+        pure
+        override
+        returns (
+            bytes32 content_hash,
+            address arbitrator,
+            uint32 opening_ts,
+            uint32 timeout,
+            uint32 finalize_ts,
+            bool is_pending_arbitration,
+            uint256 bounty,
+            bytes32 best_answer,
+            bytes32 history_hash,
+            uint256 bond,
+            uint256 min_bond
+        )
+    {
+        return (bytes32(0), address(0), 0, 0, 0, false, 0, bytes32(0), bytes32(0), 0, 0);
+    }
+
+    function getOpeningTS(bytes32) external pure override returns (uint32) {
+        return 0;
+    }
+
+    function getTimeout(bytes32) external pure override returns (uint32) {
+        return 0;
+    }
+
+    function createTemplateAndAskQuestion(
+        string calldata content,
+        string calldata question,
+        address arbitrator,
+        uint32 timeout,
+        uint32 opening_ts,
+        uint256 nonce
+    ) external payable override returns (bytes32) {
+        return keccak256(abi.encodePacked(content, question, arbitrator, timeout, opening_ts, nonce));
+    }
+
+    function getFinalAnswer(bytes32) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function getFinalizeTS(bytes32) external pure override returns (uint32) {
+        return 0;
+    }
+
+    function templates(uint256) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function resultFor(bytes32) external pure override returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function submitAnswerCommitment(bytes32 question_id, bytes32 answer_hash, uint256 max_previous, address _answerer)
+        external
+        payable
+        override
+    {
+        // Mock implementation
+    }
+
+    function notifyOfArbitrationRequest(bytes32 question_id, address requester, uint256 max_previous)
+        external
+        override
+    {
+        // Mock implementation
+    }
+
+    function submitAnswerByArbitrator(bytes32 question_id, bytes32 answer, address answerer) external override {
+        // Mock implementation
+    }
+
+    function assignWinnerAndSubmitAnswerByArbitrator(
+        bytes32 question_id,
+        bytes32 answer,
+        address payee_if_wrong,
+        bytes32 last_history_hash,
+        bytes32 last_answer_or_commitment_id,
+        address last_answerer
+    ) external override {
+        // Mock implementation
+    }
+
+    function cancelArbitration(bytes32 question_id) external override {
+        // Mock implementation
+    }
+
+    // Add these functions to MockRealityETH
+
+    function askQuestionWithMinBond(uint256, string calldata, address, uint32, uint32, uint256, uint256)
+        external
+        payable
+        returns (bytes32)
+    {
+        return bytes32("minbondreturn");
+    }
+
+    function getMinBond(bytes32) external pure returns (uint256) {
+        return 0;
+    }
+
+    function isSettledTooSoon(bytes32) external pure returns (bool) {
+        return false;
+    }
+
+    function reopenQuestion(uint256, string calldata, address, uint32, uint32, uint256, uint256, bytes32)
+        external
+        payable
+        returns (bytes32)
+    {
+        return bytes32(0);
+    }
+
+    function reopened_questions(bytes32) external pure returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function reopener_questions(bytes32) external pure returns (bool) {
+        return false;
+    }
+
+    function resultForOnceSettled(bytes32) external pure returns (bytes32) {
+        return bytes32(0);
+    }
+}

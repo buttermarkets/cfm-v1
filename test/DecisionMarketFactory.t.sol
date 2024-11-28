@@ -38,7 +38,7 @@ contract DecisionMarketFactoryTest is Test {
         realityETH = new RealityETH_v3_0();
 
         // Deploy the RealityAdapter with Reality_v3
-        oracleAdapter = new CFMRealityAdapter(IRealitio(address(realityETH)), address(0x00), 1, 2, 123, 321);
+        oracleAdapter = new CFMRealityAdapter(IRealityETH(address(realityETH)), address(0x00), 1, 2, 123, 321);
 
         // Deploy the DecisionMarketFactory with the RealityAdapter and ConditionalTokens
         factory = new DecisionMarketFactory(ICFMOracleAdapter(address(oracleAdapter)), conditionalTokens);

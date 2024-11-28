@@ -15,7 +15,7 @@ import "./QuestionTypes.sol";
 contract CFMRealityAdapter is ICFMOracleAdapter {
     string private constant SEPARATOR = "\u241f";
 
-    IRealitio public immutable oracle;
+    IRealityETH public immutable oracle;
     address public immutable arbitrator;
     uint256 public immutable decisionTemplateId;
     uint256 public immutable metricTemplateId;
@@ -23,7 +23,7 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
     uint256 public immutable minBond;
 
     constructor(
-        IRealitio _oracle,
+        IRealityETH _oracle,
         address _arbitrator,
         uint256 _decisionTemplateId,
         uint256 _metricTemplateId,
