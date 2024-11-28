@@ -6,11 +6,11 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ConditionalTokens, CTHelpers} from "./ConditionalTokens.sol";
 
 import {FixedProductMarketMaker, FixedProductMarketMakerData} from "./FixedProductMarketMaker.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC1155/utils/ERC1155Holder.sol";
+import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Create2CloneFactory} from "./Create2CloneFactory.sol";
 
 contract FPMMDeterministicFactory is Create2CloneFactory, FixedProductMarketMakerData, ERC1155Holder {

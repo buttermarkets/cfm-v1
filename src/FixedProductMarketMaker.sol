@@ -7,9 +7,9 @@
 pragma solidity ^0.8.0;
 
 import {ConditionalTokens} from "./ConditionalTokens.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC20/ERC20.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC1155/utils/ERC1155Holder.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "./SafeMath.sol";
 
 library CeilDiv {

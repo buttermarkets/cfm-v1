@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std-1.9.4/src/Script.sol";
+import "forge-std/src/Script.sol";
 import "../src/ConditionalTokens.sol";
 import "../src/FPMMDeterministicFactory.sol";
 import "../src/RealitioProxy.sol";
 import "../src/FixedProductMarketMaker.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC20/ERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "../test/mocks/MockRealitio.sol";
 import "../src/IConditionalTokens.sol";
 

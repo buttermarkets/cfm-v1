@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// Import Foundry's Test library
-import "forge-std-1.9.4/src/Test.sol";
+import "forge-std/src/Test.sol";
 
-// Import the contracts to be tested
 import "src/butter-v1/DecisionMarketFactory.sol";
 import "src/butter-v1/DecisionMarket.sol";
 import "src/butter-v1/ConditionalScalarMarket.sol";
 import "src/butter-v1/CFMRealityAdapter.sol";
 import "src/ConditionalTokens.sol";
 
-// Import interfaces if necessary
 import "src/butter-v1/interfaces/ICFMOracleAdapter.sol";
 
 import "./Reality_v3.sol"; // Updated import

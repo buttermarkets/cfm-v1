@@ -3,7 +3,13 @@ name = "@openzeppelin-contracts"
 version = "5.0.2"
 url = "https://soldeer-revisions.s3.amazonaws.com/@openzeppelin-contracts/5_0_2_14-03-2024_06:11:59_contracts.zip"
 checksum = "8bc4f0acc7c187771b878d46f7de4bfad1acad2eb5d096d9d05d34035853f5c3"
-integrity = "5b5e96e7d7a7349fb2057350843668196e8863b5095b177f28f67d05942f7875"
+integrity = "55881f6114aa36158566ef52b486d9d96b217c3e47d0e24bbd4994a8cfb5ee7c"
+
+[[dependencies]]
+name = "@realityeth"
+version = "3.0.61"
+git = "https://github.com/RealityETH/reality-eth-monorepo.git"
+rev = "c5abe9c19fc6217e9636838e3cf0087e93bb6621"
 
 [[dependencies]]
 name = "forge-std"

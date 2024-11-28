@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "../IRealitio.sol";
+import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
 import "./interfaces/ICFMOracleAdapter.sol";
 import "./ConditionalScalarMarket.sol";
 import "./QuestionTypes.sol";

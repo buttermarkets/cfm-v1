@@ -6,11 +6,11 @@
 
 pragma solidity ^0.8.1;
 
-import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ConditionalTokens, CTHelpers} from "./ConditionalTokens.sol";
 import {ConstructedCloneFactory} from "./ConstructedCloneFactory.sol";
 import {FixedProductMarketMaker, FixedProductMarketMakerData} from "./FixedProductMarketMaker.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin-contracts/token/ERC1155/IERC1155Receiver.sol";
 
 contract FixedProductMarketMakerFactory is ConstructedCloneFactory, FixedProductMarketMakerData {
     event FixedProductMarketMakerCreation(

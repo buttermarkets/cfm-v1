@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// FIXME remove this file
 
 pragma solidity ^0.8.0;
 

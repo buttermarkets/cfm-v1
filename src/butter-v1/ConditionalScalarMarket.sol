@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 // TODO: use explicit imports
-import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "./QuestionTypes.sol";
 import "./interfaces/ICFMOracleAdapter.sol";
 import "./interfaces/IDecisionMarket.sol";

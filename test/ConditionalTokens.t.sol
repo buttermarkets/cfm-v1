@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std-1.9.4/src/Test.sol";
+import "forge-std/src/Test.sol";
 
 import "../src/ConditionalTokens.sol";
 

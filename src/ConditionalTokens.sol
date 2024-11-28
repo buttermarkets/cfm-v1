@@ -6,8 +6,8 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC1155/extensions/ERC1155Burnable.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "./CTHelpers.sol";
 import "./SafeMath.sol";
 
