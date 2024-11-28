@@ -12,6 +12,9 @@ contract ConditionalScalarMarket is IDecisionMarket {
     string public marketName;
     ICFMOracleAdapter public immutable oracleAdapter;
     ConditionalTokens public immutable conditionalTokens;
+    bytes32 public immutable questionId;
+    uint256 public immutable minValue;
+    uint256 public immutable maxValue;
 
     bool public isResolved;
 
@@ -23,29 +26,33 @@ contract ConditionalScalarMarket is IDecisionMarket {
     ) {
         oracleAdapter = _oracleAdapter;
         conditionalTokens = _conditionalTokens;
+        minValue = _conditionalQuestionParams.minValue;
+        maxValue = _conditionalQuestionParams.maxValue;
 
-        bytes32 metricQuestionId = oracleAdapter.askMetricQuestion(_conditionalQuestionParams, _outcomeName);
+        questionId = oracleAdapter.askMetricQuestion(_conditionalQuestionParams, _outcomeName);
 
-        conditionalTokens.prepareCondition(address(oracleAdapter), metricQuestionId, 2);
+        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, 2);
 
         // TODO: This would call FixedProductMarketMakerFactory
     }
 
-    // FIXME: arguments aren't needed
-    function resolve(bytes32 questionId, uint256 low, uint256 high) external {
-        uint256 answer = uint256(oracleAdapter.resultForOnceSettled(questionId));
+    function resolve() external {
+        bytes32 answer = oracleAdapter.getAnswer(questionId);
         uint256[] memory payouts = new uint256[](3);
 
-        if (answer == uint256(oracleAdapter.getInvalidValue())) {
-            // the last outcome is INVALID_RESULT.
-            payouts[2] = 1;
-        } else if (answer <= low) {
-            payouts[0] = 1;
-        } else if (answer >= high) {
-            payouts[1] = 1;
-        } else {
-            payouts[0] = high - answer;
-            payouts[1] = answer - low;
+        // If the answer is invalid, no payouts are returned.
+        // TODO: test all cases, including invalid. In invalid, the user should
+        // still be able to merge positions.
+        if (!oracleAdapter.isInvalid(answer)) {
+            uint256 numericAnswer = uint256(answer);
+            if (numericAnswer <= minValue) {
+                payouts[0] = 1;
+            } else if (numericAnswer >= maxValue) {
+                payouts[1] = 1;
+            } else {
+                payouts[0] = maxValue - numericAnswer;
+                payouts[1] = numericAnswer - minValue;
+            }
         }
 
         conditionalTokens.reportPayouts(questionId, payouts);

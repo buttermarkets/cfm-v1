@@ -111,14 +111,12 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
     }
 
     /// @dev This is not-reverting only when the question is finalized in Reality.
-    // TODO: rename
     // TODO: QA the functioning of this.
-    function resultForOnceSettled(bytes32 questionID) public view returns (bytes32) {
+    function getAnswer(bytes32 questionID) public view returns (bytes32) {
         return oracle.resultForOnceSettled(questionID);
     }
 
-    // TODO: refactor: isInvalid
-    function getInvalidValue() public pure returns (bytes32) {
-        return 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+    function isInvalid(bytes32 answer) public pure returns (bool) {
+        return (uint256(answer) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     }
 }

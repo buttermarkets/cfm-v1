@@ -13,7 +13,7 @@ interface ICFMOracleAdapter {
         string memory outcomeName
     ) external returns (bytes32);
 
-    function resultForOnceSettled(bytes32 questionID) external view returns (bytes32);
+    function getAnswer(bytes32 questionID) external view returns (bytes32);
 
-    function getInvalidValue() external pure returns (bytes32);
+    function isInvalid(bytes32 answer) external pure returns (bool);
 }

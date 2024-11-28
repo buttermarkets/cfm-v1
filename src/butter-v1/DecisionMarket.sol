@@ -13,10 +13,13 @@ import "../ConditionalTokens.sol";
 // Conditional{,Question}. This should happen in an abstract DecisionMarket
 // contract that is implemented by this one.
 contract CFMDecisionMarket is IDecisionMarket {
-    ICFMOracleAdapter public oracleAdapter;
-    ConditionalTokens public conditionalTokens;
+    ICFMOracleAdapter public immutable oracleAdapter;
+    ConditionalTokens public immutable conditionalTokens;
+    bytes32 public immutable questionId;
+    uint256 public immutable outcomeCount;
+
     mapping(uint256 => ConditionalScalarMarket) public outcomes;
-    uint256 public outcomeCount;
+
     bool public isResolved;
 
     // TODO: move side effects to factory?
@@ -28,60 +31,38 @@ contract CFMDecisionMarket is IDecisionMarket {
     ) {
         oracleAdapter = _oracleAdapter;
         conditionalTokens = ConditionalTokens(_conditionalTokens);
+        outcomeCount = _decisionQuestionParams.outcomeNames.length;
 
-        // FIXME: how to make it so that the oracle returns an outcome from a
-        // list of outcomes?
-        // FIXME store decisionQuestionId and refactor resolve
-        //bytes32 decisionQuestionParams =
-        //    oracle.formatDecisionQuestionParams(_decisionQuestion.roundName, _decisionQuestion.outcomeNames);
-        bytes32 decisionQuestionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);
-        //bytes32 decisionConditionId = deriveConditionId(decisionQuestionId);
+        questionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);
 
-        conditionalTokens.prepareCondition(
-            address(oracleAdapter), decisionQuestionId, _decisionQuestionParams.outcomeNames.length
-        );
+        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, outcomeCount);
 
-        for (uint256 i = 0; i < _decisionQuestionParams.outcomeNames.length; i++) {
-            outcomes[outcomeCount] = new ConditionalScalarMarket(
+        for (uint256 i = 0; i < outcomeCount; i++) {
+            outcomes[i] = new ConditionalScalarMarket(
                 oracleAdapter, conditionalTokens, _conditionalQuestionParams, _decisionQuestionParams.outcomeNames[i]
             );
-            outcomeCount++;
         }
     }
 
     // Process for a resolver: call submitAnswer on Reality then resolve here
-    // FIXME: no arguments needed
-    function resolve(bytes32 decisionQuestionId, uint256 numOutcomes) external {
-        // TODO Validate questionID
-        uint256 answer = uint256(oracleAdapter.resultForOnceSettled(decisionQuestionId));
-        uint256[] memory payouts = new uint256[](numOutcomes + 1);
+    function resolve() external {
+        bytes32 answer = oracleAdapter.getAnswer(questionId);
+        uint256[] memory payouts = new uint256[](outcomeCount);
 
-        if (answer == uint256(oracleAdapter.getInvalidValue())) {
-            // FIXME: remove the INVALID_RESULT case
-            // the last outcome is INVALID_RESULT.
-            payouts[numOutcomes] = 1;
-        } else {
-            bool allZeroes = true;
+        // TODO: test!
+        // TODO: test the invalid case.
+        if (!oracleAdapter.isInvalid(answer)) {
+            uint256 numericAnswer = uint256(answer);
 
-            for (uint256 i = 0; i < numOutcomes; i++) {
-                payouts[i] = (answer >> i) & 1;
-                allZeroes = allZeroes && payouts[i] == 0;
-            }
-
-            if (allZeroes) {
-                // invalid result.
-                payouts[numOutcomes] = 1;
+            for (uint256 i = 0; i < outcomeCount; i++) {
+                payouts[i] = (numericAnswer >> i) & 1;
             }
         }
 
-        conditionalTokens.reportPayouts(decisionQuestionId, payouts);
+        conditionalTokens.reportPayouts(questionId, payouts);
     }
 
     function getResolved() public view returns (bool) {
         return isResolved;
     }
-
-    //function deriveConditionId(uint256 decisionQuestionId) private view returns (bytes32) {
-    //    return keccak256(abi.encode(decisionQuestionId, address(_oracle), _decisionQuestion.outcomeNames.length));
-    //}
 }
