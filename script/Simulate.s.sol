@@ -7,8 +7,8 @@ import "../src/FPMMDeterministicFactory.sol";
 import "../src/RealitioProxy.sol";
 import "../src/FixedProductMarketMaker.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
-import "../test/mocks/MockRealitio.sol";
 import "../src/IConditionalTokens.sol";
+import "../test/FakeRealityETH.sol";
 
 // Simple ERC20 token for collateral
 contract CollateralToken is ERC20 {

@@ -83,6 +83,7 @@ The system follows these general steps:
 - [x] Structure comments in FIXME/TODO
 - [x] What to do about INVALID?
     - [ ] Build some docs
+    - [ ] Make test scenarios or script simulations for these cases
 - [x] Finish oracle integration & prepareQuestion
     - [x] Create template in Reality
         - 3 placeholders: "What will be the %s of %s?"
@@ -103,7 +104,8 @@ The system follows these general steps:
 - [ ] Clean up/secure codebase
     - [ ] Review all comments
     - [ ] Review comments in the Seer codebase
-    - [ ] Go through best practices
+    - [ ] Go through best practices (security, tests, conventions)
+    - [ ] Compare to tests in Seer
 - [ ] Update license
     - [ ] Update license
     - [ ] Squash all commits

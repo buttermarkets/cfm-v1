@@ -5,11 +5,11 @@ import {Test} from "forge-std/src/Test.sol";
 
 import "../src/butter-v1/CFMRealityAdapter.sol";
 import "../src/ConditionalTokens.sol";
-import {MockRealityETH} from "./MockRealityETH.sol";
+import {FakeRealityETH} from "./FakeRealityETH.sol";
 
-contract CFMRealityAdapterTest is Test {
+contract CFMRealityAdapterWithMockTest is Test {
     CFMRealityAdapter realityAdapter;
-    MockRealityETH mockRealitio;
+    FakeRealityETH fakeRealityEth;
     ConditionalTokens conditionalTokens;
 
     address arbitrator = address(0x123);
@@ -19,10 +19,10 @@ contract CFMRealityAdapterTest is Test {
     uint256 minBond = 1 ether;
 
     function setUp() public {
-        mockRealitio = new MockRealityETH();
+        fakeRealityEth = new FakeRealityETH();
         conditionalTokens = new ConditionalTokens();
         realityAdapter = new CFMRealityAdapter(
-            IRealityETH(address(mockRealitio)),
+            IRealityETH(address(fakeRealityEth)),
             arbitrator,
             decisionTemplateId,
             metricTemplateId,
@@ -32,7 +32,7 @@ contract CFMRealityAdapterTest is Test {
     }
 
     function testConstructor() public view {
-        assertEq(address(realityAdapter.oracle()), address(mockRealitio));
+        assertEq(address(realityAdapter.oracle()), address(fakeRealityEth));
         assertEq(realityAdapter.arbitrator(), arbitrator);
         assertEq(realityAdapter.decisionTemplateId(), decisionTemplateId);
         assertEq(realityAdapter.metricTemplateId(), metricTemplateId);
@@ -50,16 +50,47 @@ contract CFMRealityAdapterTest is Test {
         decisionQuestionParams.outcomeNames[1] = "No";
 
         bytes32 questionId = realityAdapter.askDecisionQuestion(decisionQuestionParams);
-        //bytes32 expectedId = keccak256(
-        //    abi.encodePacked(
-        //        decisionTemplateId,
-        //        decisionQuestionParams.openingTime,
-        //        string(abi.encodePacked("Round 1", "\u241f", "\"Yes\",\"No\""))
-        //    )
-        //);
 
+        // TODO: add integrated test.
         assertEq(questionId, bytes32("minbondreturn"));
     }
 
-    // Additional tests can be added here
+    function testAskMetricQuestion() public {
+        CFMConditionalQuestionParams memory params = CFMConditionalQuestionParams({
+            metricName: "ETH price",
+            startDate: "2024-01-01",
+            endDate: "2025-01-01",
+            minValue: 0,
+            maxValue: 10000000,
+            openingTime: uint32(block.timestamp + 1000)
+        });
+
+        bytes32 questionId = realityAdapter.askMetricQuestion(params, "Above $2000");
+        assertEq(questionId, bytes32("minbondreturn"));
+    }
+
+    function testGetAnswer() public view {
+        bytes32 questionId = bytes32("someQuestionId");
+        bytes32 answer = realityAdapter.getAnswer(questionId);
+        assertEq(answer, bytes32(0)); // Adjust expected value based on mock
+    }
+
+    function testIsInvalid() public view {
+        bytes32 invalidAnswer = bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff));
+        assertTrue(realityAdapter.isInvalid(invalidAnswer));
+
+        bytes32 validAnswer = bytes32(uint256(1));
+        assertFalse(realityAdapter.isInvalid(validAnswer));
+    }
+
+    function testEmptyOutcomeNames() public {
+        CFMDecisionQuestionParams memory params = CFMDecisionQuestionParams({
+            roundName: "Round 1",
+            outcomeNames: new string[](0),
+            openingTime: uint32(block.timestamp + 1000)
+        });
+
+        vm.expectRevert(); // Should revert with empty outcomes
+        realityAdapter.askDecisionQuestion(params);
+    }
 }

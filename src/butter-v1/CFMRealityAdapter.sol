@@ -38,7 +38,7 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
         minBond = _minBond;
     }
 
-    // FIXME unit test
+    // TODO unit test
     function _formatDecisionQuestionParams(CFMDecisionQuestionParams calldata decisionQuestionParams)
         private
         pure

@@ -9,7 +9,6 @@ import "./interfaces/IDecisionMarket.sol";
 import "../ConditionalTokens.sol";
 
 contract ConditionalScalarMarket is IDecisionMarket {
-    string public marketName;
     ICFMOracleAdapter public immutable oracleAdapter;
     ConditionalTokens public immutable conditionalTokens;
     bytes32 public immutable questionId;
