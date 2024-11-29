@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./ConditionalScalarMarket.sol";
-import {ICFMOracleAdapter} from "./interfaces/ICFMOracleAdapter.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+
 import "./interfaces/IDecisionMarket.sol";
+import "./interfaces/ICFMOracleAdapter.sol";
 import "../ConditionalTokens.sol";
+import "../FixedProductMarketMakerFactory.sol";
+import "./ConditionalScalarMarket.sol";
 
 // TODO this is more a Flat CFM than a Decision Market. Think about making this a bit
 // more generic and Flat CFM being a special case. For now, how CFMDecisionQuestion is strcutured is
@@ -15,6 +18,8 @@ import "../ConditionalTokens.sol";
 contract CFMDecisionMarket is IDecisionMarket {
     ICFMOracleAdapter public immutable oracleAdapter;
     ConditionalTokens public immutable conditionalTokens;
+    FixedProductMarketMakerFactory public immutable fixedProductMarketMakerFactory;
+    IERC20 public immutable collateralToken;
     bytes32 public immutable questionId;
     uint256 public immutable outcomeCount;
 
@@ -26,6 +31,8 @@ contract CFMDecisionMarket is IDecisionMarket {
     constructor(
         ICFMOracleAdapter _oracleAdapter,
         ConditionalTokens _conditionalTokens,
+        FixedProductMarketMakerFactory _fixedProductMarketMakerFactory,
+        IERC20 _collateralToken,
         CFMDecisionQuestionParams memory _decisionQuestionParams,
         CFMConditionalQuestionParams memory _conditionalQuestionParams
     ) {
@@ -39,7 +46,11 @@ contract CFMDecisionMarket is IDecisionMarket {
 
         for (uint256 i = 0; i < outcomeCount; i++) {
             outcomes[i] = new ConditionalScalarMarket(
-                oracleAdapter, conditionalTokens, _conditionalQuestionParams, _decisionQuestionParams.outcomeNames[i]
+                oracleAdapter,
+                conditionalTokens,
+                _fixedProductMarketMakerFactory,
+                _conditionalQuestionParams,
+                _decisionQuestionParams.outcomeNames[i]
             );
         }
     }
@@ -60,9 +71,5 @@ contract CFMDecisionMarket is IDecisionMarket {
         }
 
         conditionalTokens.reportPayouts(questionId, payouts);
-    }
-
-    function getResolved() public view returns (bool) {
-        return isResolved;
     }
 }
