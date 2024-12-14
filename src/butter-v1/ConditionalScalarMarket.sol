@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 // TODO: use explicit imports whenever clearer.
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 import "../Wrapped1155Factory.sol";
 import "../ConditionalTokens.sol";
@@ -13,7 +14,7 @@ import {CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./Questio
 import "./interfaces/ICFMOracleAdapter.sol";
 import "./interfaces/IConditionalMarket.sol";
 
-contract ConditionalScalarMarket is IConditionalMarket {
+contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
     // DecisionMarket generic params:
     ICFMOracleAdapter public immutable oracleAdapter;
     ConditionalTokens public immutable conditionalTokens;
@@ -79,8 +80,8 @@ contract ConditionalScalarMarket is IConditionalMarket {
     }
 
     function _initializeCondition() private {
-        conditionalTokens.prepareCondition(address(this), questionId, 2);
-        conditionId = conditionalTokens.getConditionId(address(this), questionId, 2);
+        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, 2);
+        conditionId = conditionalTokens.getConditionId(address(oracleAdapter), questionId, 2);
     }
 
     function _initializeTokens(ConditionalMarketCTParams memory _conditionalTokensParams) private {

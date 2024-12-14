@@ -233,12 +233,19 @@ contract FakeRealityETH is IRealityETH {
 
     // Add these functions to MockRealityETH
 
-    function askQuestionWithMinBond(uint256, string calldata, address, uint32, uint32, uint256, uint256)
-        external
-        payable
-        returns (bytes32)
-    {
-        return bytes32("minbondreturn");
+    function askQuestionWithMinBond(
+        uint256 template_id,
+        string memory question,
+        address arbitrator,
+        uint32 timeout,
+        uint32 opening_ts,
+        uint256 nonce,
+        uint256 min_bond
+    ) external payable returns (bytes32) {
+        bytes32 content_hash = keccak256(abi.encodePacked(template_id, opening_ts, question));
+        bytes32 question_id =
+            keccak256(abi.encodePacked(content_hash, arbitrator, timeout, min_bond, address(this), msg.sender, nonce));
+        return question_id;
     }
 
     function getMinBond(bytes32) external pure returns (uint256) {

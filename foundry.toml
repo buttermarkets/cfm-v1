@@ -7,7 +7,7 @@ chain_id = 1
 auto_detect_solc = true
 via_ir = true
 optimizer = true
-optimizer_runs = 200
+optimizer_runs = 50 # TODO: 200
 libraries = []
 
 [soldeer]

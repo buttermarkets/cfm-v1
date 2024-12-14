@@ -49,8 +49,8 @@ contract CFMDecisionMarket is IDecisionMarket {
 
         questionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);
 
-        conditionalTokens.prepareCondition(address(this), questionId, outcomeCount);
-        conditionId = conditionalTokens.getConditionId(address(this), questionId, outcomeCount);
+        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, outcomeCount);
+        conditionId = conditionalTokens.getConditionId(address(oracleAdapter), questionId, outcomeCount);
 
         // Deploy nested conditional markets.
         for (uint256 i = 0; i < outcomeCount; i++) {

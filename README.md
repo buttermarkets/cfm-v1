@@ -91,24 +91,26 @@ The system follows these general steps:
             - Project name
     - [x] Put templateIds in OracleAdapter and not in DecisionMarket
     - [x] Collision problems
-- [ ] Try wrapping in erc20 => external trade, like Seer, with a Router
+- [ ] !Try wrapping in erc20 => external trade, like Seer, with a Router
     - [ ] Split/merge function that split the decision outcomes
     - [ ] Split/merge/redeem function that split the metric outcome
     - Note: the front-end will manage the dual-splitting.
-- [ ] Try FPMM with conditional tokens
+- [ ] !Try FPMM with conditional tokens
     - [ ] Split/merge function that split the decision outcomes
     - [ ] Check: the FPMM should be splitting the metric outcomes itself.
     - [ ] Redeem metric outcome.
-- [ ] Move the external contracts out of the codebase
+- [ ] !Simple integrated tests
+- [ ] !Move the external contracts out of the codebase
+- [ ] Write unit tests
+- [ ] QA
+    - [ ] Questions templates
+    - [ ] Trades
 - [ ] Add a play money ERC20 with limited transfers, controlled by a multisig
 - [ ] Make a View and events
     - [ ] events need to be done during coding
     - [ ] view can be done later
 - [ ] [nth] Take a look into cloning contracts for gas savings
     - [ ] https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L18C11-L18C17
-- [ ] QA
-    - [ ] Questions templates
-    - [ ] Trades
 - [ ] Clean up/secure codebase
     - [ ] Review all comments
     - [ ] Review comments in the Seer codebase
