@@ -2,12 +2,16 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/src/Script.sol";
+import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
+import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
+
 import "../src/ConditionalTokens.sol";
 import "../src/FPMMDeterministicFactory.sol";
-import "../src/RealitioProxy.sol";
+import "../src/butter-v1/interfaces/ICFMOracleAdapter.sol";
 import "../src/FixedProductMarketMaker.sol";
-import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "../src/IConditionalTokens.sol";
+import "../src/butter-v1/CFMRealityAdapter.sol";
+
 import "../test/FakeRealityETH.sol";
 
 // Simple ERC20 token for collateral
@@ -20,10 +24,10 @@ contract CollateralToken is ERC20 {
 contract PredictionMarketWorkflowSimulator is Script {
     ConditionalTokens public conditionalTokens;
     FPMMDeterministicFactory public fpmmFactory;
-    RealitioProxy public realitioProxy;
+    ICFMOracleAdapter public oracleAdapter;
     FixedProductMarketMaker public marketMaker;
     CollateralToken public collateralToken;
-    MockRealitio public mockRealitio;
+    FakeRealityETH public fakeRealityEth;
 
     bytes32 public constant QUESTION_ID = bytes32("What will be the outcome?");
     uint256 public constant OUTCOME_SLOT_COUNT = 2;
@@ -44,18 +48,19 @@ contract PredictionMarketWorkflowSimulator is Script {
         fpmmFactory = new FPMMDeterministicFactory();
         assert(address(fpmmFactory) != address(0));
 
-        // Step 4: Deploy MockRealitio
-        mockRealitio = new MockRealitio();
-        assert(address(mockRealitio) != address(0));
+        // Step 4: Deploy FakeRealityETH
+        fakeRealityEth = new FakeRealityETH();
+        assert(address(fakeRealityEth) != address(0));
 
-        // Step 5: Deploy RealitioProxy
-        realitioProxy =
-            new RealitioProxy(IConditionalTokens(address(conditionalTokens)), IRealitio(address(mockRealitio)), 42);
-        assert(address(realitioProxy) != address(0));
+        // Step 5: Deploy CFM reality adapter
+        oracleAdapter = new CFMRealityAdapter(
+            IRealityETH(address(fakeRealityEth)), fakeRealityEth.getArbitrator(""), 42, 42, 42, 42
+        );
+        assert(address(oracleAdapter) != address(0));
 
         // Step 6: Prepare condition
-        conditionalTokens.prepareCondition(address(realitioProxy), QUESTION_ID, OUTCOME_SLOT_COUNT);
-        bytes32 conditionId = CTHelpers.getConditionId(address(realitioProxy), QUESTION_ID, OUTCOME_SLOT_COUNT);
+        conditionalTokens.prepareCondition(address(oracleAdapter), QUESTION_ID, OUTCOME_SLOT_COUNT);
+        bytes32 conditionId = CTHelpers.getConditionId(address(oracleAdapter), QUESTION_ID, OUTCOME_SLOT_COUNT);
         assert(conditionalTokens.getOutcomeSlotCount(conditionId) == OUTCOME_SLOT_COUNT);
 
         // Step 7: Create market maker
@@ -96,11 +101,13 @@ contract PredictionMarketWorkflowSimulator is Script {
         assert(marketMaker.balanceOf(address(this)) > 0);
 
         // Step 10: Resolve condition
-        uint256[] memory payouts = new uint256[](OUTCOME_SLOT_COUNT);
-        payouts[0] = 1;
-        payouts[1] = 0;
-        mockRealitio.setResult(QUESTION_ID, bytes32(uint256(1)));
-        realitioProxy.resolve(QUESTION_ID, 0, "What will be the outcome?", OUTCOME_SLOT_COUNT);
+        // Mock oracle return value:
+        //uint256[] memory payouts = new uint256[](OUTCOME_SLOT_COUNT);
+        //payouts[0] = 1;
+        //payouts[1] = 0;
+        //fakeRealityEth.setResult(QUESTION_ID, bytes32(uint256(1)));
+        // Resolve:
+        //oracleAdapter.resolve(QUESTION_ID, 0, "What will be the outcome?", OUTCOME_SLOT_COUNT);
         assert(conditionalTokens.payoutDenominator(conditionId) > 0);
 
         // Step 11: Redeem winnings

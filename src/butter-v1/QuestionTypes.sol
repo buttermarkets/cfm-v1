@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+
 struct CFMDecisionQuestionParams {
     string roundName;
     string[] outcomeNames;
@@ -14,4 +16,11 @@ struct CFMConditionalQuestionParams {
     uint256 minValue;
     uint256 maxValue;
     uint32 openingTime;
+}
+
+struct ConditionalMarketCTParams {
+    bytes32 parentConditionId;
+    string outcomeName;
+    uint256 outcomeIndex;
+    IERC20 collateralToken;
 }

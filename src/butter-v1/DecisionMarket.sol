@@ -1,10 +1,18 @@
+// TODO: update license.
 // SPDX-License-Identifier: MIT
+// TODO: move everything to latest version
 pragma solidity ^0.8.0;
 
-import "./ConditionalScalarMarket.sol";
-import {ICFMOracleAdapter} from "./interfaces/ICFMOracleAdapter.sol";
-import "./interfaces/IDecisionMarket.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+
+import "../Wrapped1155Factory.sol";
 import "../ConditionalTokens.sol";
+//import "../FixedProductMarketMakerFactory.sol";
+
+import {CFMDecisionQuestionParams, CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
+import "./interfaces/IDecisionMarket.sol";
+import "./interfaces/ICFMOracleAdapter.sol";
+import "./ConditionalScalarMarket.sol";
 
 // TODO this is more a Flat CFM than a Decision Market. Think about making this a bit
 // more generic and Flat CFM being a special case. For now, how CFMDecisionQuestion is strcutured is
@@ -15,17 +23,23 @@ import "../ConditionalTokens.sol";
 contract CFMDecisionMarket is IDecisionMarket {
     ICFMOracleAdapter public immutable oracleAdapter;
     ConditionalTokens public immutable conditionalTokens;
+    // `questionId` and `outcomeCount` are recorded at construction, then
+    // used to resolve the market.
     bytes32 public immutable questionId;
     uint256 public immutable outcomeCount;
+    bytes32 public immutable conditionId;
 
     mapping(uint256 => ConditionalScalarMarket) public outcomes;
 
     bool public isResolved;
 
-    // TODO: move side effects to factory?
+    // TODO: move side effects to factory
     constructor(
         ICFMOracleAdapter _oracleAdapter,
         ConditionalTokens _conditionalTokens,
+        //FixedProductMarketMakerFactory _fixedProductMarketMakerFactory,
+        Wrapped1155Factory _wrapped1155Factory,
+        IERC20 _collateralToken,
         CFMDecisionQuestionParams memory _decisionQuestionParams,
         CFMConditionalQuestionParams memory _conditionalQuestionParams
     ) {
@@ -35,11 +49,23 @@ contract CFMDecisionMarket is IDecisionMarket {
 
         questionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);
 
-        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, outcomeCount);
+        conditionalTokens.prepareCondition(address(this), questionId, outcomeCount);
+        conditionId = conditionalTokens.getConditionId(address(this), questionId, outcomeCount);
 
+        // Deploy nested conditional markets.
         for (uint256 i = 0; i < outcomeCount; i++) {
             outcomes[i] = new ConditionalScalarMarket(
-                oracleAdapter, conditionalTokens, _conditionalQuestionParams, _decisionQuestionParams.outcomeNames[i]
+                oracleAdapter,
+                conditionalTokens,
+                //_fixedProductMarketMakerFactory,
+                _wrapped1155Factory,
+                _conditionalQuestionParams,
+                ConditionalMarketCTParams({
+                    parentConditionId: conditionId,
+                    outcomeName: _decisionQuestionParams.outcomeNames[i],
+                    outcomeIndex: i,
+                    collateralToken: _collateralToken
+                })
             );
         }
     }
@@ -60,9 +86,5 @@ contract CFMDecisionMarket is IDecisionMarket {
         }
 
         conditionalTokens.reportPayouts(questionId, payouts);
-    }
-
-    function getResolved() public view returns (bool) {
-        return isResolved;
     }
 }

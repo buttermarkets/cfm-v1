@@ -2,7 +2,8 @@
 // This contract is based on the Conditional Token Framework by Gnosis.
 // Documentation: <https://docs.gnosis.io/conditionaltokens/>
 // Repository: <https://github.com/gnosis/conditional-tokens-market-makers>
-// Note: This contract is a port of the original work, with minor modifications for compatibility with the latest EVM and toolchain.
+// Note: This contract is a port of the original work, with minor modifications
+// for compatibility with the latest EVM and toolchain.
 
 pragma solidity ^0.8.0;
 
@@ -80,7 +81,14 @@ contract FixedProductMarketMaker is ERC20, ERC1155Holder {
             uint256[] memory partition = generateBasicPartition(outcomeSlotCounts[i]);
             for (uint256 j = 0; j < collectionIds[i].length; j++) {
                 conditionalTokens.splitPosition(
-                    collateralToken, collectionIds[i][j], conditionIds[i], partition, amount
+                    // parentCollectionId: collectionIds[i][j] <- how does it get recorded?
+                    // conditionId: conditionIds[i] <- why are there multiple conditions?
+                    // partition: parition, full partition ([1,2,4…])
+                    collateralToken,
+                    collectionIds[i][j],
+                    conditionIds[i],
+                    partition,
+                    amount
                 );
             }
         }
@@ -218,11 +226,13 @@ contract FixedProductMarketMaker is ERC20, ERC1155Holder {
         emit FPMMFundingRemoved(msg.sender, sendAmounts, collateralRemovedFromFeePool, sharesToBurn);
     }
 
-    function onERC1155Received(address operator, address from, uint256 id, uint256 value, bytes memory data)
-        public
-        override
-        returns (bytes4)
-    {
+    function onERC1155Received(
+        address operator,
+        address, /*from*/
+        uint256, /*id*/
+        uint256, /*value*/
+        bytes memory /*data*/
+    ) public view override returns (bytes4) {
         if (operator == address(this)) {
             return this.onERC1155Received.selector;
         }
@@ -232,10 +242,10 @@ contract FixedProductMarketMaker is ERC20, ERC1155Holder {
     function onERC1155BatchReceived(
         address operator,
         address from,
-        uint256[] memory ids,
-        uint256[] memory values,
-        bytes memory data
-    ) public override returns (bytes4) {
+        uint256[] memory, /*ids*/
+        uint256[] memory, /*values*/
+        bytes memory /*data*/
+    ) public view override returns (bytes4) {
         if (operator == address(this) && from == address(0)) {
             return this.onERC1155BatchReceived.selector;
         }

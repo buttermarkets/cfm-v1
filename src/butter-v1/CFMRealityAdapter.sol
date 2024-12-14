@@ -3,8 +3,7 @@ pragma solidity 0.8.20;
 
 import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
 import "./interfaces/ICFMOracleAdapter.sol";
-import "./ConditionalScalarMarket.sol";
-import "./QuestionTypes.sol";
+import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./QuestionTypes.sol";
 
 // The adapter component implements both client (CFM) interface
 // and service (Reality) interface and translates incoming and outgoing calls between client and service.

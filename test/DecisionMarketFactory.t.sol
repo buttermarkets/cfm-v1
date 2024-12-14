@@ -3,13 +3,15 @@ pragma solidity ^0.8.20;
 
 import "forge-std/src/Test.sol";
 import {RealityETH_v3_0} from "@realityeth/packages/contracts/flat/RealityETH-3.0.sol"; // Updated import;
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
+import "src/ConditionalTokens.sol";
+import "src/Wrapped1155Factory.sol";
 import "src/butter-v1/DecisionMarketFactory.sol";
 import "src/butter-v1/DecisionMarket.sol";
 import "src/butter-v1/ConditionalScalarMarket.sol";
 import "src/butter-v1/CFMRealityAdapter.sol";
-import "src/ConditionalTokens.sol";
-
 import "src/butter-v1/interfaces/ICFMOracleAdapter.sol";
 
 contract CFMDecisionMarket_ConstructorSpy is CFMDecisionMarket {
@@ -23,10 +25,18 @@ contract CFMDecisionMarket_ConstructorSpy is CFMDecisionMarket {
     constructor(
         ICFMOracleAdapter adapter,
         ConditionalTokens tokens,
+        Wrapped1155Factory wrapped1155Factory,
+        IERC20 collateralToken,
         CFMDecisionQuestionParams memory dParams,
         CFMConditionalQuestionParams memory cParams
-    ) CFMDecisionMarket(adapter, tokens, dParams, cParams) {
+    ) CFMDecisionMarket(adapter, tokens, wrapped1155Factory, collateralToken, dParams, cParams) {
         emit ConstructorCalled(adapter, tokens, dParams, cParams);
+    }
+}
+
+contract TestERC20 is ERC20 {
+    constructor() ERC20("Test Token", "TEST") {
+        _mint(msg.sender, 1000000e18);
     }
 }
 
@@ -35,6 +45,8 @@ contract DecisionMarketFactoryTest is Test {
     CFMRealityAdapter public oracleAdapter;
     ConditionalTokens public conditionalTokens;
     RealityETH_v3_0 public realityETH; // Instance of Reality_v3
+    Wrapped1155Factory public wrapped1155Factory;
+    IERC20 public collateralToken;
 
     address owner = address(0x1);
     address user = address(0x2);
@@ -55,12 +67,18 @@ contract DecisionMarketFactoryTest is Test {
         // Deploy the RealityETH_v3_0 contract.
         realityETH = new RealityETH_v3_0();
 
+        // Deploy the Wrapped1155Factory contract.
+        wrapped1155Factory = new Wrapped1155Factory();
         // Deploy the RealityAdapter with Reality_v3.
         oracleAdapter =
             new CFMRealityAdapter(IRealityETH(address(realityETH)), address(0x00), 4242, 2424, 1000, 10000000000);
 
+        // Deploy the collateral token.
+        collateralToken = new TestERC20();
+
         // Deploy the DecisionMarketFactory with the RealityAdapter and ConditionalTokens
-        factory = new DecisionMarketFactory(ICFMOracleAdapter(address(oracleAdapter)), conditionalTokens);
+        factory =
+            new DecisionMarketFactory(ICFMOracleAdapter(address(oracleAdapter)), conditionalTokens, wrapped1155Factory);
 
         // Label addresses for clarity in test outputs.
         vm.label(owner, "Owner");
@@ -102,7 +120,7 @@ contract DecisionMarketFactoryTest is Test {
 
         // Create the market with the shared outcomeNames array.
         vm.prank(owner);
-        factory.createMarket(decisionQuestionParams, conditionalQuestionParams);
+        factory.createMarket(decisionQuestionParams, conditionalQuestionParams, collateralToken);
 
         // TODO: test adding multiple markets. For that, atomize the test
         // contract first.

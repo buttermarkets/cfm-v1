@@ -2,7 +2,8 @@
 // This contract is based on the Conditional Token Framework by Gnosis.
 // Documentation: <https://docs.gnosis.io/conditionaltokens/>
 // Repository: <https://github.com/gnosis/conditional-tokens-market-makers>
-// Note: This contract is a port of the original work, with minor modifications for compatibility with the latest EVM and toolchain.
+// Note: This contract is a port of the original work, with minor modifications
+// for compatibility with the latest EVM and toolchain.
 
 pragma solidity ^0.8.0;
 
@@ -75,7 +76,7 @@ contract FPMMDeterministicFactory is Create2CloneFactory, FixedProductMarketMake
         }
     }
 
-    function onERC1155Received(address operator, address from, uint256 id, uint256 value, bytes memory data)
+    function onERC1155Received(address, /*operator*/ address, /*from*/ uint256 id, uint256 value, bytes memory data)
         public
         override
         returns (bytes4)
@@ -85,8 +86,8 @@ contract FPMMDeterministicFactory is Create2CloneFactory, FixedProductMarketMake
     }
 
     function onERC1155BatchReceived(
-        address operator,
-        address from,
+        address, /*operator*/
+        address, /*from*/
         uint256[] memory ids,
         uint256[] memory values,
         bytes memory data
