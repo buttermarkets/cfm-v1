@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
+import {IERC20Errors} from "@openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 
 import "../src/butter-v1/ConditionalScalarMarket.sol";
 import "../src/butter-v1/CFMRealityAdapter.sol";
@@ -18,6 +19,7 @@ contract TestToken is ERC20 {
     }
 }
 
+// TODO: fuzz
 contract ConditionalScalarMarketTest is Test {
     ConditionalScalarMarket market;
     ConditionalTokens conditionalTokens;
@@ -45,6 +47,15 @@ contract ConditionalScalarMarketTest is Test {
         wrapped1155Factory = new Wrapped1155Factory();
 
         oracleAdapter = new CFMRealityAdapter(IRealityETH(address(realityETH)), arbitrator, 2, 1, uint32(7 days), 1e18);
+
+        // Label addresses for clarity in test outputs.
+        vm.label(user, "User");
+        vm.label(arbitrator, "Arbitrator");
+        vm.label(address(collateralToken), "$COL");
+        vm.label(address(realityETH), "RealityETH");
+        vm.label(address(conditionalTokens), "ConditionalTokens");
+        vm.label(address(wrapped1155Factory), "Wrapped1155Factory");
+        vm.label(address(oracleAdapter), "CFMRealityAdapter");
 
         collateralToken.mint(user, AMOUNT);
 
@@ -86,7 +97,7 @@ contract ConditionalScalarMarketTest is Test {
         vm.startPrank(user);
         collateralToken.approve(address(conditionalTokens), AMOUNT);
         conditionalTokens.splitPosition(
-            collateralToken, bytes32(0), parent_condition_id, generateBasicPartition(2), AMOUNT
+            collateralToken, bytes32(0), parent_condition_id, _generateBasicPartition(2), AMOUNT
         );
         vm.stopPrank();
     }
@@ -105,7 +116,7 @@ contract ConditionalScalarMarketTest is Test {
                 address(collateralToken),
                 parentCollectionId,
                 market.conditionId(),
-                generateBasicPartition(2),
+                _generateBasicPartition(2),
                 AMOUNT
             )
         );
@@ -161,7 +172,150 @@ contract ConditionalScalarMarketTest is Test {
         vm.stopPrank();
     }
 
-    function generateBasicPartition(uint256 outcomeSlotCount) private pure returns (uint256[] memory) {
+    // TODO: fuzz (amount…)
+    function testMerge() public {
+        // Arrange
+        uint256 initialParentBalance = conditionalTokens.balanceOf(user, parentPositionId);
+        vm.startPrank(user);
+        conditionalTokens.setApprovalForAll(address(market), true);
+        market.split(AMOUNT);
+        market.wrappedShort().approve(address(market), AMOUNT);
+        market.wrappedLong().approve(address(market), AMOUNT);
+
+        // Verify state before merge
+        assertEq(
+            conditionalTokens.balanceOf(user, parentPositionId),
+            initialParentBalance - AMOUNT,
+            "Initial parent balance incorrect"
+        );
+        assertEq(market.wrappedShort().balanceOf(user), AMOUNT, "Initial short balance incorrect");
+        assertEq(market.wrappedLong().balanceOf(user), AMOUNT, "Initial long balance incorrect");
+
+        // Expect the merge call
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(
+                ConditionalTokens.mergePositions.selector,
+                address(collateralToken),
+                parentCollectionId,
+                market.conditionId(),
+                _generateBasicPartition(2),
+                AMOUNT
+            )
+        );
+
+        // Act
+        market.merge(AMOUNT);
+
+        // Assert final state
+        assertEq(
+            conditionalTokens.balanceOf(user, parentPositionId),
+            initialParentBalance,
+            "Parent tokens not retrieved correctly"
+        );
+        assertEq(
+            conditionalTokens.balanceOf(address(wrapped1155Factory), market.shortPositionId()),
+            0,
+            "Short ERC1155 not returned by factory"
+        );
+        assertEq(
+            conditionalTokens.balanceOf(address(wrapped1155Factory), market.longPositionId()),
+            0,
+            "Long ERC1155 not returned by factory"
+        );
+        assertEq(market.wrappedShort().balanceOf(user), 0, "User did not return short tokens");
+        assertEq(market.wrappedLong().balanceOf(user), 0, "User did not return long tokens");
+
+        vm.stopPrank();
+    }
+
+    function testMergeInsufficientBalance() public {
+        // First split some tokens
+        vm.startPrank(user);
+        conditionalTokens.setApprovalForAll(address(market), true);
+        market.split(AMOUNT);
+        market.wrappedShort().approve(address(market), type(uint256).max);
+        market.wrappedLong().approve(address(market), type(uint256).max);
+
+        // Try to merge more than we have
+        uint256 tooMuch = AMOUNT + 1;
+
+        // Expect revert on the first token transfer
+        // The unwrap of the first ERC20 should fail since we don't have enough
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC20Errors.ERC20InsufficientBalance.selector,
+                user, // from
+                AMOUNT, // balance
+                tooMuch // needed
+            )
+        );
+        market.merge(tooMuch);
+        vm.stopPrank();
+    }
+
+    function testMergeWithoutApproval() public {
+        // First split tokens
+        vm.startPrank(user);
+        conditionalTokens.setApprovalForAll(address(market), true);
+        market.split(AMOUNT);
+
+        // Reset all approvals
+        market.wrappedShort().approve(address(market), 0);
+        market.wrappedLong().approve(address(market), 0);
+
+        // Should fail when trying to transfer ERC20s without approval
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(market), 0, AMOUNT)
+        );
+        market.merge(AMOUNT);
+        vm.stopPrank();
+    }
+
+    function testMergeZeroAmount() public {
+        vm.startPrank(user);
+        conditionalTokens.setApprovalForAll(address(market), true);
+
+        // Zero amount merges should revert early
+        vm.expectRevert("amount must be positive");
+        market.merge(0);
+        vm.stopPrank();
+    }
+
+    function testPartialMerge() public {
+        // First split all tokens
+        vm.startPrank(user);
+        conditionalTokens.setApprovalForAll(address(market), true);
+        market.split(AMOUNT);
+
+        uint256 initialParentBalance = conditionalTokens.balanceOf(user, parentPositionId);
+        uint256 mergeAmount = AMOUNT / 2;
+        market.wrappedShort().approve(address(market), mergeAmount);
+        market.wrappedLong().approve(address(market), mergeAmount);
+
+        // Merge half the tokens
+        market.merge(mergeAmount);
+
+        // Assert partial balances
+        assertEq(market.wrappedShort().balanceOf(user), AMOUNT - mergeAmount, "Wrong remaining short balance");
+        assertEq(market.wrappedLong().balanceOf(user), AMOUNT - mergeAmount, "Wrong remaining long balance");
+        assertEq(
+            conditionalTokens.balanceOf(user, parentPositionId),
+            initialParentBalance + mergeAmount,
+            "Wrong parent token balance after partial merge"
+        );
+
+        // Can still merge the rest
+        market.wrappedShort().approve(address(market), mergeAmount);
+        market.wrappedLong().approve(address(market), mergeAmount);
+        market.merge(AMOUNT - mergeAmount);
+        assertEq(market.wrappedShort().balanceOf(user), 0, "Short balance not zero after full merge");
+        assertEq(market.wrappedLong().balanceOf(user), 0, "Long balance not zero after full merge");
+
+        vm.stopPrank();
+    }
+
+    function _generateBasicPartition(uint256 outcomeSlotCount) private pure returns (uint256[] memory) {
         uint256[] memory partition = new uint256[](outcomeSlotCount);
         for (uint256 i = 0; i < outcomeSlotCount; i++) {
             partition[i] = 1 << i;

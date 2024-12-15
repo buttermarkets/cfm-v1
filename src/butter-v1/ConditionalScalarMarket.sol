@@ -142,10 +142,9 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
         conditionalTokens.reportPayouts(questionId, payouts);
     }
 
-    /// @notice Splits into Long/Short, then sends the wrapped erc20s to the
-    /// sender.
+    /// @notice Splits decision outcome into wrapped Long/Short.
     function split(uint256 amount) external {
-        // Transfer parent decision outcome 1155token to this contract.
+        // User transfers decision outcome ERC1155 to this contract.
         conditionalTokens.safeTransferFrom(
             msg.sender,
             address(this),
@@ -154,25 +153,52 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
             ""
         );
 
-        // Split position. Decision outcome tokens are burnt. Conditional
-        // Long/Short tokens are minted to the contract.
+        // Split position. Decision outcome ERC1155 are burnt. Conditional
+        // Long/Short ERC1155 are minted to the contract.
         conditionalTokens.splitPosition(
             collateralToken, getDecisionCollectionId(), conditionId, discreetPartition(), amount
         );
 
-        // Mint some 1155 tokens to the caller.
+        // Contract transfers Long/Short ERC1155 to wrapped1155Factory and
+        // gets back Long/Short ERC20.
         conditionalTokens.safeTransferFrom(
             address(this), address(wrapped1155Factory), shortPositionId, amount, shortData
         );
         conditionalTokens.safeTransferFrom(address(this), address(wrapped1155Factory), longPositionId, amount, longData);
 
+        // Contract transfers Long/Short ERC20 to user.
         require(wrappedShort.transfer(msg.sender, amount), "split short erc20 transfer failed");
         require(wrappedLong.transfer(msg.sender, amount), "split long erc20 transfer failed");
     }
 
-    // XXX
-    function merge() external {}
-    // From FixedProductMarketMaker.generateBasicPartition
+    /// @notice Merges wrapped Long/Short back into decision outcome.
+    function merge(uint256 amount) external {
+        require(amount > 0, "amount must be positive");
+
+        // User transfers Long/Short ERC20 to contract.
+        require(wrappedShort.transferFrom(msg.sender, address(this), amount), "short token transfer failed");
+        require(wrappedLong.transferFrom(msg.sender, address(this), amount), "long token transfer failed");
+
+        // Contract transfers Long/Short ERC20 to wrapped1155Factory and gets
+        // back Long/Short ERC1155.
+        wrapped1155Factory.unwrap(conditionalTokens, shortPositionId, amount, address(this), shortData);
+        wrapped1155Factory.unwrap(conditionalTokens, longPositionId, amount, address(this), longData);
+
+        // Merge position. Long/Short ERC1155 are burnt. Decision outcome
+        // ERC1155 are minted.
+        conditionalTokens.mergePositions(
+            collateralToken, getDecisionCollectionId(), conditionId, discreetPartition(), amount
+        );
+
+        // Contract transfers decision outcome ERC1155 to user.
+        conditionalTokens.safeTransferFrom(
+            address(this),
+            msg.sender,
+            conditionalTokens.getPositionId(collateralToken, getDecisionCollectionId()),
+            amount,
+            ""
+        );
+    }
 
     function discreetPartition() private pure returns (uint256[] memory) {
         uint256[] memory partition = new uint256[](2);

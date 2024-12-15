@@ -49,10 +49,15 @@ contract CFMRealityAdapterWithMockTest is Test {
         decisionQuestionParams.outcomeNames[0] = "Yes";
         decisionQuestionParams.outcomeNames[1] = "No";
 
+        vm.mockCall(
+            address(fakeRealityEth),
+            abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
+            abi.encode(bytes32("fakeDecisionQuestionId"))
+        );
         bytes32 questionId = realityAdapter.askDecisionQuestion(decisionQuestionParams);
 
         // TODO: add integrated test.
-        assertEq(questionId, bytes32("minbondreturn"));
+        assertEq(questionId, bytes32("fakeDecisionQuestionId"));
     }
 
     function testAskMetricQuestion() public {
@@ -65,8 +70,13 @@ contract CFMRealityAdapterWithMockTest is Test {
             openingTime: uint32(block.timestamp + 1000)
         });
 
+        vm.mockCall(
+            address(fakeRealityEth),
+            abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
+            abi.encode(bytes32("fakeMetricQuestionId"))
+        );
         bytes32 questionId = realityAdapter.askMetricQuestion(params, "Above $2000");
-        assertEq(questionId, bytes32("minbondreturn"));
+        assertEq(questionId, bytes32("fakeMetricQuestionId"));
     }
 
     function testGetAnswer() public view {
