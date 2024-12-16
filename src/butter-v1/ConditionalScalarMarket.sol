@@ -60,9 +60,9 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
         outcomeIndex = _conditionalTokensParams.outcomeIndex;
         parentConditionId = _conditionalTokensParams.parentConditionId;
 
-        _initializeQuestion(_conditionalQuestionParams, _conditionalTokensParams);
-        _initializeCondition();
-        _initializeTokens(_conditionalTokensParams);
+        initializeQuestion(_conditionalQuestionParams, _conditionalTokensParams);
+        initializeCondition();
+        initializeTokens(_conditionalTokensParams);
 
         // XXX: Check that this FPMM will indeed do splitPosition with as
         // parentConditionId is the decision outcome.
@@ -72,19 +72,19 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
     }
 
     // TODO: Move initialization to factory call.
-    function _initializeQuestion(
+    function initializeQuestion(
         CFMConditionalQuestionParams memory _conditionalQuestionParams,
         ConditionalMarketCTParams memory _conditionalTokensParams
     ) private {
         questionId = oracleAdapter.askMetricQuestion(_conditionalQuestionParams, _conditionalTokensParams.outcomeName);
     }
 
-    function _initializeCondition() private {
-        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, 2);
-        conditionId = conditionalTokens.getConditionId(address(oracleAdapter), questionId, 2);
+    function initializeCondition() private {
+        conditionalTokens.prepareCondition(address(this), questionId, 2);
+        conditionId = conditionalTokens.getConditionId(address(this), questionId, 2);
     }
 
-    function _initializeTokens(ConditionalMarketCTParams memory _conditionalTokensParams) private {
+    function initializeTokens(ConditionalMarketCTParams memory _conditionalTokensParams) private {
         // Deploy Long/Short ERC20s. Short index: 0.
         shortData = abi.encodePacked(
             toString31(string.concat(_conditionalTokensParams.outcomeName, "-Short")),
@@ -120,9 +120,11 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
         wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPositionId, longData);
     }
 
+    /// @notice Reports payouts corresponding to the scalar value reported by
+    /// the oracle. If the oracle value is invalid, report 50/50.
     function resolve() external {
         bytes32 answer = oracleAdapter.getAnswer(questionId);
-        uint256[] memory payouts = new uint256[](3);
+        uint256[] memory payouts = new uint256[](2);
 
         // If the answer is invalid, no payouts are returned.
         // TODO: test all cases, including invalid. In invalid, the user should
@@ -137,6 +139,9 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
                 payouts[0] = maxValue - numericAnswer;
                 payouts[1] = numericAnswer - minValue;
             }
+        } else {
+            payouts[0] = 1;
+            payouts[1] = 1;
         }
 
         conditionalTokens.reportPayouts(questionId, payouts);
@@ -198,6 +203,36 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
             amount,
             ""
         );
+    }
+
+    /// @notice Redeems Long/Short positions after condition resolution.
+    /// @param shortAmount Amount of Short tokens to redeem (can be 0).
+    /// @param longAmount Amount of Long tokens to redeem (can be 0).
+    function redeem(uint256 shortAmount, uint256 longAmount) external {
+        uint256 den = conditionalTokens.payoutDenominator(conditionId);
+        require(den > 0, "condition not resolved");
+
+        // User transfers Long/Short ERC20 to contract.
+        require(wrappedShort.transferFrom(msg.sender, address(this), shortAmount), "short token transfer failed");
+        require(wrappedLong.transferFrom(msg.sender, address(this), longAmount), "long token transfer failed");
+
+        // Contracts transfers Long/Short ERC20 to wrapped1155Factory and gets
+        // back Long/Short ERC1155.
+        wrapped1155Factory.unwrap(conditionalTokens, shortPositionId, shortAmount, address(this), shortData);
+        wrapped1155Factory.unwrap(conditionalTokens, longPositionId, longAmount, address(this), longData);
+
+        uint256 decisionPositionId = conditionalTokens.getPositionId(collateralToken, getDecisionCollectionId());
+        uint256 initialBalance = conditionalTokens.balanceOf(address(this), decisionPositionId);
+
+        // Redeem positions. Long/Short ERC1155 are burnt. Decision outcome
+        // ERC1155 are minted in proportion of payouts.
+        conditionalTokens.redeemPositions(collateralToken, getDecisionCollectionId(), conditionId, discreetPartition());
+
+        uint256 finalBalance = conditionalTokens.balanceOf(address(this), decisionPositionId);
+        uint256 redeemedAmount = finalBalance - initialBalance;
+
+        // Contract transfers ERC20 decision outcome tokens to user.
+        conditionalTokens.safeTransferFrom(address(this), msg.sender, decisionPositionId, redeemedAmount, "");
     }
 
     function discreetPartition() private pure returns (uint256[] memory) {
