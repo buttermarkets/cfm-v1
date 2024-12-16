@@ -471,8 +471,9 @@ contract SplitMergeTest is Test {
         payoutNumerators[1] = 40; // Long gets 40%
         vm.stopPrank();
 
-        vm.prank(address(market));
+        vm.startPrank(address(market));
         conditionalTokens.reportPayouts(market.questionId(), payoutNumerators);
+        vm.stopPrank();
 
         // Redeem half of each position
         vm.startPrank(user);
@@ -484,7 +485,7 @@ contract SplitMergeTest is Test {
 
         // Check balances
         assertEq(
-            collateralToken.balanceOf(user),
+            conditionalTokens.balanceOf(user, parentPositionId),
             initialCollateral + AMOUNT / 2, // (60% + 40%) of AMOUNT/2
             "Wrong collateral amount"
         );
