@@ -91,9 +91,9 @@ The system follows these general steps:
             - Project name
     - [x] Put templateIds in OracleAdapter and not in DecisionMarket
     - [x] Collision problems
-- [ ] !Try wrapping in erc20 => external trade, like Seer, with a Router
-    - [ ] Split/merge function that split the decision outcomes
-    - [ ] Split/merge/redeem function that split the metric outcome
+- [x] !Try wrapping in erc20 => external trade, like Seer, with a Router
+    - [x] Split/merge function that split the decision outcomes
+    - [x] Split/merge/redeem function that split the metric outcome
     - Note: the front-end will manage the dual-splitting.
 - [ ] !Try FPMM with conditional tokens
     - [ ] Split/merge function that split the decision outcomes
