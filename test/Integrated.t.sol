@@ -5,12 +5,12 @@ import "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
 import "../src/ConditionalTokens.sol";
-import "../src/FPMMDeterministicFactory.sol";
 import "../src/Wrapped1155Factory.sol";
 import "../src/butter-v1/DecisionMarketFactory.sol";
 import "../src/butter-v1/CFMRealityAdapter.sol";
 import "../src/FixedProductMarketMaker.sol";
 import "./FakeRealityETH.sol";
+import "./SimpleAMM.sol";
 
 contract CollateralToken is ERC20 {
     constructor(uint256 initialSupply) ERC20("Collateral Token", "CLT") {
@@ -18,7 +18,6 @@ contract CollateralToken is ERC20 {
     }
 }
 
-// XXX add names to addresses
 contract BaseIntegratedTest is Test {
     ConditionalTokens public conditionalTokens;
     Wrapped1155Factory public wrapped1155Factory;
@@ -26,7 +25,6 @@ contract BaseIntegratedTest is Test {
     ICFMOracleAdapter public oracleAdapter;
     CollateralToken public collateralToken;
     FakeRealityETH public fakeRealityEth;
-    FPMMDeterministicFactory public fpmmFactory;
 
     address USER = address(1);
     address DUMMY_ARBITRATOR = address(0x42424242);
@@ -50,9 +48,6 @@ contract BaseIntegratedTest is Test {
         fakeRealityEth = new FakeRealityETH();
         vm.label(address(fakeRealityEth), "RealityETH");
 
-        fpmmFactory = new FPMMDeterministicFactory();
-        vm.label(address(fpmmFactory), "FPMMFactory");
-
         collateralToken.transfer(USER, USER_SUPPLY);
     }
 
@@ -61,20 +56,6 @@ contract BaseIntegratedTest is Test {
         assertTrue(address(conditionalTokens) != address(0));
         assertTrue(address(wrapped1155Factory) != address(0));
         assertTrue(address(fakeRealityEth) != address(0));
-    }
-
-    function deployMarketMaker(bytes32[] calldata conditionIds) public returns (FixedProductMarketMaker) {
-        return FixedProductMarketMaker(
-            fpmmFactory.create2FixedProductMarketMaker(
-                1,
-                conditionalTokens,
-                collateralToken,
-                conditionIds,
-                0, // fee
-                INITIAL_LIQUIDITY, // Set initial funds to INITIAL_LIQUIDITY
-                new uint256[](0) // empty distribution hint
-            )
-        );
     }
 }
 
@@ -174,8 +155,16 @@ contract CreateConditionalMarketsTest is CreateDecisionMarketTest {
     }
 }
 
-contract SplitTest is CreateConditionalMarketsTest {
+contract SplitTestBase is CreateConditionalMarketsTest {
     uint256 constant DECISION_SPLIT_AMOUNT = USER_SUPPLY / 10;
+
+    function decisionDiscreetPartition() public view returns (uint256[] memory) {
+        uint256[] memory partition = new uint256[](decisionMarket.outcomeCount());
+        for (uint256 i = 0; i < decisionMarket.outcomeCount(); i++) {
+            partition[i] = 1 << i;
+        }
+        return partition;
+    }
 
     function setUp() public virtual override {
         super.setUp();
@@ -183,16 +172,13 @@ contract SplitTest is CreateConditionalMarketsTest {
         vm.startPrank(USER);
 
         collateralToken.approve(address(conditionalTokens), DECISION_SPLIT_AMOUNT);
+
         // This would be prepared by the front-end.
-        uint256[] memory partition = new uint256[](decisionMarket.outcomeCount());
-        for (uint256 i = 0; i < decisionMarket.outcomeCount(); i++) {
-            partition[i] = 1 << i;
-        }
         conditionalTokens.splitPosition(
             collateralToken,
             bytes32(0), // No parent
             decisionMarket.conditionId(),
-            partition,
+            decisionDiscreetPartition(),
             DECISION_SPLIT_AMOUNT
         );
 
@@ -206,7 +192,9 @@ contract SplitTest is CreateConditionalMarketsTest {
 
         vm.stopPrank();
     }
+}
 
+contract SplitTest is SplitTestBase {
     function testSplitPositionA() public view {
         assertEq(conditionalMarketA.wrappedShort().balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(conditionalMarketA.wrappedLong().balanceOf(USER), DECISION_SPLIT_AMOUNT);
@@ -223,20 +211,111 @@ contract SplitTest is CreateConditionalMarketsTest {
     }
 }
 
-//// TODO: test trading on the FPMM
-//contract TradeTest is SplitTest {}
+contract TradeTest is SplitTestBase, ERC1155Holder {
+    uint256 constant TRADE_AMOUNT = DECISION_SPLIT_AMOUNT / 4;
+    uint256 constant CONTRACT_LIQUIDITY = INITIAL_SUPPLY / 100; // Use 1% of initial supply for AMM liquidity
+    SimpleAMM public ammA;
+    SimpleAMM public ammB;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        collateralToken.approve(address(conditionalTokens), CONTRACT_LIQUIDITY);
+
+        conditionalTokens.splitPosition(
+            collateralToken, bytes32(0), decisionMarket.conditionId(), decisionDiscreetPartition(), CONTRACT_LIQUIDITY
+        );
+
+        // Split decision tokens into Long/Short pairs
+        conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
+        conditionalTokens.setApprovalForAll(address(conditionalMarketB), true);
+        conditionalMarketA.split(CONTRACT_LIQUIDITY);
+        conditionalMarketB.split(CONTRACT_LIQUIDITY);
+
+        // Create and initialize AMMs
+        ammA = new SimpleAMM(conditionalMarketA.wrappedShort(), conditionalMarketA.wrappedLong());
+        ammB = new SimpleAMM(conditionalMarketB.wrappedShort(), conditionalMarketB.wrappedLong());
+
+        // Contract provides liquidity
+        conditionalMarketA.wrappedShort().approve(address(ammA), CONTRACT_LIQUIDITY);
+        conditionalMarketA.wrappedLong().approve(address(ammA), CONTRACT_LIQUIDITY);
+        conditionalMarketB.wrappedShort().approve(address(ammB), CONTRACT_LIQUIDITY);
+        conditionalMarketB.wrappedLong().approve(address(ammB), CONTRACT_LIQUIDITY);
+
+        ammA.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
+        ammB.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
+
+        // User trades
+        vm.startPrank(USER);
+
+        // Market A: User trades short for long, taking a long position
+        conditionalMarketA.wrappedShort().approve(address(ammA), TRADE_AMOUNT);
+        ammA.swap(true, TRADE_AMOUNT);
+
+        // Market B: User trades more short for long, taking a larger long position
+        conditionalMarketB.wrappedShort().approve(address(ammB), TRADE_AMOUNT * 2);
+        ammB.swap(true, TRADE_AMOUNT * 2);
+
+        vm.stopPrank();
+    }
+
+    function testTradeOutcomeA() public view {
+        // User should have less short and more long tokens in market A
+        assertTrue(conditionalMarketA.wrappedShort().balanceOf(USER) < DECISION_SPLIT_AMOUNT);
+        assertTrue(conditionalMarketA.wrappedLong().balanceOf(USER) > DECISION_SPLIT_AMOUNT);
+        // AMM should reflect this
+        assertTrue(ammA.reserve0() > CONTRACT_LIQUIDITY); // More short tokens in pool
+        assertTrue(ammA.reserve1() < CONTRACT_LIQUIDITY); // Less long tokens in pool
+    }
+
+    //function testTradeOutcomeB() public view {
+    //    // User should have even less short and even more long tokens in market B
+    //    assertTrue(
+    //        conditionalMarketB.wrappedShort().balanceOf(USER) < conditionalMarketA.wrappedShort().balanceOf(USER),
+    //        "wrappedShort comparision error"
+    //    );
+    //    assertTrue(
+    //        conditionalMarketB.wrappedLong().balanceOf(USER) > conditionalMarketA.wrappedLong().balanceOf(USER),
+    //        "wrappedLong comparison error"
+    //    );
+    //    // AMM should reflect larger imbalance
+    //    assertTrue(ammB.reserve0() > ammA.reserve0()); // Even more short tokens in pool
+    //    assertTrue(ammB.reserve1() < ammA.reserve1()); // Even less long tokens in pool
+    //}
+}
+
+//contract MergeTest is TradeTest {
+//    uint256 constant MERGE_AMOUNT = DECISION_SPLIT_AMOUNT / 5;
 //
-//// TODO: test merging some back
-//contract MergeTest is TradeTest {}
+//    function setUp() public virtual override {
+//        super.setUp();
 //
-//// TODO: Resolve decision market
+//        vm.startPrank(USER);
+//
+//        conditionalMarketA.wrappedLong().approve(address(conditionalMarketA), MERGE_AMOUNT);
+//        conditionalMarketA.wrappedShort().approve(address(conditionalMarketA), MERGE_AMOUNT);
+//        conditionalMarketB.wrappedLong().approve(address(conditionalMarketB), MERGE_AMOUNT);
+//        conditionalMarketB.wrappedShort().approve(address(conditionalMarketB), MERGE_AMOUNT);
+//
+//        conditionalMarketA.merge(MERGE_AMOUNT);
+//        conditionalMarketB.merge(MERGE_AMOUNT);
+//
+//        vm.stopPrank();
+//    }
+//
+//    function testMergePositionsA() public view {
+//        assertEq(conditionalMarketA.wrappedLong().balanceOf(USER), conditionalMarketA.wrappedShort().balanceOf(USER));
+//    }
+//
+//    function testMergePositionsB() public view {
+//        assertEq(conditionalMarketB.wrappedLong().balanceOf(USER), conditionalMarketB.wrappedShort().balanceOf(USER));
+//    }
+//}
+
 //contract ResolveDecisionTest is MergeTest {}
 //
-//// TODO: Split, trade, merge some more
 //contract TradeAfterDecisionTest is ResolveDecisionTest {}
 //
-//// TODO: Resolve conditional markets
 //contract ResolveConditionalsTest is TradeAfterDecisionTest {}
 //
-//// TODO: Redeem
 //contract RedeemTest is ResolveConditionalsTest {}
