@@ -9,12 +9,12 @@ import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "./interfaces/IWrapped1155Factory.sol";
 import "./interfaces/IConditionalTokens.sol";
 import {CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
-import "./ICFMOracleAdapter.sol";
-import "./IConditionalMarket.sol";
+import "./CFMOracleAdapter.sol";
+import "./ConditionalMarket.sol";
 
-contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
+contract ConditionalScalarMarket is ConditionalMarket, ERC1155Holder {
     // DecisionMarket generic params:
-    ICFMOracleAdapter public immutable oracleAdapter;
+    CFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
@@ -36,10 +36,10 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
     IERC20 public wrappedLong;
 
     // State attributes:
-    bool public isResolved;
+    bool public override isResolved;
 
     constructor(
-        ICFMOracleAdapter _oracleAdapter,
+        CFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
         IWrapped1155Factory _wrapped1155Factory,
         CFMConditionalQuestionParams memory _conditionalQuestionParams,
@@ -113,7 +113,7 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
 
     /// @notice Reports payouts corresponding to the scalar value reported by
     /// the oracle. If the oracle value is invalid, report 50/50.
-    function resolve() external {
+    function resolve() external override {
         bytes32 answer = oracleAdapter.getAnswer(questionId);
         uint256[] memory payouts = new uint256[](2);
 

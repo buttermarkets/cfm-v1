@@ -340,7 +340,7 @@ contract SplitMergeTest is Test {
         // Resolve condition - Long wins all.
         bytes32 answer = bytes32(uint256(100e18));
         vm.mockCall(
-            address(oracleAdapter), abi.encodeWithSelector(ICFMOracleAdapter.getAnswer.selector), abi.encode(answer)
+            address(oracleAdapter), abi.encodeWithSelector(CFMOracleAdapter.getAnswer.selector), abi.encode(answer)
         );
         market.resolve();
 
@@ -374,7 +374,7 @@ contract SplitMergeTest is Test {
         // Resolve condition - 50/50 split
         bytes32 answer = bytes32(uint256(50e18));
         vm.mockCall(
-            address(oracleAdapter), abi.encodeWithSelector(ICFMOracleAdapter.getAnswer.selector), abi.encode(answer)
+            address(oracleAdapter), abi.encodeWithSelector(CFMOracleAdapter.getAnswer.selector), abi.encode(answer)
         );
         market.resolve();
 

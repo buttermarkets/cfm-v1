@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
-import "./ICFMOracleAdapter.sol"; // XXX: abstract
+import "./CFMOracleAdapter.sol"; // XXX: abstract
 import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./QuestionTypes.sol";
 
 // The adapter component implements both client (CFM) interface
@@ -11,7 +11,7 @@ import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./Questio
 // TODO: Formatting functions and template ids are coupled naturally. But we
 // could decouple other attributes, if we expect templates to change more often
 // than these. Probably not worth it for now.
-contract CFMRealityAdapter is ICFMOracleAdapter {
+contract CFMRealityAdapter is CFMOracleAdapter {
     string private constant SEPARATOR = "\u241f";
 
     IRealityETH public immutable oracle;
@@ -94,7 +94,11 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
         );
     }
 
-    function askDecisionQuestion(CFMDecisionQuestionParams calldata decisionQuestionParams) public returns (bytes32) {
+    function askDecisionQuestion(CFMDecisionQuestionParams calldata decisionQuestionParams)
+        public
+        override
+        returns (bytes32)
+    {
         string memory formattedDecisionQuestionParams = _formatDecisionQuestionParams(decisionQuestionParams);
         return _askQuestion(decisionTemplateId, formattedDecisionQuestionParams, decisionQuestionParams.openingTime);
     }
@@ -102,7 +106,7 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
     function askMetricQuestion(
         CFMConditionalQuestionParams calldata conditionalQuestionParams,
         string memory outcomeName
-    ) public returns (bytes32) {
+    ) public override returns (bytes32) {
         string memory formattedMetricQuestionParams =
             _formatMetricQuestionParams(conditionalQuestionParams, outcomeName);
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, conditionalQuestionParams.openingTime);
@@ -110,11 +114,11 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
 
     /// @dev This is not-reverting only when the question is finalized in Reality.
     // TODO: QA the functioning of this.
-    function getAnswer(bytes32 questionID) public view returns (bytes32) {
+    function getAnswer(bytes32 questionID) public view override returns (bytes32) {
         return oracle.resultForOnceSettled(questionID);
     }
 
-    function isInvalid(bytes32 answer) public pure returns (bool) {
+    function isInvalid(bytes32 answer) public pure override returns (bool) {
         return (uint256(answer) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     }
 }

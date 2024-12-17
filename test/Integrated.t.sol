@@ -21,7 +21,7 @@ contract BaseIntegratedTest is Test {
     ConditionalTokens public conditionalTokens;
     Wrapped1155Factory public wrapped1155Factory;
     DecisionMarketFactory public decisionMarketFactory;
-    ICFMOracleAdapter public oracleAdapter;
+    CFMOracleAdapter public oracleAdapter;
     CollateralToken public collateralToken;
     FakeRealityETH public fakeRealityEth;
 

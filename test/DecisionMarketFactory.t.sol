@@ -12,20 +12,20 @@ import "src/DecisionMarketFactory.sol";
 import "src/DecisionMarket.sol";
 import "src/ConditionalScalarMarket.sol";
 import "src/CFMRealityAdapter.sol";
-import "src/ICFMOracleAdapter.sol";
+import "src/CFMOracleAdapter.sol";
 
 import "./FakeRealityETH.sol";
 
 contract CFMDecisionMarket_ConstructorSpy is CFMDecisionMarket {
     event ConstructorCalled(
-        ICFMOracleAdapter adapter,
+        CFMOracleAdapter adapter,
         IConditionalTokens conditionalTokens,
         CFMDecisionQuestionParams dParams,
         CFMConditionalQuestionParams cParams
     );
 
     constructor(
-        ICFMOracleAdapter adapter,
+        CFMOracleAdapter adapter,
         IConditionalTokens conditionalTokens,
         IWrapped1155Factory wrapped1155Factory,
         IERC20 collateralToken,
@@ -80,7 +80,7 @@ contract DecisionMarketFactoryTest is Test {
 
         // Deploy the DecisionMarketFactory with the RealityAdapter and ConditionalTokens
         factory = new DecisionMarketFactory(
-            ICFMOracleAdapter(address(oracleAdapter)),
+            oracleAdapter,
             IConditionalTokens(address(conditionalTokens)),
             IWrapped1155Factory(address(wrapped1155Factory))
         );

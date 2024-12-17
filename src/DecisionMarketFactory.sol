@@ -5,12 +5,12 @@ import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IWrapped1155Factory.sol";
 import "./interfaces/IConditionalTokens.sol";
-import "./ICFMOracleAdapter.sol"; // XXX: make these guys abstract contracts rather than interfaces
-import "./DecisionMarket.sol";
+import "./CFMOracleAdapter.sol";
+import "./CFMDecisionMarket.sol";
 import "./QuestionTypes.sol";
 
 contract DecisionMarketFactory {
-    ICFMOracleAdapter public immutable oracleAdapter;
+    CFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
@@ -20,7 +20,7 @@ contract DecisionMarketFactory {
     mapping(uint256 => CFMDecisionMarket) public markets;
 
     constructor(
-        ICFMOracleAdapter _oracleAdapter,
+        CFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
         IWrapped1155Factory _wrapped1155Factory
     ) {
