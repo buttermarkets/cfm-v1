@@ -25,14 +25,25 @@ We still plan on doing the following changes:
 - `src/*`: Main contracts.
 - `src/interfaces/*`: Interfaces to external contracts.
 - `src/vendor/<github org name>/<github repo name>/*`: External contracts,
-  ported to 8.20.0 as directly as possible.
+  ported to 8.20.0 as plainly as possible.
 
-**Note to auditors:** if checking the ported files is too time consuming and we
-need to deploy these contracts on the chain that we end up choosing, we can
-simply revert to deploying the original Solidity versions (0.5.x) of these
-contracts which have already been audited. So please don't systematically
-include auditing these contracts in the estimate.
+## note on vendored contracts
 
+The vendored contracts have both been audited in their original version: [ConditionalTokens](https://github.com/gnosis/conditional-tokens-contracts/tree/master/docs/audit),
+[Wrapped1155Factory](https://github.com/gnosis/1155-to-20/blob/master/AuditReport.md).
+
+If we deploy on a chain where verified instances of these contracts already
+live (mapping to the audited versions), we will use these deployed instances
+directly.
+
+If we end up deploying to a chain where such instances don't exist, we'll need
+to deploy the contracts. We understand that porting might introduce some risks
+and void part of the previous audits
+
+If auditing these ported contracts anew introduces a noticeable addition in
+total audit time, we suggest that we might revert to deploying the original
+non-ported versions (Solidity 0.5.x) so as to be able to rely on the previous
+audits and avoid extra audit cost.
 
 ## design
 
