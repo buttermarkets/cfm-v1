@@ -69,7 +69,6 @@ contract CFMRealityAdapter is ICFMOracleAdapter {
         );
     }
 
-    // TODO This needs to be verified
     /// @dev This is the only function known by higher level contracts.
     /// @return The ID of the newly created Reality question.
     function _askQuestion(

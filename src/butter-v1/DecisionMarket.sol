@@ -75,7 +75,6 @@ contract CFMDecisionMarket is IDecisionMarket {
         bytes32 answer = oracleAdapter.getAnswer(questionId);
         uint256[] memory payouts = new uint256[](outcomeCount);
 
-        // TODO: test!
         // TODO: test the invalid case.
         if (!oracleAdapter.isInvalid(answer)) {
             uint256 numericAnswer = uint256(answer);

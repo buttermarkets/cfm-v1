@@ -7,9 +7,6 @@ import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 import "../Wrapped1155Factory.sol";
 import "../ConditionalTokens.sol";
-// XXX use the deterministic one through a dependency
-import "../FixedProductMarketMakerFactory.sol";
-import "../FixedProductMarketMaker.sol";
 import {CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
 import "./interfaces/ICFMOracleAdapter.sol";
 import "./interfaces/IConditionalMarket.sol";
@@ -28,7 +25,6 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
     IERC20 public immutable collateralToken;
 
     // Initialized attributes:
-    //FixedProductMarketMaker public immutable amm;
     bytes32 public questionId;
     bytes32 public conditionId;
     bytes public shortData;
@@ -44,7 +40,6 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
     constructor(
         ICFMOracleAdapter _oracleAdapter,
         ConditionalTokens _conditionalTokens,
-        //FixedProductMarketMakerFactory _fixedProductMarketMakerFactory,
         Wrapped1155Factory _wrapped1155Factory,
         CFMConditionalQuestionParams memory _conditionalQuestionParams,
         ConditionalMarketCTParams memory _conditionalTokensParams
@@ -63,12 +58,6 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
         initializeQuestion(_conditionalQuestionParams, _conditionalTokensParams);
         initializeCondition();
         initializeTokens(_conditionalTokensParams);
-
-        // XXX: Check that this FPMM will indeed do splitPosition with as
-        // parentConditionId is the decision outcome.
-        //amm = _fixedProductMarketMakerFactory.createFixedProductMarketMaker(
-        //    conditionalTokens, _collateralToken, [conditionId], 0
-        //);
     }
 
     // TODO: Move initialization to factory call.

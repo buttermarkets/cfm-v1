@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// FIXME: remove this
+// TODO: rather use original contract + mockCall / mockFunction.
 /* solhint-disable var-name-mixedcase, no-unused-vars */
 pragma solidity ^0.8.20;
 
