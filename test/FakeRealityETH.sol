@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 // TODO: rather use original contract + mockCall / mockFunction.
 /* solhint-disable var-name-mixedcase, no-unused-vars */
 pragma solidity ^0.8.20;

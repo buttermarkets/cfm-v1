@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // From https://github.com/gnosis/1155-to-20/blob/master/contracts/Wrapped1155Factory.sol
 pragma solidity ^0.8.0;
 
