@@ -27,6 +27,12 @@ We still plan on doing the following changes:
 - `src/vendor/<github org name>/<github repo name>/*`: External contracts,
   ported to 8.20.0 as directly as possible.
 
+**Note to auditors:** if checking the ported files is too time consuming and we
+need to deploy these contracts on the chain that we end up choosing, we can
+simply revert to deploying the original Solidity versions (0.5.x) of these
+contracts which have already been audited. So please don't systematically
+include auditing these contracts in the estimate.
+
 
 ## design
 
@@ -41,7 +47,8 @@ and condition (as in `ConditionalTokens`) during construction.
 
 `ConditionalTokens` is the core contract that manages the creation and
 redemption of conditional tokens. It's a port of Gnosis Conditional Tokens
-framework. We also rely on `Wrapped1155Factory` which enables wrapping 1155 outcome tokens in ERC20s so we can trade them on any AMM.  
+framework. We also rely on `Wrapped1155Factory` which enables wrapping 1155
+outcome tokens in ERC20s so we can trade them on any AMM.  
 Both these contracts were ported it to 8.20.0 with minor modifications for
 compatibility. We expect to deploy them on chain whenever the network we choose
 doesn't have a canonical deployment (for now, only mainnet and Gnosis Chain
