@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Origin: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.2.0/contracts/token/ERC1155/ERC1155Receiver.sol
 // Note: This contract is a port of the original work, with minor
 // modifications for compatibility with the latest EVM and toolchain.
