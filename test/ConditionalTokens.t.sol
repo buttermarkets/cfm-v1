@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/src/Test.sol";
 
-import "../src/ConditionalTokens.sol";
+import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 
 contract ConditionalTokensTest is Test {
     ConditionalTokens public conditionalTokens;

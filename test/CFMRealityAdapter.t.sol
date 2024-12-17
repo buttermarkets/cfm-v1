@@ -3,8 +3,8 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/src/Test.sol";
 
-import "../src/butter-v1/CFMRealityAdapter.sol";
-import "../src/ConditionalTokens.sol";
+import "src/CFMRealityAdapter.sol";
+import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import {FakeRealityETH} from "./FakeRealityETH.sol";
 
 contract CFMRealityAdapterWithMockTest is Test {

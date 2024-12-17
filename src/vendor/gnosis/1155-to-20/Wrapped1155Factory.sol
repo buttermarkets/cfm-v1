@@ -8,7 +8,7 @@ import "@openzeppelin-contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin-contracts/token/ERC1155/IERC1155Receiver.sol";
 
 import "./ERC1155Receiver_06Port.sol";
-import "./SafeMath.sol";
+import {SafeMath_1155to20} from "./SafeMath.sol";
 
 contract Wrapped1155Metadata {
     // workaround which also arranges first storage slots of Wrapped1155
@@ -36,7 +36,7 @@ contract Wrapped1155 is Wrapped1155Metadata, ERC20 {
 
 contract Wrapped1155Factory is ERC1155Receiver_06Port {
     using Address for address;
-    using SafeMath for uint256;
+    using SafeMath_1155to20 for uint256;
 
     Wrapped1155 public erc20Implementation;
 

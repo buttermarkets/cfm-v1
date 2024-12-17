@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
-import "./interfaces/ICFMOracleAdapter.sol";
+import "./ICFMOracleAdapter.sol"; // XXX: abstract
 import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./QuestionTypes.sol";
 
 // The adapter component implements both client (CFM) interface

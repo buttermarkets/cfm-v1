@@ -6,33 +6,33 @@ import "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
-import "src/ConditionalTokens.sol";
-import "src/Wrapped1155Factory.sol";
-import "src/butter-v1/DecisionMarketFactory.sol";
-import "src/butter-v1/DecisionMarket.sol";
-import "src/butter-v1/ConditionalScalarMarket.sol";
-import "src/butter-v1/CFMRealityAdapter.sol";
-import "src/butter-v1/interfaces/ICFMOracleAdapter.sol";
+import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
+import "src/vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
+import "src/DecisionMarketFactory.sol";
+import "src/DecisionMarket.sol";
+import "src/ConditionalScalarMarket.sol";
+import "src/CFMRealityAdapter.sol";
+import "src/ICFMOracleAdapter.sol";
 
 import "./FakeRealityETH.sol";
 
 contract CFMDecisionMarket_ConstructorSpy is CFMDecisionMarket {
     event ConstructorCalled(
         ICFMOracleAdapter adapter,
-        ConditionalTokens tokens,
+        IConditionalTokens conditionalTokens,
         CFMDecisionQuestionParams dParams,
         CFMConditionalQuestionParams cParams
     );
 
     constructor(
         ICFMOracleAdapter adapter,
-        ConditionalTokens tokens,
-        Wrapped1155Factory wrapped1155Factory,
+        IConditionalTokens conditionalTokens,
+        IWrapped1155Factory wrapped1155Factory,
         IERC20 collateralToken,
         CFMDecisionQuestionParams memory dParams,
         CFMConditionalQuestionParams memory cParams
-    ) CFMDecisionMarket(adapter, tokens, wrapped1155Factory, collateralToken, dParams, cParams) {
-        emit ConstructorCalled(adapter, tokens, dParams, cParams);
+    ) CFMDecisionMarket(adapter, conditionalTokens, wrapped1155Factory, collateralToken, dParams, cParams) {
+        emit ConstructorCalled(adapter, conditionalTokens, dParams, cParams);
     }
 }
 
@@ -79,8 +79,11 @@ contract DecisionMarketFactoryTest is Test {
         collateralToken = new TestERC20();
 
         // Deploy the DecisionMarketFactory with the RealityAdapter and ConditionalTokens
-        factory =
-            new DecisionMarketFactory(ICFMOracleAdapter(address(oracleAdapter)), conditionalTokens, wrapped1155Factory);
+        factory = new DecisionMarketFactory(
+            ICFMOracleAdapter(address(oracleAdapter)),
+            IConditionalTokens(address(conditionalTokens)),
+            IWrapped1155Factory(address(wrapped1155Factory))
+        );
 
         // Label addresses for clarity in test outputs.
         vm.label(owner, "Owner");

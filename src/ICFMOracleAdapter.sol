@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "../QuestionTypes.sol";
+import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./QuestionTypes.sol";
 
 interface ICFMOracleAdapter {
     function askDecisionQuestion(CFMDecisionQuestionParams calldata decisionQuestionParams)

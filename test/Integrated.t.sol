@@ -4,11 +4,10 @@ pragma solidity ^0.8.20;
 import "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
-import "../src/ConditionalTokens.sol";
-import "../src/Wrapped1155Factory.sol";
-import "../src/butter-v1/DecisionMarketFactory.sol";
-import "../src/butter-v1/CFMRealityAdapter.sol";
-import "../src/FixedProductMarketMaker.sol";
+import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
+import "src/vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
+import "src/DecisionMarketFactory.sol";
+import "src/CFMRealityAdapter.sol";
 import "./FakeRealityETH.sol";
 import "./SimpleAMM.sol";
 
@@ -71,7 +70,11 @@ contract DeployCoreContractsTest is BaseIntegratedTest {
             QUESTION_TIMEOUT,
             MIN_BOND
         );
-        decisionMarketFactory = new DecisionMarketFactory(oracleAdapter, conditionalTokens, wrapped1155Factory);
+        decisionMarketFactory = new DecisionMarketFactory(
+            oracleAdapter,
+            IConditionalTokens(address(conditionalTokens)),
+            IWrapped1155Factory(address(wrapped1155Factory))
+        );
     }
 
     function testDecisionMarketFactoryDeployment() public view {

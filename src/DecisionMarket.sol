@@ -1,17 +1,17 @@
 // TODO: update license.
 // SPDX-License-Identifier: MIT
 // TODO: move everything to latest version
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 
-import "../Wrapped1155Factory.sol";
-import "../ConditionalTokens.sol";
+import "./interfaces/IWrapped1155Factory.sol";
+import "./interfaces/IConditionalTokens.sol";
 //import "../FixedProductMarketMakerFactory.sol";
 
 import {CFMDecisionQuestionParams, CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
-import "./interfaces/IDecisionMarket.sol";
-import "./interfaces/ICFMOracleAdapter.sol";
+import "./IDecisionMarket.sol"; // XXX replace by abstract contract
+import "./ICFMOracleAdapter.sol";
 import "./ConditionalScalarMarket.sol";
 
 // TODO this is more a Flat CFM than a Decision Market. Think about making this a bit
@@ -22,7 +22,7 @@ import "./ConditionalScalarMarket.sol";
 // contract that is implemented by this one.
 contract CFMDecisionMarket is IDecisionMarket {
     ICFMOracleAdapter public immutable oracleAdapter;
-    ConditionalTokens public immutable conditionalTokens;
+    IConditionalTokens public immutable conditionalTokens;
     // `questionId` and `outcomeCount` are recorded at construction, then
     // used to resolve the market.
     bytes32 public immutable questionId;
@@ -36,15 +36,15 @@ contract CFMDecisionMarket is IDecisionMarket {
     // TODO: move side effects to factory
     constructor(
         ICFMOracleAdapter _oracleAdapter,
-        ConditionalTokens _conditionalTokens,
+        IConditionalTokens _conditionalTokens,
         //FixedProductMarketMakerFactory _fixedProductMarketMakerFactory,
-        Wrapped1155Factory _wrapped1155Factory,
+        IWrapped1155Factory _wrapped1155Factory,
         IERC20 _collateralToken,
         CFMDecisionQuestionParams memory _decisionQuestionParams,
         CFMConditionalQuestionParams memory _conditionalQuestionParams
     ) {
         oracleAdapter = _oracleAdapter;
-        conditionalTokens = ConditionalTokens(_conditionalTokens);
+        conditionalTokens = IConditionalTokens(_conditionalTokens);
         outcomeCount = _decisionQuestionParams.outcomeNames.length;
 
         questionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);

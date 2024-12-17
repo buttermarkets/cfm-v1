@@ -3,19 +3,20 @@ pragma solidity 0.8.20;
 
 // TODO: use explicit imports whenever clearer.
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
-import "../Wrapped1155Factory.sol";
-import "../ConditionalTokens.sol";
+import "./interfaces/IWrapped1155Factory.sol";
+import "./interfaces/IConditionalTokens.sol";
 import {CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
-import "./interfaces/ICFMOracleAdapter.sol";
-import "./interfaces/IConditionalMarket.sol";
+import "./ICFMOracleAdapter.sol";
+import "./IConditionalMarket.sol";
 
 contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
     // DecisionMarket generic params:
     ICFMOracleAdapter public immutable oracleAdapter;
-    ConditionalTokens public immutable conditionalTokens;
-    Wrapped1155Factory public immutable wrapped1155Factory;
+    IConditionalTokens public immutable conditionalTokens;
+    IWrapped1155Factory public immutable wrapped1155Factory;
 
     // CondtionalMarket-specific params:
     uint256 public immutable minValue;
@@ -39,8 +40,8 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
 
     constructor(
         ICFMOracleAdapter _oracleAdapter,
-        ConditionalTokens _conditionalTokens,
-        Wrapped1155Factory _wrapped1155Factory,
+        IConditionalTokens _conditionalTokens,
+        IWrapped1155Factory _wrapped1155Factory,
         CFMConditionalQuestionParams memory _conditionalQuestionParams,
         ConditionalMarketCTParams memory _conditionalTokensParams
     ) {
@@ -105,6 +106,7 @@ contract ConditionalScalarMarket is IConditionalMarket, ERC1155Holder {
                 2 // 1 << 1
             )
         );
+        // FIXME: is this type-bypassing really needed?
         wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPositionId, shortData);
         wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPositionId, longData);
     }
