@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/src/Test.sol";
+import "forge-std/src/console.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
 import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
@@ -160,6 +161,8 @@ contract CreateConditionalMarketsTest is CreateDecisionMarketTest {
 
 contract SplitTestBase is CreateConditionalMarketsTest {
     uint256 constant DECISION_SPLIT_AMOUNT = USER_SUPPLY / 10;
+    uint256 constant DECISION_SPLIT_AMOUNT_A = DECISION_SPLIT_AMOUNT;
+    uint256 constant DECISION_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;
 
     function decisionDiscreetPartition() public view returns (uint256[] memory) {
         uint256[] memory partition = new uint256[](decisionMarket.outcomeCount());
@@ -190,8 +193,8 @@ contract SplitTestBase is CreateConditionalMarketsTest {
         conditionalTokens.setApprovalForAll(address(conditionalMarketC), true);
 
         // Do some splits:
-        conditionalMarketA.split(DECISION_SPLIT_AMOUNT);
-        conditionalMarketB.split(DECISION_SPLIT_AMOUNT / 2);
+        conditionalMarketA.split(DECISION_SPLIT_AMOUNT_A);
+        conditionalMarketB.split(DECISION_SPLIT_AMOUNT_B);
 
         vm.stopPrank();
     }
@@ -216,9 +219,12 @@ contract SplitTest is SplitTestBase {
 
 contract TradeTest is SplitTestBase, ERC1155Holder {
     uint256 constant TRADE_AMOUNT = DECISION_SPLIT_AMOUNT / 4;
-    uint256 constant CONTRACT_LIQUIDITY = INITIAL_SUPPLY / 100; // Use 1% of initial supply for AMM liquidity
+    uint256 constant CONTRACT_LIQUIDITY = INITIAL_SUPPLY / 100;
     SimpleAMM public ammA;
     SimpleAMM public ammB;
+    SimpleAMM public ammC;
+
+    uint256 constant DECISION_SPLIT_AMOUNT_C = DECISION_SPLIT_AMOUNT / 2;
 
     function setUp() public virtual override {
         super.setUp();
@@ -232,59 +238,107 @@ contract TradeTest is SplitTestBase, ERC1155Holder {
         // Split decision tokens into Long/Short pairs
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
         conditionalTokens.setApprovalForAll(address(conditionalMarketB), true);
+        conditionalTokens.setApprovalForAll(address(conditionalMarketC), true);
         conditionalMarketA.split(CONTRACT_LIQUIDITY);
         conditionalMarketB.split(CONTRACT_LIQUIDITY);
+        conditionalMarketC.split(CONTRACT_LIQUIDITY);
 
         // Create and initialize AMMs
         ammA = new SimpleAMM(conditionalMarketA.wrappedShort(), conditionalMarketA.wrappedLong());
+        vm.label(address(ammA), "amm A");
         ammB = new SimpleAMM(conditionalMarketB.wrappedShort(), conditionalMarketB.wrappedLong());
+        vm.label(address(ammB), "amm B");
+        ammC = new SimpleAMM(conditionalMarketC.wrappedShort(), conditionalMarketC.wrappedLong());
+        vm.label(address(ammC), "amm C");
 
         // Contract provides liquidity
         conditionalMarketA.wrappedShort().approve(address(ammA), CONTRACT_LIQUIDITY);
         conditionalMarketA.wrappedLong().approve(address(ammA), CONTRACT_LIQUIDITY);
         conditionalMarketB.wrappedShort().approve(address(ammB), CONTRACT_LIQUIDITY);
         conditionalMarketB.wrappedLong().approve(address(ammB), CONTRACT_LIQUIDITY);
+        conditionalMarketC.wrappedShort().approve(address(ammC), CONTRACT_LIQUIDITY);
+        conditionalMarketC.wrappedLong().approve(address(ammC), CONTRACT_LIQUIDITY);
 
         ammA.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
         ammB.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
+        ammC.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
 
         // User trades
         vm.startPrank(USER);
 
-        // Market A: User trades short for long, taking a long position
+        // Market A: User trades short for long, taking a long position.
         conditionalMarketA.wrappedShort().approve(address(ammA), TRADE_AMOUNT);
         ammA.swap(true, TRADE_AMOUNT);
 
-        // Market B: User trades more short for long, taking a larger long position
-        conditionalMarketB.wrappedShort().approve(address(ammB), TRADE_AMOUNT * 2);
-        ammB.swap(true, TRADE_AMOUNT * 2);
+        // Market B: User trades the same amount, with a different starting
+        // point.
+        conditionalMarketB.wrappedShort().approve(address(ammB), TRADE_AMOUNT);
+        ammB.swap(true, TRADE_AMOUNT);
+
+        // Market C: Same starting point as B, but larger trade.
+        conditionalMarketC.split(DECISION_SPLIT_AMOUNT_C);
+        conditionalMarketC.wrappedShort().approve(address(ammC), TRADE_AMOUNT * 2);
+        ammC.swap(true, TRADE_AMOUNT * 2);
 
         vm.stopPrank();
     }
 
     function testTradeOutcomeA() public view {
-        // User should have less short and more long tokens in market A
-        assertTrue(conditionalMarketA.wrappedShort().balanceOf(USER) < DECISION_SPLIT_AMOUNT);
-        assertTrue(conditionalMarketA.wrappedLong().balanceOf(USER) > DECISION_SPLIT_AMOUNT);
-        // AMM should reflect this
-        assertTrue(ammA.reserve0() > CONTRACT_LIQUIDITY); // More short tokens in pool
-        assertTrue(ammA.reserve1() < CONTRACT_LIQUIDITY); // Less long tokens in pool
+        // User should have less short and more long tokens in market A.
+        assertTrue(conditionalMarketA.wrappedShort().balanceOf(USER) < DECISION_SPLIT_AMOUNT_A);
+        assertTrue(conditionalMarketA.wrappedLong().balanceOf(USER) > DECISION_SPLIT_AMOUNT_A);
+        // The contrary for market inventory.
+        assertTrue(marketBalanceA(true) > CONTRACT_LIQUIDITY);
+        assertTrue(marketBalanceA(false) < CONTRACT_LIQUIDITY);
     }
 
-    //function testTradeOutcomeB() public view {
-    //    // User should have even less short and even more long tokens in market B
-    //    assertTrue(
-    //        conditionalMarketB.wrappedShort().balanceOf(USER) < conditionalMarketA.wrappedShort().balanceOf(USER),
-    //        "wrappedShort comparision error"
-    //    );
-    //    assertTrue(
-    //        conditionalMarketB.wrappedLong().balanceOf(USER) > conditionalMarketA.wrappedLong().balanceOf(USER),
-    //        "wrappedLong comparison error"
-    //    );
-    //    // AMM should reflect larger imbalance
-    //    assertTrue(ammB.reserve0() > ammA.reserve0()); // Even more short tokens in pool
-    //    assertTrue(ammB.reserve1() < ammA.reserve1()); // Even less long tokens in pool
-    //}
+    function testTradeOutcomeB() public view {
+        // User should have made the same move as in Market A.
+        assertEq(
+            DECISION_SPLIT_AMOUNT_B - conditionalMarketB.wrappedShort().balanceOf(USER),
+            DECISION_SPLIT_AMOUNT_A - conditionalMarketA.wrappedShort().balanceOf(USER)
+        );
+        assertEq(
+            conditionalMarketB.wrappedLong().balanceOf(USER) - DECISION_SPLIT_AMOUNT_B,
+            conditionalMarketA.wrappedLong().balanceOf(USER) - DECISION_SPLIT_AMOUNT_A
+        );
+        assertEq(marketBalanceA(true), marketBalanceB(true));
+        assertEq(marketBalanceA(false), marketBalanceB(false));
+    }
+
+    function testTradeOutcomeC() public view {
+        // User should have traded more, with the same starting point.
+        assertTrue(
+            conditionalMarketC.wrappedShort().balanceOf(USER) < conditionalMarketB.wrappedShort().balanceOf(USER)
+        );
+        assertTrue(conditionalMarketC.wrappedLong().balanceOf(USER) > conditionalMarketB.wrappedLong().balanceOf(USER));
+        assertTrue(marketBalanceC(true) > marketBalanceB(true));
+        assertTrue(marketBalanceC(false) < marketBalanceB(false));
+    }
+
+    function marketBalanceA(bool short) private view returns (uint256) {
+        if (short) {
+            return conditionalMarketA.wrappedShort().balanceOf(address(ammA));
+        } else {
+            return conditionalMarketA.wrappedLong().balanceOf(address(ammA));
+        }
+    }
+
+    function marketBalanceB(bool short) private view returns (uint256) {
+        if (short) {
+            return conditionalMarketB.wrappedShort().balanceOf(address(ammB));
+        } else {
+            return conditionalMarketB.wrappedLong().balanceOf(address(ammB));
+        }
+    }
+
+    function marketBalanceC(bool short) private view returns (uint256) {
+        if (short) {
+            return conditionalMarketC.wrappedShort().balanceOf(address(ammC));
+        } else {
+            return conditionalMarketC.wrappedLong().balanceOf(address(ammC));
+        }
+    }
 }
 
 //contract MergeTest is TradeTest {
