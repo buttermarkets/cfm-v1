@@ -106,7 +106,6 @@ contract DecisionMarketFactoryTest is Test {
             address(conditionalTokens),
             "Market ConditionalTokens address mismatch"
         );
-        assertEq(factory.marketCount(), 0, "Initial market count should be zero");
     }
 
     function testCreateMarket(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
@@ -126,15 +125,25 @@ contract DecisionMarketFactoryTest is Test {
 
         // Create the market with the shared outcomeNames array.
         vm.prank(owner);
-        factory.createMarket(decisionQuestionParams, conditionalQuestionParams, collateralToken);
+        vm.recordLogs();
+        FlatCFM createdMarket = factory.createMarket(decisionQuestionParams, conditionalQuestionParams, collateralToken);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
+        address firstCsmAddr;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                // topics[2] because address is the second indexed param
+                firstCsmAddr = address(uint160(uint256(logs[i].topics[2])));
+                break;
+            }
+        }
+        assertTrue(firstCsmAddr != address(0), "No ConditionalMarket created");
+        ConditionalScalarMarket firstCsm = ConditionalScalarMarket(firstCsmAddr);
 
         // TODO: test adding multiple markets. For that, atomize the test
         // contract first.
-        FlatCFM createdMarket = factory.markets(0);
         // Test that the markets mapping has been updated.
         assertTrue(address(createdMarket) != address(0), "Created market address should not be zero");
-
-        assertEq(factory.marketCount(), 1, "Market counter should be updated");
 
         // As we are testing deployments and we can't mock constructor calls,
         // we just check that the resulting deployed contract has the right
@@ -142,10 +151,10 @@ contract DecisionMarketFactoryTest is Test {
         assertEq(address(createdMarket.oracleAdapter()), address(oracleAdapter));
         assertEq(address(createdMarket.conditionalTokens()), address(conditionalTokens));
         assertEq(createdMarket.outcomeCount(), outcomeNames.length, "Incorrect number of conditional markets created");
-        ConditionalScalarMarket csm = createdMarket.outcomes(0);
-        assertEq(address(csm.oracleAdapter()), address(oracleAdapter));
-        assertEq(address(csm.conditionalTokens()), address(conditionalTokens));
-        assertEq(csm.minValue(), conditionalQuestionParams.minValue);
-        assertEq(csm.maxValue(), conditionalQuestionParams.maxValue);
+
+        assertEq(address(firstCsm.oracleAdapter()), address(oracleAdapter));
+        assertEq(address(firstCsm.conditionalTokens()), address(conditionalTokens));
+        assertEq(firstCsm.minValue(), conditionalQuestionParams.minValue);
+        assertEq(firstCsm.maxValue(), conditionalQuestionParams.maxValue);
     }
 }

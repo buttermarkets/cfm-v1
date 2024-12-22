@@ -89,6 +89,10 @@ contract DeployCoreContractsTest is DeployCoreContractsBase {
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams cfmQuestionParams;
     ScalarQuestionParams scalarQuestionParams;
+    FlatCFM cfm;
+    ConditionalScalarMarket conditionalMarketA;
+    ConditionalScalarMarket conditionalMarketB;
+    ConditionalScalarMarket conditionalMarketC;
 
     function setUp() public virtual override {
         super.setUp();
@@ -113,54 +117,51 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             openingTime: uint32(block.timestamp + 90 * 24 * 3600)
         });
 
-        decisionMarketFactory.createMarket(cfmQuestionParams, scalarQuestionParams, collateralToken);
+        vm.recordLogs();
+        cfm = decisionMarketFactory.createMarket(cfmQuestionParams, scalarQuestionParams, collateralToken);
+        recordScalarMarkets();
+        vm.label(address(cfm), "DecisionMarket");
+        vm.label(address(conditionalMarketA), "ConditionalMarketA");
+        vm.label(address(conditionalMarketB), "ConditionalMarketB");
+        vm.label(address(conditionalMarketC), "ConditionalMarketC");
+    }
+
+    function recordScalarMarkets() public {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
+
+        uint256 found = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)) {
+                if (found == 0) {
+                    conditionalMarketA = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
+                }
+                if (found == 1) {
+                    conditionalMarketB = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
+                }
+                if (found == 2) {
+                    conditionalMarketC = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
+                }
+                found++;
+            }
+        }
+        assertTrue(address(conditionalMarketA) != address(0), "Conditional market not found");
     }
 }
 
 contract CreateDecisionMarketTest is CreateDecisionMarketBase {
-    function testMarketsCountUp() public view {
-        assertEq(decisionMarketFactory.marketCount(), 1);
-    }
-
     function testDecisionMarketCreated() public view {
-        FlatCFM cfm = FlatCFM(decisionMarketFactory.markets(decisionMarketFactory.marketCount() - 1));
         assertTrue(address(cfm) != address(0));
     }
 }
 
-contract CreateConditionalMarketsBase is CreateDecisionMarketBase {
-    FlatCFM cfm;
-    ConditionalScalarMarket conditionalMarketA;
-    ConditionalScalarMarket conditionalMarketB;
-    ConditionalScalarMarket conditionalMarketC;
-
-    function setUp() public virtual override {
-        super.setUp();
-
-        cfm = FlatCFM(decisionMarketFactory.markets(decisionMarketFactory.marketCount() - 1));
-        vm.label(address(cfm), "DecisionMarket");
-        conditionalMarketA = cfm.outcomes(0);
-        vm.label(address(conditionalMarketA), "ConditionalMarketA");
-        conditionalMarketB = cfm.outcomes(1);
-        vm.label(address(conditionalMarketB), "ConditionalMarketB");
-        conditionalMarketC = cfm.outcomes(2);
-        vm.label(address(conditionalMarketC), "ConditionalMarketC");
-    }
-}
-
-contract CreateConditionalMarketsTest is CreateConditionalMarketsBase {
+contract CreateConditionalMarketsTest is CreateDecisionMarketBase {
     function testOutcomeCount() public view {
         assertEq(cfm.outcomeCount(), 3);
     }
-
-    function testConditionalMarketsCreated() public view {
-        assertTrue(address(cfm.outcomes(0)) != address(0));
-        assertTrue(address(cfm.outcomes(1)) != address(0));
-        assertTrue(address(cfm.outcomes(2)) != address(0));
-    }
 }
 
-contract SplitTestBase is CreateConditionalMarketsBase {
+contract SplitTestBase is CreateDecisionMarketBase {
     uint256 constant DECISION_SPLIT_AMOUNT = USER_SUPPLY / 10;
     uint256 constant DECISION_SPLIT_AMOUNT_A = DECISION_SPLIT_AMOUNT;
     uint256 constant DECISION_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;

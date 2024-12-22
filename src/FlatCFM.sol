@@ -19,11 +19,13 @@ contract FlatCFM {
     uint256 public immutable outcomeCount;
     bytes32 public immutable conditionId;
 
-    mapping(uint256 => ConditionalScalarMarket) public outcomes;
-
     bool public isResolved;
 
-    // TODO: move side effects to the factory or to an `initialize` function (whichever is best). This should notably help to write some unit tests. We can continue using a dumb constructor that only does arguments-to-contract-attributes assignments.
+    // XXX add         bytes32 conditionId, bytes32 questionId
+    event ConditionalMarketCreated(
+        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
+    );
+
     // TODO: write some unit tests.
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
@@ -45,7 +47,7 @@ contract FlatCFM {
 
         // Deploy nested conditional markets.
         for (uint256 i = 0; i < outcomeCount; i++) {
-            outcomes[i] = new ConditionalScalarMarket(
+            ConditionalScalarMarket csm = new ConditionalScalarMarket(
                 oracleAdapter,
                 conditionalTokens,
                 //_fixedProductMarketMakerFactory,
@@ -58,6 +60,8 @@ contract FlatCFM {
                     collateralToken: _collateralToken
                 })
             );
+
+            emit ConditionalMarketCreated(address(this), address(csm), i);
         }
     }
 
