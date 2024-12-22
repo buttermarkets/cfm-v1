@@ -8,9 +8,9 @@ import {FlatCFMQuestionParams, ScalarQuestionParams} from "./QuestionTypes.sol";
 // The adapter component implements both client (CFM) interface
 // and service (Reality) interface and translates incoming and outgoing calls between client and service.
 
-// TODO: Formatting functions and template ids are coupled naturally. But we
+// Formatting functions and template ids are coupled naturally. But we
 // could decouple other attributes, if we expect templates to change more often
-// than these. Probably not worth it for now.
+// than these.
 contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     string private constant SEPARATOR = "\u241f";
 

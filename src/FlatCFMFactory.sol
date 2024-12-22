@@ -14,10 +14,8 @@ contract FlatCFMFactory {
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
-    uint256 public marketCount;
-
-    // Mapping from market ID to DecisionMarket contract
-    mapping(uint256 => FlatCFM) public markets;
+    // FIXME: add questionId, conditionId
+    event FlatCFMCreated(address indexed market, string roundName, address collateralToken);
 
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
@@ -33,13 +31,13 @@ contract FlatCFMFactory {
         FlatCFMQuestionParams calldata _flatCFMQuestionParams,
         ScalarQuestionParams calldata _scalarQuestionParams,
         IERC20 _collateralToken
-    ) external {
+    ) external returns (FlatCFM) {
         for (uint256 i = 0; i < _flatCFMQuestionParams.outcomeNames.length; i++) {
             // Must be <=25 to allow for -LONG & -SHORT suffixes
             require(bytes(_flatCFMQuestionParams.outcomeNames[i]).length <= 25, "outcome name too long");
         }
 
-        markets[marketCount] = new FlatCFM(
+        FlatCFM flatCFM = new FlatCFM(
             oracleAdapter,
             conditionalTokens,
             wrapped1155Factory,
@@ -47,6 +45,9 @@ contract FlatCFMFactory {
             _flatCFMQuestionParams,
             _scalarQuestionParams
         );
-        marketCount++;
+
+        emit FlatCFMCreated(address(flatCFM), _flatCFMQuestionParams.roundName, address(_collateralToken));
+
+        return flatCFM;
     }
 }

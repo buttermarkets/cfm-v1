@@ -105,7 +105,6 @@ contract ConditionalScalarMarket is ERC1155Holder {
                 2 // 1 << 1
             )
         );
-        // FIXME: is this type-bypassing really needed?
         wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPositionId, shortData);
         wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPositionId, longData);
     }
