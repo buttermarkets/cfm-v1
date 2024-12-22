@@ -3,12 +3,12 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/src/Test.sol";
 
-import "src/CFMRealityAdapter.sol";
+import "src/FlatCFMRealityAdapter.sol";
 import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import {FakeRealityETH} from "./FakeRealityETH.sol";
 
 contract CFMRealityAdapterWithMockTest is Test {
-    CFMRealityAdapter realityAdapter;
+    FlatCFMRealityAdapter realityAdapter;
     FakeRealityETH fakeRealityEth;
     ConditionalTokens conditionalTokens;
 
@@ -21,7 +21,7 @@ contract CFMRealityAdapterWithMockTest is Test {
     function setUp() public {
         fakeRealityEth = new FakeRealityETH();
         conditionalTokens = new ConditionalTokens();
-        realityAdapter = new CFMRealityAdapter(
+        realityAdapter = new FlatCFMRealityAdapter(
             IRealityETH(address(fakeRealityEth)),
             arbitrator,
             decisionTemplateId,
@@ -41,27 +41,27 @@ contract CFMRealityAdapterWithMockTest is Test {
     }
 
     function testAskDecisionQuestion() public {
-        CFMDecisionQuestionParams memory decisionQuestionParams = CFMDecisionQuestionParams({
+        FlatCFMQuestionParams memory flatCFMQuestionParams = FlatCFMQuestionParams({
             roundName: "Round 1",
             outcomeNames: new string[](2),
             openingTime: uint32(block.timestamp + 1000)
         });
-        decisionQuestionParams.outcomeNames[0] = "Yes";
-        decisionQuestionParams.outcomeNames[1] = "No";
+        flatCFMQuestionParams.outcomeNames[0] = "Yes";
+        flatCFMQuestionParams.outcomeNames[1] = "No";
 
         vm.mockCall(
             address(fakeRealityEth),
             abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
             abi.encode(bytes32("fakeDecisionQuestionId"))
         );
-        bytes32 questionId = realityAdapter.askDecisionQuestion(decisionQuestionParams);
+        bytes32 questionId = realityAdapter.askDecisionQuestion(flatCFMQuestionParams);
 
         // TODO: add integrated test.
         assertEq(questionId, bytes32("fakeDecisionQuestionId"));
     }
 
     function testAskMetricQuestion() public {
-        CFMConditionalQuestionParams memory params = CFMConditionalQuestionParams({
+        ScalarQuestionParams memory params = ScalarQuestionParams({
             metricName: "ETH price",
             startDate: "2024-01-01",
             endDate: "2025-01-01",
@@ -94,7 +94,7 @@ contract CFMRealityAdapterWithMockTest is Test {
     }
 
     function testEmptyOutcomeNames() public {
-        CFMDecisionQuestionParams memory params = CFMDecisionQuestionParams({
+        FlatCFMQuestionParams memory params = FlatCFMQuestionParams({
             roundName: "Round 1",
             outcomeNames: new string[](0),
             openingTime: uint32(block.timestamp + 1000)

@@ -6,7 +6,7 @@ import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import {IERC20Errors} from "@openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 
 import "src/ConditionalScalarMarket.sol";
-import "src/CFMRealityAdapter.sol";
+import "src/FlatCFMRealityAdapter.sol";
 import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import "src/vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
 import "./FakeRealityETH.sol";
@@ -24,7 +24,7 @@ contract SplitMergeTest is Test {
     ConditionalScalarMarket market;
     ConditionalTokens conditionalTokens;
     Wrapped1155Factory wrapped1155Factory;
-    CFMRealityAdapter oracleAdapter;
+    FlatCFMRealityAdapter oracleAdapter;
     TestToken collateralToken;
     FakeRealityETH realityETH;
 
@@ -46,7 +46,8 @@ contract SplitMergeTest is Test {
         conditionalTokens = new ConditionalTokens();
         wrapped1155Factory = new Wrapped1155Factory();
 
-        oracleAdapter = new CFMRealityAdapter(IRealityETH(address(realityETH)), arbitrator, 2, 1, uint32(7 days), 1e18);
+        oracleAdapter =
+            new FlatCFMRealityAdapter(IRealityETH(address(realityETH)), arbitrator, 2, 1, uint32(7 days), 1e18);
 
         // Label addresses for clarity in test outputs.
         vm.label(user, "User");
@@ -55,7 +56,7 @@ contract SplitMergeTest is Test {
         vm.label(address(realityETH), "RealityETH");
         vm.label(address(conditionalTokens), "ConditionalTokens");
         vm.label(address(wrapped1155Factory), "Wrapped1155Factory");
-        vm.label(address(oracleAdapter), "CFMRealityAdapter");
+        vm.label(address(oracleAdapter), "FlatCFMRealityAdapter");
 
         collateralToken.mint(user, AMOUNT);
 
@@ -69,7 +70,7 @@ contract SplitMergeTest is Test {
         parent_condition_id = conditionalTokens.getConditionId(address(oracleAdapter), PARENT_QUESTION_ID, 2);
 
         // Setup market parameters
-        CFMConditionalQuestionParams memory questionParams = CFMConditionalQuestionParams({
+        ScalarQuestionParams memory scalarQuestionParams = ScalarQuestionParams({
             metricName: "Market Cap",
             startDate: "2024-01-01",
             endDate: "2024-12-31",
@@ -78,7 +79,7 @@ contract SplitMergeTest is Test {
             openingTime: uint32(block.timestamp + 1 days)
         });
 
-        ConditionalMarketCTParams memory ctParams = ConditionalMarketCTParams({
+        ConditionalTokensParams memory ctParams = ConditionalTokensParams({
             parentConditionId: parent_condition_id,
             outcomeName: "Market Cap Q1",
             outcomeIndex: 0,
@@ -90,7 +91,7 @@ contract SplitMergeTest is Test {
             oracleAdapter,
             IConditionalTokens(address(conditionalTokens)),
             IWrapped1155Factory(address(wrapped1155Factory)),
-            questionParams,
+            scalarQuestionParams,
             ctParams
         );
 
@@ -340,7 +341,7 @@ contract SplitMergeTest is Test {
         // Resolve condition - Long wins all.
         bytes32 answer = bytes32(uint256(100e18));
         vm.mockCall(
-            address(oracleAdapter), abi.encodeWithSelector(CFMOracleAdapter.getAnswer.selector), abi.encode(answer)
+            address(oracleAdapter), abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector), abi.encode(answer)
         );
         market.resolve();
 
@@ -374,7 +375,7 @@ contract SplitMergeTest is Test {
         // Resolve condition - 50/50 split
         bytes32 answer = bytes32(uint256(50e18));
         vm.mockCall(
-            address(oracleAdapter), abi.encodeWithSelector(CFMOracleAdapter.getAnswer.selector), abi.encode(answer)
+            address(oracleAdapter), abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector), abi.encode(answer)
         );
         market.resolve();
 
@@ -513,7 +514,7 @@ contract ResolveTest is Test {
     ConditionalScalarMarket market;
     ConditionalTokens conditionalTokens;
     Wrapped1155Factory wrapped1155Factory;
-    CFMRealityAdapter oracleAdapter;
+    FlatCFMRealityAdapter oracleAdapter;
     TestToken collateralToken;
     FakeRealityETH realityETH;
 
@@ -526,13 +527,14 @@ contract ResolveTest is Test {
         realityETH = new FakeRealityETH();
         conditionalTokens = new ConditionalTokens();
         wrapped1155Factory = new Wrapped1155Factory();
-        oracleAdapter = new CFMRealityAdapter(IRealityETH(address(realityETH)), arbitrator, 2, 1, uint32(7 days), 1e18);
+        oracleAdapter =
+            new FlatCFMRealityAdapter(IRealityETH(address(realityETH)), arbitrator, 2, 1, uint32(7 days), 1e18);
 
         // Prepare parent condition
         conditionalTokens.prepareCondition(address(oracleAdapter), PARENT_QUESTION_ID, 2);
         bytes32 parentConditionId = conditionalTokens.getConditionId(address(oracleAdapter), PARENT_QUESTION_ID, 2);
 
-        CFMConditionalQuestionParams memory questionParams = CFMConditionalQuestionParams({
+        ScalarQuestionParams memory scalarQuestionParams = ScalarQuestionParams({
             metricName: "Market Cap",
             startDate: "2024-01-01",
             endDate: "2024-12-31",
@@ -541,7 +543,7 @@ contract ResolveTest is Test {
             openingTime: uint32(block.timestamp + 1 days)
         });
 
-        ConditionalMarketCTParams memory ctParams = ConditionalMarketCTParams({
+        ConditionalTokensParams memory ctParams = ConditionalTokensParams({
             parentConditionId: parentConditionId,
             outcomeName: "Market Cap Q1",
             outcomeIndex: 0,
@@ -552,7 +554,7 @@ contract ResolveTest is Test {
             oracleAdapter,
             IConditionalTokens(address(conditionalTokens)),
             IWrapped1155Factory(address(wrapped1155Factory)),
-            questionParams,
+            scalarQuestionParams,
             ctParams
         );
 
@@ -572,7 +574,7 @@ contract ResolveTest is Test {
     }
 
     function testResolveInvalid() public {
-        // TODO: rather mock isInvalid and test CFMRealityAdapter independently
+        // TODO: rather mock isInvalid and test FlatCFMRealityAdapter independently
         bytes32 answer = bytes32(type(uint256).max);
         vm.mockCall(
             address(realityETH),

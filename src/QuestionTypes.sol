@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.20;
-// TODO: rename Types.
 
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 
-struct CFMDecisionQuestionParams {
+struct FlatCFMQuestionParams {
     string roundName;
     string[] outcomeNames;
     uint32 openingTime;
 }
 
-struct CFMConditionalQuestionParams {
+struct ScalarQuestionParams {
     string metricName;
     string startDate;
     string endDate; // Should be before openingTime.
@@ -19,7 +18,7 @@ struct CFMConditionalQuestionParams {
     uint32 openingTime;
 }
 
-struct ConditionalMarketCTParams {
+struct ConditionalTokensParams {
     bytes32 parentConditionId;
     string outcomeName;
     uint256 outcomeIndex;

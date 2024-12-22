@@ -2,8 +2,8 @@
 pragma solidity 0.8.20;
 
 import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
-import "./CFMOracleAdapter.sol"; // XXX: abstract
-import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./QuestionTypes.sol";
+import "./FlatCFMOracleAdapter.sol";
+import {FlatCFMQuestionParams, ScalarQuestionParams} from "./QuestionTypes.sol";
 
 // The adapter component implements both client (CFM) interface
 // and service (Reality) interface and translates incoming and outgoing calls between client and service.
@@ -11,7 +11,7 @@ import {CFMDecisionQuestionParams, CFMConditionalQuestionParams} from "./Questio
 // TODO: Formatting functions and template ids are coupled naturally. But we
 // could decouple other attributes, if we expect templates to change more often
 // than these. Probably not worth it for now.
-contract CFMRealityAdapter is CFMOracleAdapter {
+contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     string private constant SEPARATOR = "\u241f";
 
     IRealityETH public immutable oracle;
@@ -38,7 +38,7 @@ contract CFMRealityAdapter is CFMOracleAdapter {
     }
 
     // TODO unit test
-    function _formatDecisionQuestionParams(CFMDecisionQuestionParams calldata decisionQuestionParams)
+    function _formatDecisionQuestionParams(FlatCFMQuestionParams calldata decisionQuestionParams)
         private
         pure
         returns (string memory)
@@ -53,7 +53,7 @@ contract CFMRealityAdapter is CFMOracleAdapter {
     }
 
     function _formatMetricQuestionParams(
-        CFMConditionalQuestionParams calldata conditionalQuestionParams,
+        ScalarQuestionParams calldata conditionalQuestionParams,
         string memory outcomeName
     ) private pure returns (string memory) {
         return string(
@@ -94,7 +94,7 @@ contract CFMRealityAdapter is CFMOracleAdapter {
         );
     }
 
-    function askDecisionQuestion(CFMDecisionQuestionParams calldata decisionQuestionParams)
+    function askDecisionQuestion(FlatCFMQuestionParams calldata decisionQuestionParams)
         public
         override
         returns (bytes32)
@@ -103,10 +103,11 @@ contract CFMRealityAdapter is CFMOracleAdapter {
         return _askQuestion(decisionTemplateId, formattedDecisionQuestionParams, decisionQuestionParams.openingTime);
     }
 
-    function askMetricQuestion(
-        CFMConditionalQuestionParams calldata conditionalQuestionParams,
-        string memory outcomeName
-    ) public override returns (bytes32) {
+    function askMetricQuestion(ScalarQuestionParams calldata conditionalQuestionParams, string memory outcomeName)
+        public
+        override
+        returns (bytes32)
+    {
         string memory formattedMetricQuestionParams =
             _formatMetricQuestionParams(conditionalQuestionParams, outcomeName);
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, conditionalQuestionParams.openingTime);

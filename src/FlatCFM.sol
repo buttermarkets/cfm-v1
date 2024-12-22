@@ -1,25 +1,17 @@
-// TODO: update license.
 // SPDX-License-Identifier: GPL-3.0-or-later
-// TODO: move everything to latest version
+// TODO: move all solidity files to latest version
 pragma solidity ^0.8.20;
 
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IWrapped1155Factory.sol";
 import "./interfaces/IConditionalTokens.sol";
-import {CFMDecisionQuestionParams, CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
-import "./DecisionMarket.sol";
-import "./CFMOracleAdapter.sol";
+import {FlatCFMQuestionParams, ScalarQuestionParams, ConditionalTokensParams} from "./QuestionTypes.sol";
+import "./FlatCFMOracleAdapter.sol";
 import "./ConditionalScalarMarket.sol";
 
-// TODO this is more a Flat CFM than a Decision Market. Think about making this a bit
-// more generic and Flat CFM being a special case. For now, how CFMDecisionQuestion is strcutured is
-// specific to 'flat', and ConditionalQuestionParams is specific to 'funding markets'.
-// => Say Decision{,Question} (but this needs to be potentially plural) and
-// Conditional{,Question}. This should happen in an abstract DecisionMarket
-// contract that is implemented by this one.
-contract CFMDecisionMarket is DecisionMarket {
-    CFMOracleAdapter public immutable oracleAdapter;
+contract FlatCFM {
+    FlatCFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     // `questionId` and `outcomeCount` are recorded at construction, then
     // used to resolve the market.
@@ -31,15 +23,16 @@ contract CFMDecisionMarket is DecisionMarket {
 
     bool public isResolved;
 
-    // TODO: move side effects to factory
+    // TODO: move side effects to the factory or to an `initialize` function (whichever is best). This should notably help to write some unit tests. We can continue using a dumb constructor that only does arguments-to-contract-attributes assignments.
+    // TODO: write some unit tests.
     constructor(
-        CFMOracleAdapter _oracleAdapter,
+        FlatCFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
         //FixedProductMarketMakerFactory _fixedProductMarketMakerFactory,
         IWrapped1155Factory _wrapped1155Factory,
         IERC20 _collateralToken,
-        CFMDecisionQuestionParams memory _decisionQuestionParams,
-        CFMConditionalQuestionParams memory _conditionalQuestionParams
+        FlatCFMQuestionParams memory _decisionQuestionParams,
+        ScalarQuestionParams memory _conditionalQuestionParams
     ) {
         oracleAdapter = _oracleAdapter;
         conditionalTokens = IConditionalTokens(_conditionalTokens);
@@ -58,7 +51,7 @@ contract CFMDecisionMarket is DecisionMarket {
                 //_fixedProductMarketMakerFactory,
                 _wrapped1155Factory,
                 _conditionalQuestionParams,
-                ConditionalMarketCTParams({
+                ConditionalTokensParams({
                     parentConditionId: conditionId,
                     outcomeName: _decisionQuestionParams.outcomeNames[i],
                     outcomeIndex: i,

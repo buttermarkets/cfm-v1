@@ -8,31 +8,31 @@ import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
 import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import "src/vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
-import "src/DecisionMarketFactory.sol";
-import "src/DecisionMarket.sol";
+import "src/FlatCFMFactory.sol";
+import "src/FlatCFM.sol";
 import "src/ConditionalScalarMarket.sol";
-import "src/CFMRealityAdapter.sol";
-import "src/CFMOracleAdapter.sol";
+import "src/FlatCFMRealityAdapter.sol";
+import "src/FlatCFMOracleAdapter.sol";
 
 import "./FakeRealityETH.sol";
 
-contract CFMDecisionMarket_ConstructorSpy is CFMDecisionMarket {
+contract CFMDecisionMarket_ConstructorSpy is FlatCFM {
     event ConstructorCalled(
-        CFMOracleAdapter adapter,
+        FlatCFMOracleAdapter adapter,
         IConditionalTokens conditionalTokens,
-        CFMDecisionQuestionParams dParams,
-        CFMConditionalQuestionParams cParams
+        FlatCFMQuestionParams cfmParams,
+        ScalarQuestionParams sParams
     );
 
     constructor(
-        CFMOracleAdapter adapter,
+        FlatCFMOracleAdapter adapter,
         IConditionalTokens conditionalTokens,
         IWrapped1155Factory wrapped1155Factory,
         IERC20 collateralToken,
-        CFMDecisionQuestionParams memory dParams,
-        CFMConditionalQuestionParams memory cParams
-    ) CFMDecisionMarket(adapter, conditionalTokens, wrapped1155Factory, collateralToken, dParams, cParams) {
-        emit ConstructorCalled(adapter, conditionalTokens, dParams, cParams);
+        FlatCFMQuestionParams memory dParams,
+        ScalarQuestionParams memory sParams
+    ) FlatCFM(adapter, conditionalTokens, wrapped1155Factory, collateralToken, dParams, sParams) {
+        emit ConstructorCalled(adapter, conditionalTokens, dParams, sParams);
     }
 }
 
@@ -43,8 +43,8 @@ contract TestERC20 is ERC20 {
 }
 
 contract DecisionMarketFactoryTest is Test {
-    DecisionMarketFactory public factory;
-    CFMRealityAdapter public oracleAdapter;
+    FlatCFMFactory public factory;
+    FlatCFMRealityAdapter public oracleAdapter;
     ConditionalTokens public conditionalTokens;
     FakeRealityETH public fakeRealityETH; // Instance of Reality_v3
     Wrapped1155Factory public wrapped1155Factory;
@@ -72,14 +72,15 @@ contract DecisionMarketFactoryTest is Test {
         // Deploy the Wrapped1155Factory contract.
         wrapped1155Factory = new Wrapped1155Factory();
         // Deploy the RealityAdapter with Reality_v3.
-        oracleAdapter =
-            new CFMRealityAdapter(IRealityETH(address(fakeRealityETH)), address(0x00), 4242, 2424, 1000, 10000000000);
+        oracleAdapter = new FlatCFMRealityAdapter(
+            IRealityETH(address(fakeRealityETH)), address(0x00), 4242, 2424, 1000, 10000000000
+        );
 
         // Deploy the collateral token.
         collateralToken = new TestERC20();
 
-        // Deploy the DecisionMarketFactory with the RealityAdapter and ConditionalTokens
-        factory = new DecisionMarketFactory(
+        // Deploy the FlatCFMFactory with the RealityAdapter and ConditionalTokens
+        factory = new FlatCFMFactory(
             oracleAdapter,
             IConditionalTokens(address(conditionalTokens)),
             IWrapped1155Factory(address(wrapped1155Factory))
@@ -111,10 +112,10 @@ contract DecisionMarketFactoryTest is Test {
     function testCreateMarket(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
         public
     {
-        CFMDecisionQuestionParams memory decisionQuestionParams =
-            CFMDecisionQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
+        FlatCFMQuestionParams memory decisionQuestionParams =
+            FlatCFMQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
 
-        CFMConditionalQuestionParams memory conditionalQuestionParams = CFMConditionalQuestionParams({
+        ScalarQuestionParams memory conditionalQuestionParams = ScalarQuestionParams({
             metricName: "metric",
             startDate: "2024-01-01",
             endDate: "2025-01-01",
@@ -129,7 +130,7 @@ contract DecisionMarketFactoryTest is Test {
 
         // TODO: test adding multiple markets. For that, atomize the test
         // contract first.
-        CFMDecisionMarket createdMarket = factory.markets(0);
+        FlatCFM createdMarket = factory.markets(0);
         // Test that the markets mapping has been updated.
         assertTrue(address(createdMarket) != address(0), "Created market address should not be zero");
 

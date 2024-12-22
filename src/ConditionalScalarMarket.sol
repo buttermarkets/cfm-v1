@@ -8,13 +8,12 @@ import "@openzeppelin-contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 import "./interfaces/IWrapped1155Factory.sol";
 import "./interfaces/IConditionalTokens.sol";
-import {CFMConditionalQuestionParams, ConditionalMarketCTParams} from "./QuestionTypes.sol";
-import "./CFMOracleAdapter.sol";
-import "./ConditionalMarket.sol";
+import {ScalarQuestionParams, ConditionalTokensParams} from "./QuestionTypes.sol";
+import "./FlatCFMOracleAdapter.sol";
 
-contract ConditionalScalarMarket is ConditionalMarket, ERC1155Holder {
+contract ConditionalScalarMarket is ERC1155Holder {
     // DecisionMarket generic params:
-    CFMOracleAdapter public immutable oracleAdapter;
+    FlatCFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
@@ -36,14 +35,14 @@ contract ConditionalScalarMarket is ConditionalMarket, ERC1155Holder {
     IERC20 public wrappedLong;
 
     // State attributes:
-    bool public override isResolved;
+    bool public isResolved;
 
     constructor(
-        CFMOracleAdapter _oracleAdapter,
+        FlatCFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
         IWrapped1155Factory _wrapped1155Factory,
-        CFMConditionalQuestionParams memory _conditionalQuestionParams,
-        ConditionalMarketCTParams memory _conditionalTokensParams
+        ScalarQuestionParams memory _conditionalQuestionParams,
+        ConditionalTokensParams memory _conditionalTokensParams
     ) {
         oracleAdapter = _oracleAdapter;
         conditionalTokens = _conditionalTokens;
@@ -63,8 +62,8 @@ contract ConditionalScalarMarket is ConditionalMarket, ERC1155Holder {
 
     // TODO: Move initialization to factory call.
     function initializeQuestion(
-        CFMConditionalQuestionParams memory _conditionalQuestionParams,
-        ConditionalMarketCTParams memory _conditionalTokensParams
+        ScalarQuestionParams memory _conditionalQuestionParams,
+        ConditionalTokensParams memory _conditionalTokensParams
     ) private {
         questionId = oracleAdapter.askMetricQuestion(_conditionalQuestionParams, _conditionalTokensParams.outcomeName);
     }
@@ -74,7 +73,7 @@ contract ConditionalScalarMarket is ConditionalMarket, ERC1155Holder {
         conditionId = conditionalTokens.getConditionId(address(this), questionId, 2);
     }
 
-    function initializeTokens(ConditionalMarketCTParams memory _conditionalTokensParams) private {
+    function initializeTokens(ConditionalTokensParams memory _conditionalTokensParams) private {
         // Deploy Long/Short ERC20s. Short index: 0.
         shortData = abi.encodePacked(
             toString31(string.concat(_conditionalTokensParams.outcomeName, "-Short")),
@@ -113,7 +112,7 @@ contract ConditionalScalarMarket is ConditionalMarket, ERC1155Holder {
 
     /// @notice Reports payouts corresponding to the scalar value reported by
     /// the oracle. If the oracle value is invalid, report 50/50.
-    function resolve() external override {
+    function resolve() external {
         bytes32 answer = oracleAdapter.getAnswer(questionId);
         uint256[] memory payouts = new uint256[](2);
 

@@ -7,8 +7,8 @@ import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
 import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import "src/vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
-import "src/DecisionMarketFactory.sol";
-import "src/CFMRealityAdapter.sol";
+import "src/FlatCFMFactory.sol";
+import "src/FlatCFMRealityAdapter.sol";
 import "./FakeRealityETH.sol";
 import "./SimpleAMM.sol";
 
@@ -60,15 +60,15 @@ contract BaseIntegratedTestCheck is BaseIntegratedTest {
 }
 
 contract DeployCoreContractsBase is BaseIntegratedTest {
-    CFMOracleAdapter public oracleAdapter;
-    DecisionMarketFactory public decisionMarketFactory;
+    FlatCFMOracleAdapter public oracleAdapter;
+    FlatCFMFactory public decisionMarketFactory;
 
     function setUp() public virtual override {
         super.setUp();
-        oracleAdapter = new CFMRealityAdapter(
+        oracleAdapter = new FlatCFMRealityAdapter(
             IRealityETH(address(fakeRealityEth)), DUMMY_ARBITRATOR, 2, 1, QUESTION_TIMEOUT, MIN_BOND
         );
-        decisionMarketFactory = new DecisionMarketFactory(
+        decisionMarketFactory = new FlatCFMFactory(
             oracleAdapter,
             IConditionalTokens(address(conditionalTokens)),
             IWrapped1155Factory(address(wrapped1155Factory))
@@ -87,8 +87,8 @@ contract DeployCoreContractsTest is DeployCoreContractsBase {
 }
 
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
-    CFMDecisionQuestionParams decisionQuestionParams;
-    CFMConditionalQuestionParams conditionalQuestionParams;
+    FlatCFMQuestionParams cfmQuestionParams;
+    ScalarQuestionParams scalarQuestionParams;
 
     function setUp() public virtual override {
         super.setUp();
@@ -98,13 +98,13 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         outcomes[1] = "Project B";
         outcomes[2] = "Project C";
 
-        decisionQuestionParams = CFMDecisionQuestionParams({
+        cfmQuestionParams = FlatCFMQuestionParams({
             roundName: "Which project will get funded?",
             outcomeNames: outcomes,
             openingTime: uint32(block.timestamp + 2 * 24 * 3600)
         });
 
-        conditionalQuestionParams = CFMConditionalQuestionParams({
+        scalarQuestionParams = ScalarQuestionParams({
             metricName: "ETH Price",
             startDate: "2024-01-01",
             endDate: "2024-12-31",
@@ -113,7 +113,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             openingTime: uint32(block.timestamp + 90 * 24 * 3600)
         });
 
-        decisionMarketFactory.createMarket(decisionQuestionParams, conditionalQuestionParams, collateralToken);
+        decisionMarketFactory.createMarket(cfmQuestionParams, scalarQuestionParams, collateralToken);
     }
 }
 
@@ -123,14 +123,13 @@ contract CreateDecisionMarketTest is CreateDecisionMarketBase {
     }
 
     function testDecisionMarketCreated() public view {
-        CFMDecisionMarket decisionMarket =
-            CFMDecisionMarket(decisionMarketFactory.markets(decisionMarketFactory.marketCount() - 1));
-        assertTrue(address(decisionMarket) != address(0));
+        FlatCFM cfm = FlatCFM(decisionMarketFactory.markets(decisionMarketFactory.marketCount() - 1));
+        assertTrue(address(cfm) != address(0));
     }
 }
 
 contract CreateConditionalMarketsBase is CreateDecisionMarketBase {
-    CFMDecisionMarket decisionMarket;
+    FlatCFM cfm;
     ConditionalScalarMarket conditionalMarketA;
     ConditionalScalarMarket conditionalMarketB;
     ConditionalScalarMarket conditionalMarketC;
@@ -138,26 +137,26 @@ contract CreateConditionalMarketsBase is CreateDecisionMarketBase {
     function setUp() public virtual override {
         super.setUp();
 
-        decisionMarket = CFMDecisionMarket(decisionMarketFactory.markets(decisionMarketFactory.marketCount() - 1));
-        vm.label(address(decisionMarket), "DecisionMarket");
-        conditionalMarketA = decisionMarket.outcomes(0);
+        cfm = FlatCFM(decisionMarketFactory.markets(decisionMarketFactory.marketCount() - 1));
+        vm.label(address(cfm), "DecisionMarket");
+        conditionalMarketA = cfm.outcomes(0);
         vm.label(address(conditionalMarketA), "ConditionalMarketA");
-        conditionalMarketB = decisionMarket.outcomes(1);
+        conditionalMarketB = cfm.outcomes(1);
         vm.label(address(conditionalMarketB), "ConditionalMarketB");
-        conditionalMarketC = decisionMarket.outcomes(2);
+        conditionalMarketC = cfm.outcomes(2);
         vm.label(address(conditionalMarketC), "ConditionalMarketC");
     }
 }
 
 contract CreateConditionalMarketsTest is CreateConditionalMarketsBase {
     function testOutcomeCount() public view {
-        assertEq(decisionMarket.outcomeCount(), 3);
+        assertEq(cfm.outcomeCount(), 3);
     }
 
     function testConditionalMarketsCreated() public view {
-        assertTrue(address(decisionMarket.outcomes(0)) != address(0));
-        assertTrue(address(decisionMarket.outcomes(1)) != address(0));
-        assertTrue(address(decisionMarket.outcomes(2)) != address(0));
+        assertTrue(address(cfm.outcomes(0)) != address(0));
+        assertTrue(address(cfm.outcomes(1)) != address(0));
+        assertTrue(address(cfm.outcomes(2)) != address(0));
     }
 }
 
@@ -167,8 +166,8 @@ contract SplitTestBase is CreateConditionalMarketsBase {
     uint256 constant DECISION_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;
 
     function decisionDiscreetPartition() public view returns (uint256[] memory) {
-        uint256[] memory partition = new uint256[](decisionMarket.outcomeCount());
-        for (uint256 i = 0; i < decisionMarket.outcomeCount(); i++) {
+        uint256[] memory partition = new uint256[](cfm.outcomeCount());
+        for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
             partition[i] = 1 << i;
         }
         return partition;
@@ -182,11 +181,7 @@ contract SplitTestBase is CreateConditionalMarketsBase {
         collateralToken.approve(address(conditionalTokens), DECISION_SPLIT_AMOUNT);
 
         conditionalTokens.splitPosition(
-            collateralToken,
-            bytes32(0),
-            decisionMarket.conditionId(),
-            decisionDiscreetPartition(),
-            DECISION_SPLIT_AMOUNT
+            collateralToken, bytes32(0), cfm.conditionId(), decisionDiscreetPartition(), DECISION_SPLIT_AMOUNT
         );
 
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
@@ -269,7 +264,7 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
 
         collateralToken.approve(address(conditionalTokens), CONTRACT_LIQUIDITY);
         conditionalTokens.splitPosition(
-            collateralToken, bytes32(0), decisionMarket.conditionId(), decisionDiscreetPartition(), CONTRACT_LIQUIDITY
+            collateralToken, bytes32(0), cfm.conditionId(), decisionDiscreetPartition(), CONTRACT_LIQUIDITY
         );
 
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
