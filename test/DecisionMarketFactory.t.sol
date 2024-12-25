@@ -16,25 +16,25 @@ import "src/FlatCFMOracleAdapter.sol";
 
 import "./FakeRealityETH.sol";
 
-contract CFMDecisionMarket_ConstructorSpy is FlatCFM {
-    event ConstructorCalled(
-        FlatCFMOracleAdapter adapter,
-        IConditionalTokens conditionalTokens,
-        FlatCFMQuestionParams cfmParams,
-        ScalarQuestionParams sParams
-    );
-
-    constructor(
-        FlatCFMOracleAdapter adapter,
-        IConditionalTokens conditionalTokens,
-        IWrapped1155Factory wrapped1155Factory,
-        IERC20 collateralToken,
-        FlatCFMQuestionParams memory dParams,
-        ScalarQuestionParams memory sParams
-    ) FlatCFM(adapter, conditionalTokens, wrapped1155Factory, collateralToken, dParams, sParams) {
-        emit ConstructorCalled(adapter, conditionalTokens, dParams, sParams);
-    }
-}
+//contract CFMDecisionMarket_ConstructorSpy is FlatCFM {
+//    event ConstructorCalled(
+//        FlatCFMOracleAdapter adapter,
+//        IConditionalTokens conditionalTokens,
+//        FlatCFMQuestionParams cfmParams,
+//        ScalarQuestionParams sParams
+//    );
+//
+//    constructor(
+//        FlatCFMOracleAdapter adapter,
+//        IConditionalTokens conditionalTokens,
+//        IWrapped1155Factory wrapped1155Factory,
+//        IERC20 collateralToken,
+//        FlatCFMQuestionParams memory dParams,
+//        ScalarQuestionParams memory sParams
+//    ) FlatCFM(adapter, conditionalTokens, wrapped1155Factory, collateralToken, dParams, sParams) {
+//        emit ConstructorCalled(adapter, conditionalTokens, dParams, sParams);
+//    }
+//}
 
 contract TestERC20 is ERC20 {
     constructor() ERC20("Test Token", "TEST") {
@@ -128,7 +128,7 @@ contract DecisionMarketFactoryTest is Test {
         vm.recordLogs();
         FlatCFM createdMarket = factory.createMarket(decisionQuestionParams, conditionalQuestionParams, collateralToken);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
+        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256,address)");
         address firstCsmAddr;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == eventSignature) {

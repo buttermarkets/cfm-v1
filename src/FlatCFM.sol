@@ -21,48 +21,18 @@ contract FlatCFM {
 
     bool public isResolved;
 
-    // XXX add         bytes32 conditionId, bytes32 questionId
-    event ConditionalMarketCreated(
-        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
-    );
-
-    // TODO: write some unit tests.
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
-        //FixedProductMarketMakerFactory _fixedProductMarketMakerFactory,
-        IWrapped1155Factory _wrapped1155Factory,
-        IERC20 _collateralToken,
-        FlatCFMQuestionParams memory _decisionQuestionParams,
-        ScalarQuestionParams memory _conditionalQuestionParams
+        uint256 _outcomeCount,
+        bytes32 _questionId,
+        bytes32 _conditionId
     ) {
         oracleAdapter = _oracleAdapter;
-        conditionalTokens = IConditionalTokens(_conditionalTokens);
-        outcomeCount = _decisionQuestionParams.outcomeNames.length;
-
-        questionId = oracleAdapter.askDecisionQuestion(_decisionQuestionParams);
-
-        conditionalTokens.prepareCondition(address(oracleAdapter), questionId, outcomeCount);
-        conditionId = conditionalTokens.getConditionId(address(oracleAdapter), questionId, outcomeCount);
-
-        // Deploy nested conditional markets.
-        for (uint256 i = 0; i < outcomeCount; i++) {
-            ConditionalScalarMarket csm = new ConditionalScalarMarket(
-                oracleAdapter,
-                conditionalTokens,
-                //_fixedProductMarketMakerFactory,
-                _wrapped1155Factory,
-                _conditionalQuestionParams,
-                ConditionalTokensParams({
-                    parentConditionId: conditionId,
-                    outcomeName: _decisionQuestionParams.outcomeNames[i],
-                    outcomeIndex: i,
-                    collateralToken: _collateralToken
-                })
-            );
-
-            emit ConditionalMarketCreated(address(this), address(csm), i);
-        }
+        conditionalTokens = _conditionalTokens;
+        outcomeCount = _outcomeCount;
+        questionId = _questionId;
+        conditionId = _conditionId;
     }
 
     // Process for a resolver: call submitAnswer on Reality then resolve here
