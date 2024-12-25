@@ -117,7 +117,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         });
 
         vm.recordLogs();
-        cfm = decisionMarketFactory.createMarket(cfmQuestionParams, genericScalarQuestionParams, collateralToken);
+        cfm = decisionMarketFactory.create(cfmQuestionParams, genericScalarQuestionParams, collateralToken);
         recordScalarMarkets();
         vm.label(address(cfm), "DecisionMarket");
         vm.label(address(conditionalMarketA), "ConditionalMarketA");
