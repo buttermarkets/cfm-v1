@@ -16,19 +16,16 @@ contract FlatCFMFactory {
     IWrapped1155Factory public immutable wrapped1155Factory;
 
     event FlatCFMCreated(
-        address indexed market,
-        string roundName,
-        address collateralToken,
-        bytes32 conditionalQuestionId,
-        bytes32 conditionalConditionId
+        address indexed market, string roundName, bytes32 questionId, bytes32 conditionId, address collateralToken
     );
-    // XXX add
     event ConditionalMarketCreated(
-        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex, address collateralToken
+        address indexed decisionMarket,
+        address indexed conditionalMarket,
+        uint256 outcomeIndex,
+        string outcomeName,
+        bytes32 questionId,
+        bytes32 conditionId
     );
-    /*,
-        bytes32 conditionalQuestionId,
-        bytes32 conditionalConditionId*/
 
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
@@ -59,7 +56,7 @@ contract FlatCFMFactory {
         FlatCFM flatCFM = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
 
         emit FlatCFMCreated(
-            address(flatCFM), _flatCFMQuestionParams.roundName, address(_collateralToken), cfmQuestionId, cfmConditionId
+            address(flatCFM), _flatCFMQuestionParams.roundName, cfmQuestionId, cfmConditionId, address(_collateralToken)
         );
 
         // 4. Deploy nested conditional markets.
@@ -101,11 +98,7 @@ contract FlatCFMFactory {
             );
 
             emit ConditionalMarketCreated(
-                address(flatCFM),
-                address(csm),
-                outcomeIndex,
-                // XXX add outcomeName
-                address(_collateralToken) /*, conditionalQuestionId, conditionalConditionId*/
+                address(flatCFM), address(csm), outcomeIndex, outcomeName, conditionalQuestionId, conditionalConditionId
             );
         }
 
