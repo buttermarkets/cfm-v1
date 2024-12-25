@@ -125,7 +125,7 @@ contract DecisionMarketFactoryTest is Test {
         // Create the market with the shared outcomeNames array.
         vm.prank(owner);
         vm.recordLogs();
-        FlatCFM createdMarket = factory.createMarket(decisionQuestionParams, conditionalQuestionParams, collateralToken);
+        FlatCFM createdMarket = factory.create(decisionQuestionParams, conditionalQuestionParams, collateralToken);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256,string,bytes32,bytes32)");
         address firstCsmAddr;

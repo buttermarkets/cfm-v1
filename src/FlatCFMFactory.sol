@@ -8,9 +8,17 @@ import "./interfaces/IConditionalTokens.sol";
 import "./FlatCFMOracleAdapter.sol";
 import "./FlatCFM.sol";
 import "./ConditionalScalarMarket.sol";
-import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
+import {
+    FlatCFMQuestionParams,
+    GenericScalarQuestionParams,
+    ScalarParams,
+    WrappedConditionalTokensData,
+    ConditionalScalarCTParams
+} from "./Types.sol";
 
 contract FlatCFMFactory {
+    uint256 constant MAX_OUTCOMES = 50;
+
     FlatCFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
@@ -18,6 +26,7 @@ contract FlatCFMFactory {
     event FlatCFMCreated(
         address indexed market, string roundName, bytes32 questionId, bytes32 conditionId, address collateralToken
     );
+
     event ConditionalMarketCreated(
         address indexed decisionMarket,
         address indexed conditionalMarket,
@@ -37,75 +46,102 @@ contract FlatCFMFactory {
         wrapped1155Factory = _wrapped1155Factory;
     }
 
-    // XXX break this down
-    function createMarket(
-        FlatCFMQuestionParams calldata _flatCFMQuestionParams,
-        GenericScalarQuestionParams calldata _genericScalarQuestionParams,
-        IERC20 _collateralToken
+    /// @notice Creates a FlatCFM and corresponding nested conditional markets.
+    function create(
+        FlatCFMQuestionParams calldata flatCFMQParams,
+        GenericScalarQuestionParams calldata genericScalarQParams,
+        IERC20 collateralToken
     ) external returns (FlatCFM) {
-        uint256 outcomeCount = _flatCFMQuestionParams.outcomeNames.length;
+        uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
+        // Early revert if outcomeCount is excessively large (for gas safety).
+        require(outcomeCount > 0 && outcomeCount <= MAX_OUTCOMES, "Invalid outcome count");
 
-        // 1. Ask decision market question.
-        bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(_flatCFMQuestionParams);
+        // Create the decision market.
+        (FlatCFM cfm,, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount, collateralToken);
 
-        // 2. Prepare ConditionalTokens condition.
+        for (uint256 i = 0; i < outcomeCount;) {
+            (ConditionalScalarMarket csm, bytes32 metricQ, bytes32 conditionalConditionId) =
+                createConditionalMarket(flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId);
+            emit ConditionalMarketCreated(
+                address(cfm), address(csm), i, flatCFMQParams.outcomeNames[i], metricQ, conditionalConditionId
+            );
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        return cfm;
+    }
+
+    /// @dev 1) Asks a decision question on the oracle,
+    ///      2) Prepares the condition in ConditionalTokens,
+    ///      3) Deploys the FlatCFM contract.
+    function createDecisionMarket(
+        FlatCFMQuestionParams calldata flatCFMQParams,
+        uint256 outcomeCount,
+        IERC20 collateralToken
+    ) private returns (FlatCFM, bytes32, bytes32) {
+        bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(flatCFMQParams);
+
         conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount);
         bytes32 cfmConditionId = conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount);
 
-        // 3. Deploy decision market.
-        FlatCFM flatCFM = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
+        FlatCFM cfm = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
 
         emit FlatCFMCreated(
-            address(flatCFM), _flatCFMQuestionParams.roundName, cfmQuestionId, cfmConditionId, address(_collateralToken)
+            address(cfm), flatCFMQParams.roundName, cfmQuestionId, cfmConditionId, address(collateralToken)
         );
 
-        // 4. Deploy nested conditional markets.
-        for (uint256 outcomeIndex = 0; outcomeIndex < outcomeCount; outcomeIndex++) {
-            // Must be <=25 to allow for -LONG & -SHORT suffixes
-            require(bytes(_flatCFMQuestionParams.outcomeNames[outcomeIndex]).length <= 25, "outcome name too long");
-
-            string calldata outcomeName = _flatCFMQuestionParams.outcomeNames[outcomeIndex];
-            bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
-
-            // 4.1. Ask conditional market question.
-            bytes32 conditionalQuestionId = oracleAdapter.askMetricQuestion(_genericScalarQuestionParams, outcomeName);
-
-            // 4.2. Prepare ConditionalTokens condition.
-            conditionalTokens.prepareCondition(address(this), conditionalQuestionId, 2);
-            bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), conditionalQuestionId, 2);
-
-            // 4.3. Deploy Long/Short ERC20s. Short index: 0.
-            WrappedConditionalTokensData memory wrappedCTData = deployWrappedConditionalTokens(
-                outcomeName, _collateralToken, decisionCollectionId, conditionalConditionId
-            );
-
-            // 4.3. Deploy conditional market.
-            ConditionalScalarMarket csm = new ConditionalScalarMarket(
-                oracleAdapter,
-                conditionalTokens,
-                wrapped1155Factory,
-                ConditionalScalarCTParams({
-                    questionId: conditionalQuestionId,
-                    conditionId: conditionalConditionId,
-                    parentCollectionId: decisionCollectionId,
-                    collateralToken: _collateralToken
-                }),
-                ScalarParams({
-                    minValue: _genericScalarQuestionParams.scalarParams.minValue,
-                    maxValue: _genericScalarQuestionParams.scalarParams.maxValue
-                }),
-                wrappedCTData
-            );
-
-            emit ConditionalMarketCreated(
-                address(flatCFM), address(csm), outcomeIndex, outcomeName, conditionalQuestionId, conditionalConditionId
-            );
-        }
-
-        return flatCFM;
+        return (cfm, cfmQuestionId, cfmConditionId);
     }
 
-    function deployWrappedConditionalTokens(
+    ///@dev For each outcome,
+    ///     1) Ask a metric question,
+    ///     2) Prepare the child condition,
+    ///     3) Deploy short/long ERC20 tokens,
+    ///     4) Deploy the ConditionalScalarMarket contract.
+    function createConditionalMarket(
+        FlatCFMQuestionParams calldata flatCFMQParams,
+        uint256 outcomeIndex,
+        GenericScalarQuestionParams calldata genericScalarQParams,
+        IERC20 collateralToken,
+        bytes32 cfmConditionId
+    ) private returns (ConditionalScalarMarket, bytes32, bytes32) {
+        string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
+        require(bytes(outcomeName).length <= 25, "Outcome name too long");
+
+        bytes32 metricQ = oracleAdapter.askMetricQuestion(genericScalarQParams, outcomeName);
+
+        conditionalTokens.prepareCondition(address(this), metricQ, 2);
+        bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), metricQ, 2);
+
+        bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
+        WrappedConditionalTokensData memory wrappedCTData =
+            deployWrappedConditiontalTokens(outcomeName, collateralToken, decisionCollectionId, conditionalConditionId);
+
+        ConditionalScalarMarket csm = new ConditionalScalarMarket(
+            oracleAdapter,
+            conditionalTokens,
+            wrapped1155Factory,
+            ConditionalScalarCTParams({
+                questionId: metricQ,
+                conditionId: conditionalConditionId,
+                parentCollectionId: decisionCollectionId,
+                collateralToken: collateralToken
+            }),
+            ScalarParams({
+                minValue: genericScalarQParams.scalarParams.minValue,
+                maxValue: genericScalarQParams.scalarParams.maxValue
+            }),
+            wrappedCTData
+        );
+
+        return (csm, metricQ, conditionalConditionId);
+    }
+
+    /// @dev Deploy short/long ERC20s for the nested condition.
+    function deployWrappedConditiontalTokens(
         string calldata outcomeName,
         IERC20 collateralToken,
         bytes32 decisionCollectionId,
@@ -117,34 +153,24 @@ contract FlatCFMFactory {
         bytes memory longData = abi.encodePacked(
             toString31(string.concat(outcomeName, "-Long")), toString31(string.concat(outcomeName, "-LG")), uint8(18)
         );
-        uint256 shortPositionId = conditionalTokens.getPositionId(
-            collateralToken,
-            // Collection: condition, joint with decision outcome, 2nd slot.
-            conditionalTokens.getCollectionId(
-                // Parent collection: the corresponding decision outcome.
-                decisionCollectionId,
-                conditionalConditionId,
-                1 // 1 << 0
-            )
+
+        // Compute positions
+        uint256 shortPosId = conditionalTokens.getPositionId(
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, conditionalConditionId, 1)
         );
-        uint256 longPositionId = conditionalTokens.getPositionId(
-            collateralToken,
-            // Collection: condition, joint with decision outcome, 2nd slot.
-            conditionalTokens.getCollectionId(
-                // Parent collection: the corresponding decision outcome.
-                decisionCollectionId,
-                conditionalConditionId,
-                2 // 1 << 1
-            )
+        uint256 longPosId = conditionalTokens.getPositionId(
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, conditionalConditionId, 2)
         );
-        IERC20 wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPositionId, shortData);
-        IERC20 wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPositionId, longData);
+
+        // Create wrappers
+        IERC20 wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPosId, shortData);
+        IERC20 wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPosId, longData);
 
         return WrappedConditionalTokensData({
             shortData: shortData,
             longData: longData,
-            shortPositionId: shortPositionId,
-            longPositionId: longPositionId,
+            shortPositionId: shortPosId,
+            longPositionId: longPosId,
             wrappedShort: wrappedShort,
             wrappedLong: wrappedLong
         });
