@@ -21,7 +21,6 @@ contract CollateralToken is ERC20 {
 contract BaseIntegratedTest is Test {
     ConditionalTokens public conditionalTokens;
     Wrapped1155Factory public wrapped1155Factory;
-    CollateralToken public collateralToken;
     FakeRealityETH public fakeRealityEth;
 
     address USER = address(1);
@@ -37,22 +36,17 @@ contract BaseIntegratedTest is Test {
         vm.label(USER, "User");
         vm.label(DUMMY_ARBITRATOR, "Arbitrator");
 
-        collateralToken = new CollateralToken(INITIAL_SUPPLY);
-        vm.label(address(collateralToken), "$COL");
         conditionalTokens = new ConditionalTokens();
         vm.label(address(conditionalTokens), "ConditionalTokens");
         wrapped1155Factory = new Wrapped1155Factory();
         vm.label(address(wrapped1155Factory), "Wrapped1155Factory");
         fakeRealityEth = new FakeRealityETH();
         vm.label(address(fakeRealityEth), "RealityETH");
-
-        collateralToken.transfer(USER, USER_SUPPLY);
     }
 }
 
 contract BaseIntegratedTestCheck is BaseIntegratedTest {
     function testDependenciesDeployments() public view {
-        assertTrue(address(collateralToken) != address(0));
         assertTrue(address(conditionalTokens) != address(0));
         assertTrue(address(wrapped1155Factory) != address(0));
         assertTrue(address(fakeRealityEth) != address(0));
@@ -88,7 +82,8 @@ contract DeployCoreContractsTest is DeployCoreContractsBase {
 
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams cfmQuestionParams;
-    ScalarQuestionParams scalarQuestionParams;
+    GenericScalarQuestionParams genericScalarQuestionParams;
+    CollateralToken public collateralToken;
     FlatCFM cfm;
     ConditionalScalarMarket conditionalMarketA;
     ConditionalScalarMarket conditionalMarketB;
@@ -96,6 +91,11 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
 
     function setUp() public virtual override {
         super.setUp();
+
+        collateralToken = new CollateralToken(INITIAL_SUPPLY);
+        vm.label(address(collateralToken), "$COL");
+
+        collateralToken.transfer(USER, USER_SUPPLY);
 
         string[] memory outcomes = new string[](3);
         outcomes[0] = "Project A";
@@ -108,17 +108,16 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             openingTime: uint32(block.timestamp + 2 * 24 * 3600)
         });
 
-        scalarQuestionParams = ScalarQuestionParams({
+        genericScalarQuestionParams = GenericScalarQuestionParams({
             metricName: "ETH Price",
             startDate: "2024-01-01",
             endDate: "2024-12-31",
-            minValue: 0,
-            maxValue: 10000,
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10000}),
             openingTime: uint32(block.timestamp + 90 * 24 * 3600)
         });
 
         vm.recordLogs();
-        cfm = decisionMarketFactory.createMarket(cfmQuestionParams, scalarQuestionParams, collateralToken);
+        cfm = decisionMarketFactory.createMarket(cfmQuestionParams, genericScalarQuestionParams, collateralToken);
         recordScalarMarkets();
         vm.label(address(cfm), "DecisionMarket");
         vm.label(address(conditionalMarketA), "ConditionalMarketA");
@@ -166,6 +165,13 @@ contract SplitTestBase is CreateDecisionMarketBase {
     uint256 constant DECISION_SPLIT_AMOUNT_A = DECISION_SPLIT_AMOUNT;
     uint256 constant DECISION_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;
 
+    IERC20 wrappedShortA;
+    IERC20 wrappedLongA;
+    IERC20 wrappedShortB;
+    IERC20 wrappedLongB;
+    IERC20 wrappedShortC;
+    IERC20 wrappedLongC;
+
     function decisionDiscreetPartition() public view returns (uint256[] memory) {
         uint256[] memory partition = new uint256[](cfm.outcomeCount());
         for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
@@ -193,62 +199,45 @@ contract SplitTestBase is CreateDecisionMarketBase {
         conditionalMarketB.split(DECISION_SPLIT_AMOUNT_B);
 
         vm.stopPrank();
+
+        (,,,, wrappedShortA, wrappedLongA) = conditionalMarketA.wrappedCTData();
+        (,,,, wrappedShortB, wrappedLongB) = conditionalMarketB.wrappedCTData();
+        (,,,, wrappedShortC, wrappedLongC) = conditionalMarketC.wrappedCTData();
     }
 }
 
 contract SplitTest is SplitTestBase {
     function testSplitPositionA() public view {
-        assertEq(conditionalMarketA.wrappedShort().balanceOf(USER), DECISION_SPLIT_AMOUNT);
-        assertEq(conditionalMarketA.wrappedLong().balanceOf(USER), DECISION_SPLIT_AMOUNT);
+        assertEq(wrappedShortA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
+        assertEq(wrappedLongA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(userBalanceOutcomeA(), DECISION_SPLIT_AMOUNT - DECISION_SPLIT_AMOUNT_A);
     }
 
     function testSplitPositionB() public view {
-        assertEq(conditionalMarketB.wrappedShort().balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
-        assertEq(conditionalMarketB.wrappedLong().balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
+        assertEq(wrappedShortB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
+        assertEq(wrappedLongB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(userBalanceOutcomeB(), DECISION_SPLIT_AMOUNT - DECISION_SPLIT_AMOUNT_B);
     }
 
     function testSplitPositionC() public view {
-        assertEq(conditionalMarketC.wrappedShort().balanceOf(USER), 0);
-        assertEq(conditionalMarketC.wrappedLong().balanceOf(USER), 0);
+        assertEq(wrappedShortC.balanceOf(USER), 0);
+        assertEq(wrappedLongC.balanceOf(USER), 0);
         assertEq(userBalanceOutcomeC(), DECISION_SPLIT_AMOUNT);
     }
 
     function userBalanceOutcomeA() private view returns (uint256) {
-        return conditionalTokens.balanceOf(
-            USER,
-            conditionalTokens.getPositionId(
-                collateralToken,
-                conditionalTokens.getCollectionId(
-                    0, conditionalMarketA.parentConditionId(), 1 << conditionalMarketA.outcomeIndex()
-                )
-            )
-        );
+        (,, bytes32 parentCollectionId,) = conditionalMarketA.ctParams();
+        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
     }
 
     function userBalanceOutcomeB() private view returns (uint256) {
-        return conditionalTokens.balanceOf(
-            USER,
-            conditionalTokens.getPositionId(
-                collateralToken,
-                conditionalTokens.getCollectionId(
-                    0, conditionalMarketB.parentConditionId(), 1 << conditionalMarketB.outcomeIndex()
-                )
-            )
-        );
+        (,, bytes32 parentCollectionId,) = conditionalMarketB.ctParams();
+        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
     }
 
     function userBalanceOutcomeC() private view returns (uint256) {
-        return conditionalTokens.balanceOf(
-            USER,
-            conditionalTokens.getPositionId(
-                collateralToken,
-                conditionalTokens.getCollectionId(
-                    0, conditionalMarketC.parentConditionId(), 1 << conditionalMarketC.outcomeIndex()
-                )
-            )
-        );
+        (,, bytes32 parentCollectionId,) = conditionalMarketC.ctParams();
+        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
     }
 }
 
@@ -276,85 +265,77 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
         conditionalMarketB.split(CONTRACT_LIQUIDITY);
         conditionalMarketC.split(CONTRACT_LIQUIDITY);
 
-        ammA = new SimpleAMM(conditionalMarketA.wrappedShort(), conditionalMarketA.wrappedLong());
+        ammA = new SimpleAMM(wrappedShortA, wrappedLongA);
         vm.label(address(ammA), "amm A");
-        ammB = new SimpleAMM(conditionalMarketB.wrappedShort(), conditionalMarketB.wrappedLong());
+        ammB = new SimpleAMM(wrappedShortB, wrappedLongB);
         vm.label(address(ammB), "amm B");
-        ammC = new SimpleAMM(conditionalMarketC.wrappedShort(), conditionalMarketC.wrappedLong());
+        ammC = new SimpleAMM(wrappedShortC, wrappedLongC);
         vm.label(address(ammC), "amm C");
 
-        conditionalMarketA.wrappedShort().approve(address(ammA), CONTRACT_LIQUIDITY);
-        conditionalMarketA.wrappedLong().approve(address(ammA), CONTRACT_LIQUIDITY);
+        wrappedShortA.approve(address(ammA), CONTRACT_LIQUIDITY);
+        wrappedLongA.approve(address(ammA), CONTRACT_LIQUIDITY);
         ammA.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
 
-        conditionalMarketB.wrappedShort().approve(address(ammB), CONTRACT_LIQUIDITY);
-        conditionalMarketB.wrappedLong().approve(address(ammB), CONTRACT_LIQUIDITY);
+        wrappedShortB.approve(address(ammB), CONTRACT_LIQUIDITY);
+        wrappedLongB.approve(address(ammB), CONTRACT_LIQUIDITY);
         ammB.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
 
-        conditionalMarketC.wrappedShort().approve(address(ammC), CONTRACT_LIQUIDITY);
-        conditionalMarketC.wrappedLong().approve(address(ammC), CONTRACT_LIQUIDITY);
+        wrappedShortC.approve(address(ammC), CONTRACT_LIQUIDITY);
+        wrappedLongC.approve(address(ammC), CONTRACT_LIQUIDITY);
         ammC.addLiquidity(CONTRACT_LIQUIDITY, CONTRACT_LIQUIDITY);
 
         vm.startPrank(USER);
 
-        conditionalMarketA.wrappedShort().approve(address(ammA), TRADE_AMOUNT);
+        wrappedShortA.approve(address(ammA), TRADE_AMOUNT);
         ammA.swap(true, TRADE_AMOUNT);
 
-        conditionalMarketB.wrappedShort().approve(address(ammB), TRADE_AMOUNT);
+        wrappedShortB.approve(address(ammB), TRADE_AMOUNT);
         ammB.swap(true, TRADE_AMOUNT);
 
         conditionalMarketC.split(DECISION_SPLIT_AMOUNT_C);
-        conditionalMarketC.wrappedShort().approve(address(ammC), TRADE_AMOUNT * 2);
+        wrappedShortC.approve(address(ammC), TRADE_AMOUNT * 2);
         ammC.swap(true, TRADE_AMOUNT * 2);
 
         vm.stopPrank();
     }
 
     function marketBalanceA(bool short) internal view returns (uint256) {
-        return short
-            ? conditionalMarketA.wrappedShort().balanceOf(address(ammA))
-            : conditionalMarketA.wrappedLong().balanceOf(address(ammA));
+        return short ? wrappedShortA.balanceOf(address(ammA)) : wrappedLongA.balanceOf(address(ammA));
     }
 
     function marketBalanceB(bool short) internal view returns (uint256) {
-        return short
-            ? conditionalMarketB.wrappedShort().balanceOf(address(ammB))
-            : conditionalMarketB.wrappedLong().balanceOf(address(ammB));
+        return short ? wrappedShortB.balanceOf(address(ammB)) : wrappedLongB.balanceOf(address(ammB));
     }
 
     function marketBalanceC(bool short) internal view returns (uint256) {
-        return short
-            ? conditionalMarketC.wrappedShort().balanceOf(address(ammC))
-            : conditionalMarketC.wrappedLong().balanceOf(address(ammC));
+        return short ? wrappedShortC.balanceOf(address(ammC)) : wrappedLongC.balanceOf(address(ammC));
     }
 }
 
 contract TradeTest is TradeTestBase {
     function testTradeOutcomeA() public view {
-        assertTrue(conditionalMarketA.wrappedShort().balanceOf(USER) < DECISION_SPLIT_AMOUNT);
-        assertTrue(conditionalMarketA.wrappedLong().balanceOf(USER) > DECISION_SPLIT_AMOUNT);
+        assertTrue(wrappedShortA.balanceOf(USER) < DECISION_SPLIT_AMOUNT);
+        assertTrue(wrappedLongA.balanceOf(USER) > DECISION_SPLIT_AMOUNT);
         assertTrue(marketBalanceA(true) > CONTRACT_LIQUIDITY);
         assertTrue(marketBalanceA(false) < CONTRACT_LIQUIDITY);
     }
 
     function testTradeOutcomeB() public view {
         assertEq(
-            DECISION_SPLIT_AMOUNT / 2 - conditionalMarketB.wrappedShort().balanceOf(USER),
-            DECISION_SPLIT_AMOUNT - conditionalMarketA.wrappedShort().balanceOf(USER)
+            DECISION_SPLIT_AMOUNT / 2 - wrappedShortB.balanceOf(USER),
+            DECISION_SPLIT_AMOUNT - wrappedShortA.balanceOf(USER)
         );
         assertEq(
-            conditionalMarketB.wrappedLong().balanceOf(USER) - (DECISION_SPLIT_AMOUNT / 2),
-            conditionalMarketA.wrappedLong().balanceOf(USER) - DECISION_SPLIT_AMOUNT
+            wrappedLongB.balanceOf(USER) - (DECISION_SPLIT_AMOUNT / 2),
+            wrappedLongA.balanceOf(USER) - DECISION_SPLIT_AMOUNT
         );
         assertEq(marketBalanceA(true), marketBalanceB(true));
         assertEq(marketBalanceA(false), marketBalanceB(false));
     }
 
     function testTradeOutcomeC() public view {
-        assertTrue(
-            conditionalMarketC.wrappedShort().balanceOf(USER) < conditionalMarketB.wrappedShort().balanceOf(USER)
-        );
-        assertTrue(conditionalMarketC.wrappedLong().balanceOf(USER) > conditionalMarketB.wrappedLong().balanceOf(USER));
+        assertTrue(wrappedShortC.balanceOf(USER) < wrappedShortB.balanceOf(USER));
+        assertTrue(wrappedLongC.balanceOf(USER) > wrappedLongB.balanceOf(USER));
         assertTrue(marketBalanceC(true) > marketBalanceB(true));
         assertTrue(marketBalanceC(false) < marketBalanceB(false));
     }
@@ -377,28 +358,28 @@ contract MergeTestBase is TradeTestBase {
     function setUp() public virtual override {
         super.setUp();
 
-        uint256 someTradeAmount = conditionalMarketC.wrappedLong().balanceOf(USER) / 4;
+        uint256 someTradeAmount = wrappedLongC.balanceOf(USER) / 4;
 
         vm.startPrank(USER);
-        conditionalMarketC.wrappedLong().approve(address(ammC), someTradeAmount);
+        wrappedLongC.approve(address(ammC), someTradeAmount);
         ammC.swap(false, someTradeAmount);
-        uint256 mergeMax = conditionalMarketC.wrappedShort().balanceOf(USER);
+        uint256 mergeMax = wrappedShortC.balanceOf(USER);
 
         userBalanceBeforeMerge = UserBalance({
-            AShort: conditionalMarketA.wrappedShort().balanceOf(USER),
-            ALong: conditionalMarketA.wrappedLong().balanceOf(USER),
-            BShort: conditionalMarketB.wrappedShort().balanceOf(USER),
-            BLong: conditionalMarketB.wrappedLong().balanceOf(USER),
-            CShort: conditionalMarketC.wrappedShort().balanceOf(USER),
-            CLong: conditionalMarketC.wrappedLong().balanceOf(USER)
+            AShort: wrappedShortA.balanceOf(USER),
+            ALong: wrappedLongA.balanceOf(USER),
+            BShort: wrappedShortB.balanceOf(USER),
+            BLong: wrappedLongB.balanceOf(USER),
+            CShort: wrappedShortC.balanceOf(USER),
+            CLong: wrappedLongC.balanceOf(USER)
         });
 
-        conditionalMarketA.wrappedLong().approve(address(conditionalMarketA), MERGE_AMOUNT);
-        conditionalMarketA.wrappedShort().approve(address(conditionalMarketA), MERGE_AMOUNT);
-        conditionalMarketB.wrappedLong().approve(address(conditionalMarketB), MERGE_AMOUNT);
-        conditionalMarketB.wrappedShort().approve(address(conditionalMarketB), MERGE_AMOUNT);
-        conditionalMarketC.wrappedLong().approve(address(conditionalMarketC), mergeMax);
-        conditionalMarketC.wrappedShort().approve(address(conditionalMarketC), mergeMax);
+        wrappedLongA.approve(address(conditionalMarketA), MERGE_AMOUNT);
+        wrappedShortA.approve(address(conditionalMarketA), MERGE_AMOUNT);
+        wrappedLongB.approve(address(conditionalMarketB), MERGE_AMOUNT);
+        wrappedShortB.approve(address(conditionalMarketB), MERGE_AMOUNT);
+        wrappedLongC.approve(address(conditionalMarketC), mergeMax);
+        wrappedShortC.approve(address(conditionalMarketC), mergeMax);
 
         conditionalMarketA.merge(MERGE_AMOUNT);
         conditionalMarketB.merge(MERGE_AMOUNT);
@@ -410,18 +391,18 @@ contract MergeTestBase is TradeTestBase {
 
 contract MergeTest is MergeTestBase {
     function testMergePositionsA() public view {
-        assertEq(conditionalMarketA.wrappedShort().balanceOf(USER), userBalanceBeforeMerge.AShort - MERGE_AMOUNT);
-        assertEq(conditionalMarketA.wrappedLong().balanceOf(USER), userBalanceBeforeMerge.ALong - MERGE_AMOUNT);
+        assertEq(wrappedShortA.balanceOf(USER), userBalanceBeforeMerge.AShort - MERGE_AMOUNT);
+        assertEq(wrappedLongA.balanceOf(USER), userBalanceBeforeMerge.ALong - MERGE_AMOUNT);
     }
 
     function testMergePositionsB() public view {
-        assertEq(conditionalMarketB.wrappedShort().balanceOf(USER), userBalanceBeforeMerge.BShort - MERGE_AMOUNT);
-        assertEq(conditionalMarketB.wrappedLong().balanceOf(USER), userBalanceBeforeMerge.BLong - MERGE_AMOUNT);
+        assertEq(wrappedShortB.balanceOf(USER), userBalanceBeforeMerge.BShort - MERGE_AMOUNT);
+        assertEq(wrappedLongB.balanceOf(USER), userBalanceBeforeMerge.BLong - MERGE_AMOUNT);
     }
 
     function testMergePositionsC() public view {
         // Merged all into collateral, so no wrapped short left.
-        assertEq(conditionalMarketC.wrappedShort().balanceOf(USER), 0);
+        assertEq(wrappedShortC.balanceOf(USER), 0);
     }
 }
 
