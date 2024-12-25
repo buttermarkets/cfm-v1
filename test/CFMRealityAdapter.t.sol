@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/src/Test.sol";
 
 import "src/FlatCFMRealityAdapter.sol";
+import {GenericScalarQuestionParams, ScalarParams} from "src/Types.sol";
 import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import {FakeRealityETH} from "./FakeRealityETH.sol";
 
@@ -61,12 +62,11 @@ contract CFMRealityAdapterWithMockTest is Test {
     }
 
     function testAskMetricQuestion() public {
-        ScalarQuestionParams memory params = ScalarQuestionParams({
+        GenericScalarQuestionParams memory params = GenericScalarQuestionParams({
             metricName: "ETH price",
             startDate: "2024-01-01",
             endDate: "2025-01-01",
-            minValue: 0,
-            maxValue: 10000000,
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10000000}),
             openingTime: uint32(block.timestamp + 1000)
         });
 

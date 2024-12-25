@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
 import "./FlatCFMOracleAdapter.sol";
-import {FlatCFMQuestionParams, ScalarQuestionParams} from "./QuestionTypes.sol";
+import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
 
 // The adapter component implements both client (CFM) interface
 // and service (Reality) interface and translates incoming and outgoing calls between client and service.
@@ -38,33 +38,33 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     }
 
     // TODO unit test
-    function _formatDecisionQuestionParams(FlatCFMQuestionParams calldata decisionQuestionParams)
+    function _formatDecisionQuestionParams(FlatCFMQuestionParams calldata flatCFMQuestionParams)
         private
         pure
         returns (string memory)
     {
-        bytes memory formattedOutcomes = abi.encodePacked('"', decisionQuestionParams.outcomeNames[0], '"');
+        bytes memory formattedOutcomes = abi.encodePacked('"', flatCFMQuestionParams.outcomeNames[0], '"');
 
-        for (uint256 i = 1; i < decisionQuestionParams.outcomeNames.length; i++) {
-            formattedOutcomes = abi.encodePacked(formattedOutcomes, ',"', decisionQuestionParams.outcomeNames[i], '"');
+        for (uint256 i = 1; i < flatCFMQuestionParams.outcomeNames.length; i++) {
+            formattedOutcomes = abi.encodePacked(formattedOutcomes, ',"', flatCFMQuestionParams.outcomeNames[i], '"');
         }
 
-        return string(abi.encodePacked(decisionQuestionParams.roundName, SEPARATOR, formattedOutcomes));
+        return string(abi.encodePacked(flatCFMQuestionParams.roundName, SEPARATOR, formattedOutcomes));
     }
 
     function _formatMetricQuestionParams(
-        ScalarQuestionParams calldata conditionalQuestionParams,
+        GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
     ) private pure returns (string memory) {
         return string(
             abi.encodePacked(
-                conditionalQuestionParams.metricName,
+                genericScalarQuestionParams.metricName,
                 SEPARATOR,
                 outcomeName,
                 SEPARATOR,
-                conditionalQuestionParams.startDate,
+                genericScalarQuestionParams.startDate,
                 SEPARATOR,
-                conditionalQuestionParams.endDate
+                genericScalarQuestionParams.endDate
             )
         );
     }
@@ -94,23 +94,22 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         );
     }
 
-    function askDecisionQuestion(FlatCFMQuestionParams calldata decisionQuestionParams)
+    function askDecisionQuestion(FlatCFMQuestionParams calldata flatCFMQuestionParams)
         public
         override
         returns (bytes32)
     {
-        string memory formattedDecisionQuestionParams = _formatDecisionQuestionParams(decisionQuestionParams);
-        return _askQuestion(decisionTemplateId, formattedDecisionQuestionParams, decisionQuestionParams.openingTime);
+        string memory formattedDecisionQuestionParams = _formatDecisionQuestionParams(flatCFMQuestionParams);
+        return _askQuestion(decisionTemplateId, formattedDecisionQuestionParams, flatCFMQuestionParams.openingTime);
     }
 
-    function askMetricQuestion(ScalarQuestionParams calldata conditionalQuestionParams, string memory outcomeName)
-        public
-        override
-        returns (bytes32)
-    {
+    function askMetricQuestion(
+        GenericScalarQuestionParams calldata genericScalarQuestionParams,
+        string memory outcomeName
+    ) public override returns (bytes32) {
         string memory formattedMetricQuestionParams =
-            _formatMetricQuestionParams(conditionalQuestionParams, outcomeName);
-        return _askQuestion(metricTemplateId, formattedMetricQuestionParams, conditionalQuestionParams.openingTime);
+            _formatMetricQuestionParams(genericScalarQuestionParams, outcomeName);
+        return _askQuestion(metricTemplateId, formattedMetricQuestionParams, genericScalarQuestionParams.openingTime);
     }
 
     /// @dev This is not-reverting only when the question is finalized in Reality.

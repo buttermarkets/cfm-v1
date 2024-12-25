@@ -114,12 +114,11 @@ contract DecisionMarketFactoryTest is Test {
         FlatCFMQuestionParams memory decisionQuestionParams =
             FlatCFMQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
 
-        ScalarQuestionParams memory conditionalQuestionParams = ScalarQuestionParams({
+        GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
             metricName: "metric",
             startDate: "2024-01-01",
             endDate: "2025-01-01",
-            minValue: minValue,
-            maxValue: maxValue,
+            scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
 
@@ -154,7 +153,8 @@ contract DecisionMarketFactoryTest is Test {
 
         assertEq(address(firstCsm.oracleAdapter()), address(oracleAdapter));
         assertEq(address(firstCsm.conditionalTokens()), address(conditionalTokens));
-        assertEq(firstCsm.minValue(), conditionalQuestionParams.minValue);
-        assertEq(firstCsm.maxValue(), conditionalQuestionParams.maxValue);
+        (uint256 minv, uint256 maxv) = firstCsm.scalarParams();
+        assertEq(minv, conditionalQuestionParams.scalarParams.minValue);
+        assertEq(maxv, conditionalQuestionParams.scalarParams.maxValue);
     }
 }
