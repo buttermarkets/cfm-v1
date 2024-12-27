@@ -23,7 +23,14 @@ contract FlatCFMFactory {
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
-    event FlatCFMCreated(address indexed market, string roundName, address collateralToken);
+    event FlatCFMCreated(
+        address indexed market,
+        string roundName,
+        string metricName,
+        string startDate,
+        string endDate,
+        address collateralToken
+    );
 
     event ConditionalMarketCreated(
         address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex, string outcomeName
@@ -50,7 +57,16 @@ contract FlatCFMFactory {
         require(outcomeCount > 0 && outcomeCount <= MAX_OUTCOMES, "Invalid outcome count");
 
         // Create the decision market.
-        (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount, collateralToken);
+        (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount);
+
+        emit FlatCFMCreated(
+            address(cfm),
+            flatCFMQParams.roundName,
+            genericScalarQParams.metricName,
+            genericScalarQParams.startDate,
+            genericScalarQParams.endDate,
+            address(collateralToken)
+        );
 
         for (uint256 i = 0; i < outcomeCount;) {
             ConditionalScalarMarket csm =
@@ -68,19 +84,16 @@ contract FlatCFMFactory {
     /// @dev 1) Asks a decision question on the oracle,
     ///      2) Prepares the condition in ConditionalTokens,
     ///      3) Deploys the FlatCFM contract.
-    function createDecisionMarket(
-        FlatCFMQuestionParams calldata flatCFMQParams,
-        uint256 outcomeCount,
-        IERC20 collateralToken
-    ) private returns (FlatCFM, bytes32) {
+    function createDecisionMarket(FlatCFMQuestionParams calldata flatCFMQParams, uint256 outcomeCount)
+        private
+        returns (FlatCFM, bytes32)
+    {
         bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(flatCFMQParams);
 
         conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount);
         bytes32 cfmConditionId = conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount);
 
         FlatCFM cfm = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
-
-        emit FlatCFMCreated(address(cfm), flatCFMQParams.roundName, address(collateralToken));
 
         return (cfm, cfmConditionId);
     }
