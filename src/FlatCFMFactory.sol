@@ -23,17 +23,10 @@ contract FlatCFMFactory {
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
-    event FlatCFMCreated(
-        address indexed market, string roundName, bytes32 questionId, bytes32 conditionId, address collateralToken
-    );
+    event FlatCFMCreated(address indexed market, string roundName, address collateralToken);
 
     event ConditionalMarketCreated(
-        address indexed decisionMarket,
-        address indexed conditionalMarket,
-        uint256 outcomeIndex,
-        string outcomeName,
-        bytes32 questionId,
-        bytes32 conditionId
+        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex, string outcomeName
     );
 
     constructor(
@@ -57,14 +50,12 @@ contract FlatCFMFactory {
         require(outcomeCount > 0 && outcomeCount <= MAX_OUTCOMES, "Invalid outcome count");
 
         // Create the decision market.
-        (FlatCFM cfm,, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount, collateralToken);
+        (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount, collateralToken);
 
         for (uint256 i = 0; i < outcomeCount;) {
-            (ConditionalScalarMarket csm, bytes32 metricQ, bytes32 conditionalConditionId) =
+            ConditionalScalarMarket csm =
                 createConditionalMarket(flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId);
-            emit ConditionalMarketCreated(
-                address(cfm), address(csm), i, flatCFMQParams.outcomeNames[i], metricQ, conditionalConditionId
-            );
+            emit ConditionalMarketCreated(address(cfm), address(csm), i, flatCFMQParams.outcomeNames[i]);
 
             unchecked {
                 ++i;
@@ -81,7 +72,7 @@ contract FlatCFMFactory {
         FlatCFMQuestionParams calldata flatCFMQParams,
         uint256 outcomeCount,
         IERC20 collateralToken
-    ) private returns (FlatCFM, bytes32, bytes32) {
+    ) private returns (FlatCFM, bytes32) {
         bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(flatCFMQParams);
 
         conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount);
@@ -89,11 +80,9 @@ contract FlatCFMFactory {
 
         FlatCFM cfm = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
 
-        emit FlatCFMCreated(
-            address(cfm), flatCFMQParams.roundName, cfmQuestionId, cfmConditionId, address(collateralToken)
-        );
+        emit FlatCFMCreated(address(cfm), flatCFMQParams.roundName, address(collateralToken));
 
-        return (cfm, cfmQuestionId, cfmConditionId);
+        return (cfm, cfmConditionId);
     }
 
     ///@dev For each outcome,
@@ -107,7 +96,7 @@ contract FlatCFMFactory {
         GenericScalarQuestionParams calldata genericScalarQParams,
         IERC20 collateralToken,
         bytes32 cfmConditionId
-    ) private returns (ConditionalScalarMarket, bytes32, bytes32) {
+    ) private returns (ConditionalScalarMarket) {
         string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
         require(bytes(outcomeName).length <= 25, "Outcome name too long");
 
@@ -137,7 +126,7 @@ contract FlatCFMFactory {
             wrappedCTData
         );
 
-        return (csm, metricQ, conditionalConditionId);
+        return csm;
     }
 
     /// @dev Deploy short/long ERC20s for the nested condition.
