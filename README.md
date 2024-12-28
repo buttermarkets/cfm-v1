@@ -1,3 +1,47 @@
+# how to
+
+## deploy a factory
+
+```sh
+export ORACLE_ADAPTER=0x1234...
+export CONDITIONAL_TOKENS=0xabcd...
+export WRAPPED1155_FACTORY=0x9999...
+forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast
+```
+
+## deploy a new Flat CFM
+
+First, define a config file (by default, use `./flatcfm.config.json`), like
+
+```json
+{
+  "roundName": "Demo Round",
+  "outcomeNames": ["Project A", "Project B"],
+  "openingTimeDecision": 1680000000,  
+  "metricName": "Rainfall (mm)",
+  "startDate": "2024-05-01",
+  "endDate": "2024-05-15",
+  "minValue": 0,
+  "maxValue": 200,
+  "openingTimeMetric": 1681000000,
+  "collateralToken": "0x1234567890abcdef1234567890abcdef12345678"
+}
+```
+
+then run
+
+```sh
+export FACTORY_ADDRESS=0x1234…
+export MARKET_CONFIG_FILE=./somewhere/flatcfm.config.json
+forge script script/CreateFlatCFMFromConfig.s.sol:CreateFlatCFMFromConfig \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast
+```
+
 # conditional funding markets (CFM)
 
 ## mechansim: flat-cfm

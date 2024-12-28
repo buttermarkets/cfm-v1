@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/* solhint-disable no-console */
+pragma solidity ^0.8.20;
+
+import "forge-std/src/Script.sol";
+
+import "src/FlatCFMFactory.sol";
+import "src/FlatCFMOracleAdapter.sol";
+import "src/interfaces/IConditionalTokens.sol";
+import "src/interfaces/IWrapped1155Factory.sol";
+
+contract CreateFlatCFMFromConfig is Script {
+    // Fallback JSON file path
+    string constant DEFAULT_CONFIG_FILE_PATH = "./flatcfm-config.json";
+
+    function run() external {
+        vm.startBroadcast();
+
+        // 1. Load the factory
+        FlatCFMFactory factory = FlatCFMFactory(vm.envAddress("FACTORY_ADDRESS"));
+
+        // 2. Determine the JSON file path from an env var or fallback
+        string memory configPath = _getJsonFilePath();
+
+        // 3. Read the entire JSON file
+        string memory jsonContent = vm.readFile(configPath);
+
+        // 4. Parse the parameters
+        FlatCFMQuestionParams memory flatQParams = _parseFlatCFMQuestionParams(jsonContent);
+        GenericScalarQuestionParams memory scalarQParams = _parseGenericScalarQuestionParams(jsonContent);
+        address collateralAddr = _parseCollateralAddress(jsonContent);
+
+        // 5. Call create
+        FlatCFM market = factory.create(flatQParams, scalarQParams, IERC20(collateralAddr));
+
+        // Log the newly created FlatCFM contract
+        console.log("Deployed FlatCFM at:", address(market));
+
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev Reads `MARKET_CONFIG_FILE` from env if present, otherwise returns DEFAULT_CONFIG_FILE_PATH
+     */
+    function _getJsonFilePath() internal view returns (string memory) {
+        string memory path;
+        try vm.envString("MARKET_CONFIG_FILE") returns (string memory envPath) {
+            path = envPath;
+        } catch {
+            path = DEFAULT_CONFIG_FILE_PATH;
+        }
+        return path;
+    }
+
+    /// @dev Reads `FlatCFMQuestionParams` from JSON
+    function _parseFlatCFMQuestionParams(string memory json) private pure returns (FlatCFMQuestionParams memory) {
+        string memory roundName = vm.parseJsonString(json, ".roundName");
+
+        // outcomeNames is an array of strings
+        bytes memory outcomeNamesRaw = vm.parseJson(json, ".outcomeNames");
+        string[] memory outcomeNames = abi.decode(outcomeNamesRaw, (string[]));
+
+        uint256 openingTimeDecision = vm.parseJsonUint(json, ".openingTimeDecision");
+        require(openingTimeDecision <= type(uint32).max, "openingTime overflow");
+
+        return FlatCFMQuestionParams({
+            roundName: roundName,
+            outcomeNames: outcomeNames,
+            openingTime: uint32(openingTimeDecision)
+        });
+    }
+
+    /// @dev Reads `GenericScalarQuestionParams` from JSON
+    function _parseGenericScalarQuestionParams(string memory json)
+        private
+        pure
+        returns (GenericScalarQuestionParams memory)
+    {
+        string memory metricName = vm.parseJsonString(json, ".metricName");
+        string memory startDate = vm.parseJsonString(json, ".startDate");
+        string memory endDate = vm.parseJsonString(json, ".endDate");
+
+        // minValue & maxValue
+        uint256 minValue = vm.parseJsonUint(json, ".minValue");
+        uint256 maxValue = vm.parseJsonUint(json, ".maxValue");
+
+        // openingTime for the metric
+        uint256 openingTimeMetric = vm.parseJsonUint(json, ".openingTimeMetric");
+        require(openingTimeMetric <= type(uint32).max, "openingTime overflow");
+
+        return GenericScalarQuestionParams({
+            metricName: metricName,
+            startDate: startDate,
+            endDate: endDate,
+            scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
+            openingTime: uint32(openingTimeMetric)
+        });
+    }
+
+    /// @dev Reads the collateral token address from JSON
+    function _parseCollateralAddress(string memory json) private pure returns (address) {
+        // parseJsonAddress is available in Foundry's newer versions
+        return vm.parseJsonAddress(json, ".collateralToken");
+    }
+}
