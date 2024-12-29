@@ -124,30 +124,36 @@ contract FlatCFMFactory {
         IERC20 collateralToken,
         bytes32 cfmConditionId
     ) private returns (ConditionalScalarMarket) {
-        string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
-        if (bytes(outcomeName).length > 25) revert InvalidOutcomeNameLength(outcomeName, 25);
+        WrappedConditionalTokensData memory wrappedCTData;
+        ConditionalScalarCTParams memory conditionalScalarCTParams;
+        {
+            string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
+            if (bytes(outcomeName).length > 25) revert InvalidOutcomeNameLength(outcomeName, 25);
 
-        bytes32 metricQ = oracleAdapter.askMetricQuestion(genericScalarQParams, outcomeName);
+            bytes32 metricQ = oracleAdapter.askMetricQuestion(genericScalarQParams, outcomeName);
 
-        conditionalTokens.prepareCondition(address(this), metricQ, 2);
-        bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), metricQ, 2);
+            conditionalTokens.prepareCondition(address(this), metricQ, 2);
+            bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), metricQ, 2);
 
-        bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
-        WrappedConditionalTokensData memory wrappedCTData =
-            deployWrappedConditiontalTokens(outcomeName, collateralToken, decisionCollectionId, conditionalConditionId);
+            bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
+            wrappedCTData = deployWrappedConditiontalTokens(
+                outcomeName, collateralToken, decisionCollectionId, conditionalConditionId
+            );
 
-        address csmClone = conditionalScalarMarketImplementation.clone();
-        ConditionalScalarMarket csm = ConditionalScalarMarket(csmClone);
-        csm.initialize(
-            oracleAdapter,
-            conditionalTokens,
-            wrapped1155Factory,
-            ConditionalScalarCTParams({
+            conditionalScalarCTParams = ConditionalScalarCTParams({
                 questionId: metricQ,
                 conditionId: conditionalConditionId,
                 parentCollectionId: decisionCollectionId,
                 collateralToken: collateralToken
-            }),
+            });
+        }
+
+        ConditionalScalarMarket csm = ConditionalScalarMarket(conditionalScalarMarketImplementation.clone());
+        csm.initialize(
+            oracleAdapter,
+            conditionalTokens,
+            wrapped1155Factory,
+            conditionalScalarCTParams,
             ScalarParams({
                 minValue: genericScalarQParams.scalarParams.minValue,
                 maxValue: genericScalarQParams.scalarParams.maxValue
