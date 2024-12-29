@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.20;
 
+import "@openzeppelin-contracts/proxy/Clones.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IWrapped1155Factory.sol";
@@ -17,11 +18,15 @@ import {
 } from "./Types.sol";
 
 contract FlatCFMFactory {
+    using Clones for address;
+
     uint256 constant MAX_OUTCOMES = 50;
 
     FlatCFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
+
+    address public immutable conditionalScalarMarketImplementation;
 
     event FlatCFMCreated(
         address indexed market,
@@ -44,6 +49,10 @@ contract FlatCFMFactory {
         oracleAdapter = _oracleAdapter;
         conditionalTokens = _conditionalTokens;
         wrapped1155Factory = _wrapped1155Factory;
+
+        // This contract is never used directly; only cloned via EIP-1167.
+        ConditionalScalarMarket master = new ConditionalScalarMarket();
+        conditionalScalarMarketImplementation = address(master);
     }
 
     /// @notice Creates a FlatCFM and corresponding nested conditional markets.
@@ -53,10 +62,8 @@ contract FlatCFMFactory {
         IERC20 collateralToken
     ) external returns (FlatCFM) {
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
-        // Early revert if outcomeCount is excessively large (for gas safety).
         require(outcomeCount > 0 && outcomeCount <= MAX_OUTCOMES, "Invalid outcome count");
 
-        // Create the decision market.
         (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount);
 
         emit FlatCFMCreated(
@@ -71,6 +78,7 @@ contract FlatCFMFactory {
         for (uint256 i = 0; i < outcomeCount;) {
             ConditionalScalarMarket csm =
                 createConditionalMarket(flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId);
+
             emit ConditionalMarketCreated(address(cfm), address(csm), i, flatCFMQParams.outcomeNames[i]);
 
             unchecked {
@@ -122,7 +130,9 @@ contract FlatCFMFactory {
         WrappedConditionalTokensData memory wrappedCTData =
             deployWrappedConditiontalTokens(outcomeName, collateralToken, decisionCollectionId, conditionalConditionId);
 
-        ConditionalScalarMarket csm = new ConditionalScalarMarket(
+        address csmClone = conditionalScalarMarketImplementation.clone();
+        ConditionalScalarMarket csm = ConditionalScalarMarket(csmClone);
+        csm.initialize(
             oracleAdapter,
             conditionalTokens,
             wrapped1155Factory,
@@ -156,7 +166,6 @@ contract FlatCFMFactory {
             toString31(string.concat(outcomeName, "-Long")), toString31(string.concat(outcomeName, "-LG")), uint8(18)
         );
 
-        // Compute positions
         uint256 shortPosId = conditionalTokens.getPositionId(
             collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, conditionalConditionId, 1)
         );
@@ -164,7 +173,6 @@ contract FlatCFMFactory {
             collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, conditionalConditionId, 2)
         );
 
-        // Create wrappers
         IERC20 wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPosId, shortData);
         IERC20 wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPosId, longData);
 

@@ -12,9 +12,9 @@ import "./FlatCFMOracleAdapter.sol";
 
 contract ConditionalScalarMarket is ERC1155Holder {
     // Decision market attributes:
-    FlatCFMOracleAdapter public immutable oracleAdapter;
-    IConditionalTokens public immutable conditionalTokens;
-    IWrapped1155Factory public immutable wrapped1155Factory;
+    FlatCFMOracleAdapter public oracleAdapter;
+    IConditionalTokens public conditionalTokens;
+    IWrapped1155Factory public wrapped1155Factory;
     // ConditionalTokens-specific attributes:
     ConditionalScalarCTParams public ctParams;
     // Scalar market-specific attributes:
@@ -23,17 +23,20 @@ contract ConditionalScalarMarket is ERC1155Holder {
     WrappedConditionalTokensData public wrappedCTData;
 
     // State attributes:
-    // XXX: useless if can be checked through ConditionalTokens.
-    //bool public isResolved;
+    bool public initialized;
 
-    constructor(
+    /// @notice Initialize function called by each clone.
+    function initialize(
         FlatCFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
         IWrapped1155Factory _wrapped1155Factory,
         ConditionalScalarCTParams memory _conditionalScalarCTParams,
         ScalarParams memory _scalarParams,
         WrappedConditionalTokensData memory _wrappedCTData
-    ) {
+    ) external {
+        require(!initialized, "Already initialized");
+        initialized = true;
+
         oracleAdapter = _oracleAdapter;
         conditionalTokens = _conditionalTokens;
         wrapped1155Factory = _wrapped1155Factory;
