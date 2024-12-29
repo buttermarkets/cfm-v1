@@ -25,6 +25,12 @@ contract ConditionalScalarMarket is ERC1155Holder {
     // State attributes:
     bool public initialized;
 
+    error AlreadyInitialized();
+    error WrappedShortTransferFailed(address wrappedShort, address from, address to, uint256 amount);
+    error WrappedLongTransferFailed(address wrappedShort, address from, address to, uint256 amount);
+    error MergeAmountNull();
+    error RedeemAmountNull();
+
     /// @notice Initialize function called by each clone.
     function initialize(
         FlatCFMOracleAdapter _oracleAdapter,
@@ -34,7 +40,7 @@ contract ConditionalScalarMarket is ERC1155Holder {
         ScalarParams memory _scalarParams,
         WrappedConditionalTokensData memory _wrappedCTData
     ) external {
-        require(!initialized, "Already initialized");
+        if (initialized) revert AlreadyInitialized();
         initialized = true;
 
         oracleAdapter = _oracleAdapter;
@@ -104,19 +110,25 @@ contract ConditionalScalarMarket is ERC1155Holder {
         );
 
         // Contract transfers Long/Short ERC20 to user.
-        require(wrappedCTData.wrappedShort.transfer(msg.sender, amount), "split short erc20 transfer failed");
-        require(wrappedCTData.wrappedLong.transfer(msg.sender, amount), "split long erc20 transfer failed");
+        if (!wrappedCTData.wrappedShort.transfer(msg.sender, amount)) {
+            revert WrappedShortTransferFailed(address(wrappedCTData.wrappedShort), address(this), msg.sender, amount);
+        }
+        if (!wrappedCTData.wrappedLong.transfer(msg.sender, amount)) {
+            revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), address(this), msg.sender, amount);
+        }
     }
 
     /// @notice Merges wrapped Long/Short back into decision outcome.
     function merge(uint256 amount) external {
-        require(amount > 0, "amount must be positive");
+        if (amount == 0) revert MergeAmountNull();
 
         // User transfers Long/Short ERC20 to contract.
-        require(
-            wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), amount), "short token transfer failed"
-        );
-        require(wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), amount), "long token transfer failed");
+        if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), amount)) {
+            revert WrappedShortTransferFailed(address(wrappedCTData.wrappedShort), msg.sender, address(this), amount);
+        }
+        if (!wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), amount)) {
+            revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), msg.sender, address(this), amount);
+        }
 
         // Contract transfers Long/Short ERC20 to wrapped1155Factory and gets
         // back Long/Short ERC1155.
@@ -148,16 +160,17 @@ contract ConditionalScalarMarket is ERC1155Holder {
     /// @param longAmount Amount of Long tokens to redeem (can be 0).
     function redeem(uint256 shortAmount, uint256 longAmount) external {
         uint256 den = conditionalTokens.payoutDenominator(ctParams.conditionId);
-        require(den > 0, "condition not resolved");
+        if (den == 0) revert RedeemAmountNull();
 
         // User transfers Long/Short ERC20 to contract.
-        require(
-            wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), shortAmount),
-            "short token transfer failed"
-        );
-        require(
-            wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), longAmount), "long token transfer failed"
-        );
+        if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), shortAmount)) {
+            revert WrappedShortTransferFailed(
+                address(wrappedCTData.wrappedShort), msg.sender, address(this), shortAmount
+            );
+        }
+        if (!wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), longAmount)) {
+            revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), msg.sender, address(this), longAmount);
+        }
 
         // Contracts transfers Long/Short ERC20 to wrapped1155Factory and gets
         // back Long/Short ERC1155.

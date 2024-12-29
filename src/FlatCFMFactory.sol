@@ -28,6 +28,10 @@ contract FlatCFMFactory {
 
     address public immutable conditionalScalarMarketImplementation;
 
+    error InvalidOutcomeCount(uint256 outcomeCount, uint256 maxOutcomeCount);
+    error InvalidOutcomeNameLength(string outcomeName, uint256 maxLength);
+    error InvalidString31Length(string _string);
+
     event FlatCFMCreated(
         address indexed market,
         string roundName,
@@ -62,7 +66,9 @@ contract FlatCFMFactory {
         IERC20 collateralToken
     ) external returns (FlatCFM) {
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
-        require(outcomeCount > 0 && outcomeCount <= MAX_OUTCOMES, "Invalid outcome count");
+        if (outcomeCount == 0 || outcomeCount > MAX_OUTCOMES) {
+            revert InvalidOutcomeCount(outcomeCount, MAX_OUTCOMES);
+        }
 
         (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount);
 
@@ -119,7 +125,7 @@ contract FlatCFMFactory {
         bytes32 cfmConditionId
     ) private returns (ConditionalScalarMarket) {
         string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
-        require(bytes(outcomeName).length <= 25, "Outcome name too long");
+        if (bytes(outcomeName).length > 25) revert InvalidOutcomeNameLength(outcomeName, 25);
 
         bytes32 metricQ = oracleAdapter.askMetricQuestion(genericScalarQParams, outcomeName);
 
@@ -192,7 +198,7 @@ contract FlatCFMFactory {
     /// <https://docs.soliditylang.org/en/v0.8.1/internals/layout_in_storage.html#bytes-and-string>
     function toString31(string memory value) private pure returns (bytes32 encodedString) {
         uint256 length = bytes(value).length;
-        require(length < 32, "string too long");
+        if (length > 31) revert InvalidString31Length(value);
 
         // Read the right-padded string data, which is guaranteed to fit into a single
         // word because its length is less than 32.
