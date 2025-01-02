@@ -61,6 +61,8 @@ contract FlatCFMFactory {
 
     /// @notice Creates a FlatCFM and corresponding nested conditional markets.
     function create(
+        uint256 decisionTemplateId,
+        uint256 metricTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
         GenericScalarQuestionParams calldata genericScalarQParams,
         IERC20 collateralToken
@@ -70,7 +72,7 @@ contract FlatCFMFactory {
             revert InvalidOutcomeCount(outcomeCount, MAX_OUTCOMES);
         }
 
-        (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(flatCFMQParams, outcomeCount);
+        (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(decisionTemplateId, flatCFMQParams, outcomeCount);
 
         emit FlatCFMCreated(
             address(cfm),
@@ -82,8 +84,9 @@ contract FlatCFMFactory {
         );
 
         for (uint256 i = 0; i < outcomeCount;) {
-            ConditionalScalarMarket csm =
-                createConditionalMarket(flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId);
+            ConditionalScalarMarket csm = createConditionalMarket(
+                metricTemplateId, flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId
+            );
 
             emit ConditionalMarketCreated(address(cfm), address(csm), i, flatCFMQParams.outcomeNames[i]);
 
@@ -98,11 +101,12 @@ contract FlatCFMFactory {
     /// @dev 1) Asks a decision question on the oracle,
     ///      2) Prepares the condition in ConditionalTokens,
     ///      3) Deploys the FlatCFM contract.
-    function createDecisionMarket(FlatCFMQuestionParams calldata flatCFMQParams, uint256 outcomeCount)
-        private
-        returns (FlatCFM, bytes32)
-    {
-        bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(flatCFMQParams);
+    function createDecisionMarket(
+        uint256 decisionTemplateId,
+        FlatCFMQuestionParams calldata flatCFMQParams,
+        uint256 outcomeCount
+    ) private returns (FlatCFM, bytes32) {
+        bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
 
         conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount);
         bytes32 cfmConditionId = conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount);
@@ -118,6 +122,7 @@ contract FlatCFMFactory {
     ///     3) Deploy short/long ERC20 tokens,
     ///     4) Deploy the ConditionalScalarMarket contract.
     function createConditionalMarket(
+        uint256 metricTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
         uint256 outcomeIndex,
         GenericScalarQuestionParams calldata genericScalarQParams,
@@ -130,7 +135,7 @@ contract FlatCFMFactory {
             string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
             if (bytes(outcomeName).length > 25) revert InvalidOutcomeNameLength(outcomeName, 25);
 
-            bytes32 metricQ = oracleAdapter.askMetricQuestion(genericScalarQParams, outcomeName);
+            bytes32 metricQ = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
 
             conditionalTokens.prepareCondition(address(this), metricQ, 2);
             bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), metricQ, 2);

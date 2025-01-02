@@ -43,15 +43,17 @@ contract TestERC20 is ERC20 {
 }
 
 contract DecisionMarketFactoryTest is Test {
+    address owner = address(0x1);
+    address user = address(0x2);
+    uint256 decisionTemplateId = 4242;
+    uint256 metricTemplateId = 2424;
+
     FlatCFMFactory public factory;
     FlatCFMRealityAdapter public oracleAdapter;
     ConditionalTokens public conditionalTokens;
     FakeRealityETH public fakeRealityETH; // Instance of Reality_v3
     Wrapped1155Factory public wrapped1155Factory;
     IERC20 public collateralToken;
-
-    address owner = address(0x1);
-    address user = address(0x2);
 
     // Shared outcomeNames array.
     string[] public outcomeNames;
@@ -72,9 +74,8 @@ contract DecisionMarketFactoryTest is Test {
         // Deploy the Wrapped1155Factory contract.
         wrapped1155Factory = new Wrapped1155Factory();
         // Deploy the RealityAdapter with Reality_v3.
-        oracleAdapter = new FlatCFMRealityAdapter(
-            IRealityETH(address(fakeRealityETH)), address(0x00), 4242, 2424, 1000, 10000000000
-        );
+        oracleAdapter =
+            new FlatCFMRealityAdapter(IRealityETH(address(fakeRealityETH)), address(0x00), 1000, 10000000000);
 
         // Deploy the collateral token.
         collateralToken = new TestERC20();
@@ -125,7 +126,9 @@ contract DecisionMarketFactoryTest is Test {
         // Create the market with the shared outcomeNames array.
         vm.prank(owner);
         vm.recordLogs();
-        FlatCFM createdMarket = factory.create(decisionQuestionParams, conditionalQuestionParams, collateralToken);
+        FlatCFM createdMarket = factory.create(
+            decisionTemplateId, metricTemplateId, decisionQuestionParams, conditionalQuestionParams, collateralToken
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256,string)");
         address firstCsmAddr;

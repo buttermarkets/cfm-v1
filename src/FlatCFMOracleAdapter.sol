@@ -4,12 +4,13 @@ pragma solidity 0.8.20;
 import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
 
 abstract contract FlatCFMOracleAdapter {
-    function askDecisionQuestion(FlatCFMQuestionParams calldata flatCFMQuestionParams)
+    function askDecisionQuestion(uint256 decisionTemplateId, FlatCFMQuestionParams calldata flatCFMQuestionParams)
         external
         virtual
         returns (bytes32);
 
     function askMetricQuestion(
+        uint256 metricTemplateId,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
     ) external virtual returns (bytes32);

@@ -22,21 +22,13 @@ contract CFMRealityAdapterWithMockTest is Test {
     function setUp() public {
         fakeRealityEth = new FakeRealityETH();
         conditionalTokens = new ConditionalTokens();
-        realityAdapter = new FlatCFMRealityAdapter(
-            IRealityETH(address(fakeRealityEth)),
-            arbitrator,
-            decisionTemplateId,
-            metricTemplateId,
-            questionTimeout,
-            minBond
-        );
+        realityAdapter =
+            new FlatCFMRealityAdapter(IRealityETH(address(fakeRealityEth)), arbitrator, questionTimeout, minBond);
     }
 
     function testConstructor() public view {
         assertEq(address(realityAdapter.oracle()), address(fakeRealityEth));
         assertEq(realityAdapter.arbitrator(), arbitrator);
-        assertEq(realityAdapter.decisionTemplateId(), decisionTemplateId);
-        assertEq(realityAdapter.metricTemplateId(), metricTemplateId);
         assertEq(realityAdapter.questionTimeout(), questionTimeout);
         assertEq(realityAdapter.minBond(), minBond);
     }
@@ -55,7 +47,7 @@ contract CFMRealityAdapterWithMockTest is Test {
             abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
             abi.encode(bytes32("fakeDecisionQuestionId"))
         );
-        bytes32 questionId = realityAdapter.askDecisionQuestion(flatCFMQuestionParams);
+        bytes32 questionId = realityAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQuestionParams);
 
         // TODO: add integrated test.
         assertEq(questionId, bytes32("fakeDecisionQuestionId"));
@@ -75,7 +67,7 @@ contract CFMRealityAdapterWithMockTest is Test {
             abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
             abi.encode(bytes32("fakeMetricQuestionId"))
         );
-        bytes32 questionId = realityAdapter.askMetricQuestion(params, "Above $2000");
+        bytes32 questionId = realityAdapter.askMetricQuestion(metricTemplateId, params, "Above $2000");
         assertEq(questionId, bytes32("fakeMetricQuestionId"));
     }
 
@@ -101,6 +93,6 @@ contract CFMRealityAdapterWithMockTest is Test {
         });
 
         vm.expectRevert(); // Should revert with empty outcomes
-        realityAdapter.askDecisionQuestion(params);
+        realityAdapter.askDecisionQuestion(decisionTemplateId, params);
     }
 }
