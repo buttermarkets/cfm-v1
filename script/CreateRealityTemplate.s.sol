@@ -10,7 +10,7 @@ interface IRealityV3 {
 contract CreateRealityTemplate is Script {
     function run() external {
         // Retrieve the deployed Reality contract address from an environment variable
-        address realityAddress = vm.envAddress("REALITY_V3_ADDRESS");
+        address realityAddress = vm.envAddress("REALITY_V3");
         IRealityV3 reality = IRealityV3(realityAddress);
 
         // Retrieve the template content from an environment variable
