@@ -16,23 +16,12 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
 
     IRealityETH public immutable oracle;
     address public immutable arbitrator;
-    uint256 public immutable decisionTemplateId;
-    uint256 public immutable metricTemplateId;
     uint32 public immutable questionTimeout;
     uint256 public immutable minBond;
 
-    constructor(
-        IRealityETH _oracle,
-        address _arbitrator,
-        uint256 _decisionTemplateId,
-        uint256 _metricTemplateId,
-        uint32 _questionTimeout,
-        uint256 _minBond
-    ) {
+    constructor(IRealityETH _oracle, address _arbitrator, uint32 _questionTimeout, uint256 _minBond) {
         oracle = _oracle;
         arbitrator = _arbitrator;
-        decisionTemplateId = _decisionTemplateId;
-        metricTemplateId = _metricTemplateId;
         questionTimeout = _questionTimeout;
         minBond = _minBond;
     }
@@ -69,7 +58,6 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         );
     }
 
-    /// @dev This is the only function known by higher level contracts.
     /// @return The ID of the newly created Reality question.
     function _askQuestion(
         uint256 templateId,
@@ -94,7 +82,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         );
     }
 
-    function askDecisionQuestion(FlatCFMQuestionParams calldata flatCFMQuestionParams)
+    function askDecisionQuestion(uint256 decisionTemplateId, FlatCFMQuestionParams calldata flatCFMQuestionParams)
         public
         override
         returns (bytes32)
@@ -104,6 +92,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     }
 
     function askMetricQuestion(
+        uint256 metricTemplateId,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
     ) public override returns (bytes32) {

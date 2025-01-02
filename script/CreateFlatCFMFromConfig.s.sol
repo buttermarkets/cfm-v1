@@ -16,22 +16,19 @@ contract CreateFlatCFMFromConfig is Script {
     function run() external {
         vm.startBroadcast();
 
-        // 1. Load the factory
-        FlatCFMFactory factory = FlatCFMFactory(vm.envAddress("FACTORY_ADDRESS"));
-
-        // 2. Determine the JSON file path from an env var or fallback
         string memory configPath = _getJsonFilePath();
-
-        // 3. Read the entire JSON file
         string memory jsonContent = vm.readFile(configPath);
 
-        // 4. Parse the parameters
+        FlatCFMFactory factory = FlatCFMFactory(_parseFactoryAddress(jsonContent));
+        uint256 decisionTemplateId = _parseDecisionTemplateId(jsonContent);
+        uint256 metricTemplateId = _parseMetricTemplateId(jsonContent);
         FlatCFMQuestionParams memory flatQParams = _parseFlatCFMQuestionParams(jsonContent);
         GenericScalarQuestionParams memory scalarQParams = _parseGenericScalarQuestionParams(jsonContent);
         address collateralAddr = _parseCollateralAddress(jsonContent);
 
         // 5. Call create
-        FlatCFM market = factory.create(flatQParams, scalarQParams, IERC20(collateralAddr));
+        FlatCFM market =
+            factory.create(decisionTemplateId, metricTemplateId, flatQParams, scalarQParams, IERC20(collateralAddr));
 
         // Log the newly created FlatCFM contract
         console.log("Deployed FlatCFM at:", address(market));
@@ -50,6 +47,18 @@ contract CreateFlatCFMFromConfig is Script {
             path = DEFAULT_CONFIG_FILE_PATH;
         }
         return path;
+    }
+
+    function _parseFactoryAddress(string memory json) private pure returns (address) {
+        return vm.parseJsonAddress(json, ".factoryAddress");
+    }
+
+    function _parseDecisionTemplateId(string memory json) private pure returns (uint256) {
+        return vm.parseJsonUint(json, ".decisionTemplateId");
+    }
+
+    function _parseMetricTemplateId(string memory json) private pure returns (uint256) {
+        return vm.parseJsonUint(json, ".metricTemplateId");
     }
 
     /// @dev Reads `FlatCFMQuestionParams` from JSON

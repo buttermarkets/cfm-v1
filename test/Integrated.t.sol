@@ -60,7 +60,7 @@ contract DeployCoreContractsBase is BaseIntegratedTest {
     function setUp() public virtual override {
         super.setUp();
         oracleAdapter = new FlatCFMRealityAdapter(
-            IRealityETH(address(fakeRealityEth)), DUMMY_ARBITRATOR, 2, 1, QUESTION_TIMEOUT, MIN_BOND
+            IRealityETH(address(fakeRealityEth)), DUMMY_ARBITRATOR, QUESTION_TIMEOUT, MIN_BOND
         );
         decisionMarketFactory = new FlatCFMFactory(
             oracleAdapter,
@@ -81,6 +81,9 @@ contract DeployCoreContractsTest is DeployCoreContractsBase {
 }
 
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
+    uint256 decisionTemplateId = 1;
+    uint256 metricTemplateId = 2;
+
     FlatCFMQuestionParams cfmQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
     CollateralToken public collateralToken;
@@ -117,7 +120,9 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         });
 
         vm.recordLogs();
-        cfm = decisionMarketFactory.create(cfmQuestionParams, genericScalarQuestionParams, collateralToken);
+        cfm = decisionMarketFactory.create(
+            decisionTemplateId, metricTemplateId, cfmQuestionParams, genericScalarQuestionParams, collateralToken
+        );
         recordScalarMarkets();
         vm.label(address(cfm), "DecisionMarket");
         vm.label(address(conditionalMarketA), "ConditionalMarketA");
