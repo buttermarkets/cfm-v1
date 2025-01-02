@@ -16,7 +16,7 @@ contract DeployFlatCFMFactory is Script {
         // Try reading environment variables.
         address oracleAdapterAddr = _requireEnvAddress("ORACLE_ADAPTER");
         address conditionalTokensAddr = _requireEnvAddress("CONDITIONAL_TOKENS");
-        address wrapped1155FactoryAddr = _requireEnvAddress("WRAPPED1155_FACTORY");
+        address wrapped1155FactoryAddr = _requireEnvAddress("WRAPPED_1155_FACTORY");
 
         // Convert to interfaces.
         FlatCFMOracleAdapter oracleAdapter = FlatCFMOracleAdapter(oracleAdapterAddr);

@@ -9,6 +9,8 @@ via_ir = true
 optimizer = true
 optimizer_runs = 50 # TODO: 200
 libraries = []
+extra_output = ["metadata"]
+extra_output_files = ["metadata"]
 
 [soldeer]
 remappings_generate = true
