@@ -14,10 +14,23 @@ forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory \
 
 ## deploy a new Flat CFM
 
+### using a block explorer
+
+1. Locate the FlatCFMFactory page on the block explorer.
+2. Connect your wallet.
+3. Enter fileds.
+4. Submit and send transaction.
+
+![factory-create.png](img/factory-create.png.png)
+
+
+### using a config file
+
 First, define a config file (by default, use `./flatcfm.config.json`), like
 
 ```json
 {
+  "factoryAddress": "0x1234567890abcdef1234567890abcdef12345678",
   "roundName": "Demo Round",
   "outcomeNames": ["Project A", "Project B"],
   "openingTimeDecision": 1680000000,  
