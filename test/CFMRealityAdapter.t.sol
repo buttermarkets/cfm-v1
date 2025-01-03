@@ -3,15 +3,16 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/src/Test.sol";
 
+import "src/interfaces/IConditionalTokens.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import {GenericScalarQuestionParams, ScalarParams} from "src/Types.sol";
-import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
-import {FakeRealityETH} from "./FakeRealityETH.sol";
+import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
+import "./fake/FakeRealityETH.sol";
 
 contract CFMRealityAdapterWithMockTest is Test {
     FlatCFMRealityAdapter realityAdapter;
     FakeRealityETH fakeRealityEth;
-    ConditionalTokens conditionalTokens;
+    IConditionalTokens conditionalTokens;
 
     address arbitrator = address(0x123);
     uint256 decisionTemplateId = 1;
@@ -21,7 +22,7 @@ contract CFMRealityAdapterWithMockTest is Test {
 
     function setUp() public {
         fakeRealityEth = new FakeRealityETH();
-        conditionalTokens = new ConditionalTokens();
+        conditionalTokens = new DummyConditionalTokens();
         realityAdapter =
             new FlatCFMRealityAdapter(IRealityETH(address(fakeRealityEth)), arbitrator, questionTimeout, minBond);
     }
