@@ -11,6 +11,8 @@ optimizer_runs = 50 # TODO: 200
 libraries = []
 extra_output = ["metadata"]
 extra_output_files = ["metadata"]
+allowed_paths = ["./deployment-configs"]
+fs_permissions = [{ access = "read", path = "./deployment-configs"}]
 
 [soldeer]
 remappings_generate = true
