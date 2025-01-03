@@ -50,8 +50,4 @@ interface IConditionalTokens is IERC1155 {
     function payoutDenominator(bytes32 conditionId) external view returns (uint256);
 
     function getOutcomeSlotCount(bytes32 conditionId) external view returns (uint256);
-
-    function safeTransferFrom(address from, address to, uint256 id, uint256 value, bytes calldata data) external;
-
-    function balanceOf(address owner, uint256 id) external view returns (uint256);
 }

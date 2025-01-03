@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.20;
 
-//import "forge-std/src/Test.sol";
+import "forge-std/src/Test.sol";
+import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
+
+import "src/ConditionalScalarMarket.sol";
+import "src/FlatCFMOracleAdapter.sol";
+import "src/interfaces/IConditionalTokens.sol";
+import "src/interfaces/IWrapped1155Factory.sol";
+import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
+import {DummyWrapped1155Factory} from "./dummy/Wrapped1155Factory.sol";
+
 //import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 //import {IERC20Errors} from "@openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 //
@@ -614,3 +624,251 @@ pragma solidity 0.8.20;
 //        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), expectedLongPayout);
 //    }
 //}
+
+contract ConditionalScalarMarketRedeemTest is Test {
+    // Mocks / fakes for external contracts
+    FlatCFMOracleAdapter oracleAdapter;
+    IConditionalTokens conditionalTokens;
+    IWrapped1155Factory wrapped1155Factory;
+
+    // The contract under test
+    ConditionalScalarMarket csm;
+
+    // Token references
+    IERC20 shortToken;
+    IERC20 longToken;
+
+    // Helpful constants
+    address owner = address(0x123);
+    address user = address(0x456);
+
+    // Some amounts
+    uint256 shortAmountToRedeem = 30;
+    uint256 longAmountToRedeem = 40;
+
+    // Tracking user’s initial and final balances
+    uint256 userInitialOutcomeBalance;
+    uint256 userFinalOutcomeBalance;
+
+    function setUp() public {
+        // 1. Deploy or mock the external dependencies
+        oracleAdapter = new FlatCFMOracleAdapterMock();
+        conditionalTokens = new DummyConditionalTokens();
+        wrapped1155Factory = new DummyWrapped1155Factory();
+
+        // 2. Deploy the ConditionalScalarMarket
+        csm = new ConditionalScalarMarket();
+        // Initialize with some dummy data
+        csm.initialize(
+            oracleAdapter,
+            conditionalTokens,
+            wrapped1155Factory,
+            ConditionalScalarCTParams({
+                questionId: bytes32("someQuestionId"),
+                conditionId: bytes32("someConditionId"),
+                parentCollectionId: bytes32("someParentCollectionId"),
+                collateralToken: IERC20(address(0x999))
+            }),
+            ScalarParams({minValue: 10, maxValue: 1000}),
+            WrappedConditionalTokensData({
+                shortData: "",
+                longData: "",
+                shortPositionId: 1,
+                longPositionId: 2,
+                wrappedShort: IERC20(address(new ERC20Mock("Short", "ST"))),
+                wrappedLong: IERC20(address(new ERC20Mock("Long", "LG")))
+            })
+        );
+
+        // 3. Provide user with Short and Long tokens to redeem
+        (,,,, shortToken, longToken) = csm.wrappedCTData();
+        deal(address(shortToken), user, 100);
+        deal(address(longToken), user, 100);
+
+        // 4. "Resolve" the condition so that redeem is available
+        //    (In a real test, your oracle adapter and CT would do the real resolution.)
+        vm.startPrank(owner);
+        csm.resolve();
+        vm.stopPrank();
+
+        // 5. Simulate user redeeming in setUp
+        //    If we need multiple “act” variants, we can create multiple test
+        //    contracts or do it inside each test function. But here we do it once:
+        vm.startPrank(user);
+        shortToken.approve(address(csm), shortAmountToRedeem);
+        longToken.approve(address(csm), longAmountToRedeem);
+
+        // Keep track of user’s outcome balance before redeem
+        userInitialOutcomeBalance = conditionalTokens.balanceOf(user, 9999); // Example ID
+
+        // Act: call redeem
+        csm.redeem(shortAmountToRedeem, longAmountToRedeem);
+
+        // Keep track of user’s outcome balance after redeem
+        userFinalOutcomeBalance = conditionalTokens.balanceOf(user, 9999); // Example ID
+        vm.stopPrank();
+    }
+
+    function testUserBalanceIncreasesByRedeemedAmount() public view {
+        // The difference in outcome token balance should be short+long-based redemption
+        uint256 diff = userFinalOutcomeBalance - userInitialOutcomeBalance;
+        assertGt(diff, 0, "Outcome balance did not increase after redeem");
+    }
+
+    function testShortAndLongTokensBurnedFromUser() public view {
+        // In a real scenario, we'd read user’s short/long balances.
+        // Since we mock, just check that user no longer has as many tokens
+        uint256 shortBal = shortToken.balanceOf(user);
+        uint256 longBal = longToken.balanceOf(user);
+        assertEq(shortBal, 70, "Short tokens not burned properly");
+        assertEq(longBal, 60, "Long tokens not burned properly");
+    }
+
+    function testCannotRedeemZeroAmounts() public {
+        vm.startPrank(user);
+        vm.expectRevert(ConditionalScalarMarket.RedeemAmountNull.selector);
+        csm.redeem(0, 0);
+        vm.stopPrank();
+    }
+
+    function testRevertIfConditionNotResolved() public {
+        // We deploy a fresh instance, do not call resolve
+        ConditionalScalarMarket csm2 = _duplicateCsm(csm);
+
+        // Attempt redeem before csm2 is resolved
+        vm.startPrank(user);
+        shortToken.approve(address(csm2), shortAmountToRedeem);
+        longToken.approve(address(csm2), longAmountToRedeem);
+        // For demonstration, we assume some revert or zero payout if not resolved.
+        // In real code, you'd add the revert or check logic in your mocks.
+        vm.expectRevert("PayoutDenominatorIsZero()");
+        csm2.redeem(shortAmountToRedeem, longAmountToRedeem);
+        vm.stopPrank();
+    }
+
+    function _duplicateCsm(ConditionalScalarMarket originalCsm) public returns (ConditionalScalarMarket) {
+        ConditionalScalarCTParams memory ctParams;
+        ScalarParams memory scalarParams;
+        WrappedConditionalTokensData memory wrappedCTData;
+        {
+            (
+                bytes memory shortData,
+                bytes memory longData,
+                uint256 shortPositionId,
+                uint256 longPositionId,
+                IERC20 wrappedShort,
+                IERC20 wrappedLong
+            ) = originalCsm.wrappedCTData();
+            wrappedCTData = WrappedConditionalTokensData({
+                shortData: shortData,
+                longData: longData,
+                shortPositionId: shortPositionId,
+                longPositionId: longPositionId,
+                wrappedShort: wrappedShort,
+                wrappedLong: wrappedLong
+            });
+        }
+        {
+            (bytes32 questionId, bytes32 conditionId, bytes32 parentCollectionId, IERC20 collateralToken) =
+                originalCsm.ctParams();
+            ctParams = ConditionalScalarCTParams({
+                questionId: questionId,
+                conditionId: conditionId,
+                parentCollectionId: parentCollectionId,
+                collateralToken: collateralToken
+            });
+        }
+        {
+            (uint256 minValue, uint256 maxValue) = originalCsm.scalarParams();
+            scalarParams = ScalarParams({minValue: minValue, maxValue: maxValue});
+        }
+
+        ConditionalScalarMarket csm2 = new ConditionalScalarMarket();
+        csm2.initialize(oracleAdapter, conditionalTokens, wrapped1155Factory, ctParams, scalarParams, wrappedCTData);
+
+        return csm2;
+    }
+}
+
+/* 
+   Below are bare-bones mocks to keep the above test short. 
+   In practice, you'd either use real contracts on a testnet
+   or more robust mocks that replicate desired functionality.
+*/
+
+// XXX rather use the actual adapter that is in our codebase and use mockCall /
+// expectCall when needed
+contract FlatCFMOracleAdapterMock is FlatCFMOracleAdapter {
+    function askDecisionQuestion(uint256, FlatCFMQuestionParams calldata) external pure override returns (bytes32) {
+        return bytes32("mockQuestion");
+    }
+
+    function askMetricQuestion(uint256, GenericScalarQuestionParams calldata, string memory)
+        external
+        pure
+        override
+        returns (bytes32)
+    {
+        return bytes32("mockMetric");
+    }
+
+    function getAnswer(bytes32) external pure override returns (bytes32) {
+        // Pretend we have a numeric answer
+        return bytes32(uint256(500));
+    }
+
+    function isInvalid(bytes32) external pure override returns (bool) {
+        return false;
+    }
+}
+
+// XXX directly use OZ's ERC20.
+contract ERC20Mock is IERC20 {
+    string public name;
+    string public symbol;
+    uint8 public decimals = 18;
+
+    uint256 total;
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowance;
+
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
+        symbol = _symbol;
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return total;
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _balances[msg.sender] -= amount;
+        _balances[to] += amount;
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return _allowance[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        _allowance[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        _allowance[from][msg.sender] -= amount;
+        _balances[from] -= amount;
+        _balances[to] += amount;
+        return true;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _balances[to] += amount;
+        total += amount;
+    }
+}

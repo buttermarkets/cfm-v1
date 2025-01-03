@@ -6,15 +6,16 @@ import "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
-import "src/vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
-import "src/vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
 import "src/FlatCFMFactory.sol";
 import "src/FlatCFM.sol";
 import "src/ConditionalScalarMarket.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import "src/FlatCFMOracleAdapter.sol";
 
-import "./FakeRealityETH.sol";
+// XXX replace by a dummy
+import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
+import {DummyWrapped1155Factory} from "./dummy/Wrapped1155Factory.sol";
+import "./fake/FakeRealityETH.sol";
 
 //contract CFMDecisionMarket_ConstructorSpy is FlatCFM {
 //    event ConstructorCalled(
@@ -50,9 +51,9 @@ contract DecisionMarketFactoryTest is Test {
 
     FlatCFMFactory public factory;
     FlatCFMRealityAdapter public oracleAdapter;
-    ConditionalTokens public conditionalTokens;
+    IConditionalTokens public conditionalTokens;
     FakeRealityETH public fakeRealityETH; // Instance of Reality_v3
-    Wrapped1155Factory public wrapped1155Factory;
+    IWrapped1155Factory public wrapped1155Factory;
     IERC20 public collateralToken;
 
     // Shared outcomeNames array.
@@ -66,13 +67,13 @@ contract DecisionMarketFactoryTest is Test {
         outcomeNames[1] = "Project Y";
 
         // Deploy the ConditionalTokens contract.
-        conditionalTokens = new ConditionalTokens();
+        conditionalTokens = new DummyConditionalTokens();
 
         // Deploy the RealityETH_v3_0 contract.
         fakeRealityETH = new FakeRealityETH();
 
         // Deploy the Wrapped1155Factory contract.
-        wrapped1155Factory = new Wrapped1155Factory();
+        wrapped1155Factory = new DummyWrapped1155Factory();
         // Deploy the RealityAdapter with Reality_v3.
         oracleAdapter =
             new FlatCFMRealityAdapter(IRealityETH(address(fakeRealityETH)), address(0x00), 1000, 10000000000);
