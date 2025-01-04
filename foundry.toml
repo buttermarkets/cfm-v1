@@ -18,6 +18,10 @@ fs_permissions = [{ access = "read", path = "./deployment-configs"}]
 test = "integration-test"
 via_ir = true
 
+[profile.ftest]
+test = "fork-test"
+fs_permissions = [{ access = "read", path = "./fork-test"}]
+
 [soldeer]
 remappings_generate = true
 remappings_regenerate = true
