@@ -14,6 +14,10 @@ extra_output_files = ["metadata"]
 allowed_paths = ["./deployment-configs"]
 fs_permissions = [{ access = "read", path = "./deployment-configs"}]
 
+[profile.itest]
+test = "integration-test"
+via_ir = true
+
 [soldeer]
 remappings_generate = true
 remappings_regenerate = true
