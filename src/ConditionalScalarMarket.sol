@@ -28,8 +28,6 @@ contract ConditionalScalarMarket is ERC1155Holder {
     error AlreadyInitialized();
     error WrappedShortTransferFailed(address wrappedShort, address from, address to, uint256 amount);
     error WrappedLongTransferFailed(address wrappedShort, address from, address to, uint256 amount);
-    error MergeAmountNull();
-    error RedeemAmountNull();
 
     /// @notice Initialize function called by each clone.
     function initialize(
@@ -80,7 +78,6 @@ contract ConditionalScalarMarket is ERC1155Holder {
         conditionalTokens.reportPayouts(ctParams.questionId, payouts);
     }
 
-    // XXX Split/m/r in a different way if the parent is resolved? Probably not
     // FIXME Test split/m/r in all different state cases: DecisionResolved? x
     // ConditionalResolved?
     /// @notice Splits decision outcome into wrapped Long/Short.
@@ -120,8 +117,6 @@ contract ConditionalScalarMarket is ERC1155Holder {
 
     /// @notice Merges wrapped Long/Short back into decision outcome.
     function merge(uint256 amount) external {
-        if (amount == 0) revert MergeAmountNull();
-
         // User transfers Long/Short ERC20 to contract.
         if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), amount)) {
             revert WrappedShortTransferFailed(address(wrappedCTData.wrappedShort), msg.sender, address(this), amount);
@@ -156,12 +151,11 @@ contract ConditionalScalarMarket is ERC1155Holder {
     }
 
     /// @notice Redeems Long/Short positions after condition resolution.
+    /// @dev Calls `conditionalTokens.redeemPositions(...)`, which will revert if the condition’s payouts
+    ///      haven’t been reported yet (i.e., `payoutDenominator(conditionId) == 0`).
     /// @param shortAmount Amount of Short tokens to redeem (can be 0).
     /// @param longAmount Amount of Long tokens to redeem (can be 0).
     function redeem(uint256 shortAmount, uint256 longAmount) external {
-        uint256 den = conditionalTokens.payoutDenominator(ctParams.conditionId);
-        if (den == 0) revert RedeemAmountNull();
-
         // User transfers Long/Short ERC20 to contract.
         if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), shortAmount)) {
             revert WrappedShortTransferFailed(
@@ -194,7 +188,6 @@ contract ConditionalScalarMarket is ERC1155Holder {
         uint256 finalBalance = conditionalTokens.balanceOf(address(this), decisionPositionId);
         uint256 redeemedAmount = finalBalance - initialBalance;
 
-        // Contract transfers ERC20 decision outcome tokens to user.
         conditionalTokens.safeTransferFrom(address(this), msg.sender, decisionPositionId, redeemedAmount, "");
     }
 
