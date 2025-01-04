@@ -48,3 +48,8 @@ jobs:
         run: |
           forge test -vvv
         id: test
+      
+      - name: Run integration tests
+        run: |
+          FOUNDRY_PROFILE=itest forge test
+        id: integration-test
