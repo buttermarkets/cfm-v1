@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 
 import {IRealityETH} from "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
 
-contract FakeRealityETH is IRealityETH {
+contract DummyRealityETH is IRealityETH {
     function claimWinnings(
         bytes32 question_id,
         bytes32[] calldata history_hashes,

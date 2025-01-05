@@ -15,10 +15,6 @@ contract FlatCFM {
     uint256 public immutable outcomeCount;
     bytes32 public immutable conditionId;
 
-    // XXX keep? useless if this can be checked through ConditionalTokens.
-    // State attributes:
-    //bool public isResolved;
-
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
@@ -38,7 +34,6 @@ contract FlatCFM {
         bytes32 answer = oracleAdapter.getAnswer(questionId);
         uint256[] memory payouts = new uint256[](outcomeCount);
 
-        // TODO: test the invalid case.
         if (!oracleAdapter.isInvalid(answer)) {
             uint256 numericAnswer = uint256(answer);
 

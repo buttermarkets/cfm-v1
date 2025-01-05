@@ -8,7 +8,7 @@ import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "src/FlatCFMFactory.sol";
 import "src/FlatCFMRealityAdapter.sol";
 
-import "test/fake/FakeRealityETH.sol";
+import "test/dummy/RealityETH.sol";
 
 import "./vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import "./vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
@@ -23,7 +23,7 @@ contract CollateralToken is ERC20 {
 contract BaseIntegratedTest is Test {
     ConditionalTokens public conditionalTokens;
     Wrapped1155Factory public wrapped1155Factory;
-    FakeRealityETH public fakeRealityEth;
+    DummyRealityETH public realityEth;
 
     address USER = address(1);
     address DUMMY_ARBITRATOR = address(0x42424242);
@@ -42,8 +42,8 @@ contract BaseIntegratedTest is Test {
         vm.label(address(conditionalTokens), "ConditionalTokens");
         wrapped1155Factory = new Wrapped1155Factory();
         vm.label(address(wrapped1155Factory), "Wrapped1155Factory");
-        fakeRealityEth = new FakeRealityETH();
-        vm.label(address(fakeRealityEth), "RealityETH");
+        realityEth = new DummyRealityETH();
+        vm.label(address(realityEth), "RealityETH");
     }
 }
 
@@ -51,7 +51,7 @@ contract BaseIntegratedTestCheck is BaseIntegratedTest {
     function testDependenciesDeployments() public view {
         assertTrue(address(conditionalTokens) != address(0));
         assertTrue(address(wrapped1155Factory) != address(0));
-        assertTrue(address(fakeRealityEth) != address(0));
+        assertTrue(address(realityEth) != address(0));
     }
 }
 
@@ -61,9 +61,8 @@ contract DeployCoreContractsBase is BaseIntegratedTest {
 
     function setUp() public virtual override {
         super.setUp();
-        oracleAdapter = new FlatCFMRealityAdapter(
-            IRealityETH(address(fakeRealityEth)), DUMMY_ARBITRATOR, QUESTION_TIMEOUT, MIN_BOND
-        );
+        oracleAdapter =
+            new FlatCFMRealityAdapter(IRealityETH(address(realityEth)), DUMMY_ARBITRATOR, QUESTION_TIMEOUT, MIN_BOND);
         decisionMarketFactory = new FlatCFMFactory(
             oracleAdapter,
             IConditionalTokens(address(conditionalTokens)),

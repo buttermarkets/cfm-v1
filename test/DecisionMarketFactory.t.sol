@@ -12,10 +12,9 @@ import "src/ConditionalScalarMarket.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import "src/FlatCFMOracleAdapter.sol";
 
-// XXX replace by a dummy
 import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
 import {DummyWrapped1155Factory} from "./dummy/Wrapped1155Factory.sol";
-import "./fake/FakeRealityETH.sol";
+import {DummyRealityETH} from "./dummy/RealityETH.sol";
 
 //contract CFMDecisionMarket_ConstructorSpy is FlatCFM {
 //    event ConstructorCalled(
@@ -52,7 +51,7 @@ contract DecisionMarketFactoryTest is Test {
     FlatCFMFactory public factory;
     FlatCFMRealityAdapter public oracleAdapter;
     IConditionalTokens public conditionalTokens;
-    FakeRealityETH public fakeRealityETH; // Instance of Reality_v3
+    DummyRealityETH public oracle;
     IWrapped1155Factory public wrapped1155Factory;
     IERC20 public collateralToken;
 
@@ -70,13 +69,12 @@ contract DecisionMarketFactoryTest is Test {
         conditionalTokens = new DummyConditionalTokens();
 
         // Deploy the RealityETH_v3_0 contract.
-        fakeRealityETH = new FakeRealityETH();
+        oracle = new DummyRealityETH();
 
         // Deploy the Wrapped1155Factory contract.
         wrapped1155Factory = new DummyWrapped1155Factory();
         // Deploy the RealityAdapter with Reality_v3.
-        oracleAdapter =
-            new FlatCFMRealityAdapter(IRealityETH(address(fakeRealityETH)), address(0x00), 1000, 10000000000);
+        oracleAdapter = new FlatCFMRealityAdapter(IRealityETH(address(oracle)), address(0x00), 1000, 10000000000);
 
         // Deploy the collateral token.
         collateralToken = new TestERC20();

@@ -19,6 +19,8 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     uint32 public immutable questionTimeout;
     uint256 public immutable minBond;
 
+    error QuestionStuck(address questionId);
+
     constructor(IRealityETH _oracle, address _arbitrator, uint32 _questionTimeout, uint256 _minBond) {
         oracle = _oracle;
         arbitrator = _arbitrator;
@@ -76,7 +78,6 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
             return question_id;
         }
 
-        /// @dev This would need to call UMA if we used UMA.
         return oracle.askQuestionWithMinBond(
             templateId, formattedQuestionParams, arbitrator, questionTimeout, openingTime, 0, minBond
         );
@@ -101,10 +102,13 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, genericScalarQuestionParams.openingTime);
     }
 
-    /// @dev This is not-reverting only when the question is finalized in Reality.
-    // TODO: QA the functioning of this.
-    function getAnswer(bytes32 questionID) public view override returns (bytes32) {
-        return oracle.resultForOnceSettled(questionID);
+    /// @dev `resultForOnceSettled` reverts if the question is not finalized.
+    ///     When the Reality question is answered "too soon", the reopnened
+    ///     question's result is returned (or raises if not finalized either).
+    // solhint-disable-next-line max-line-length
+    ///     See https://github.com/RealityETH/reality-eth-monorepo/blob/13f0556b72059e4a4d402fd75999d2ce320bd3c4/packages/contracts/flat/RealityETH-3.0.sol#L618C14-L618C34
+    function getAnswer(bytes32 questionId) public view override returns (bytes32) {
+        return oracle.resultForOnceSettled(questionId);
     }
 
     function isInvalid(bytes32 answer) public pure override returns (bool) {

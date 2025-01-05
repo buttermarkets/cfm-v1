@@ -2,16 +2,19 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/src/Test.sol";
+import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
+import "@realityeth/packages/contracts/development/contracts/IRealityETHCore.sol";
 
 import "src/interfaces/IConditionalTokens.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import {GenericScalarQuestionParams, ScalarParams} from "src/Types.sol";
-import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
-import "./fake/FakeRealityETH.sol";
 
-contract CFMRealityAdapterWithMockTest is Test {
+import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
+import {DummyRealityETH} from "./dummy/RealityETH.sol";
+
+contract Base is Test {
     FlatCFMRealityAdapter realityAdapter;
-    FakeRealityETH fakeRealityEth;
+    DummyRealityETH reality;
     IConditionalTokens conditionalTokens;
 
     address arbitrator = address(0x123);
@@ -20,15 +23,16 @@ contract CFMRealityAdapterWithMockTest is Test {
     uint32 questionTimeout = 3600;
     uint256 minBond = 1 ether;
 
-    function setUp() public {
-        fakeRealityEth = new FakeRealityETH();
+    function setUp() public virtual {
+        reality = new DummyRealityETH();
         conditionalTokens = new DummyConditionalTokens();
-        realityAdapter =
-            new FlatCFMRealityAdapter(IRealityETH(address(fakeRealityEth)), arbitrator, questionTimeout, minBond);
+        realityAdapter = new FlatCFMRealityAdapter(IRealityETH(address(reality)), arbitrator, questionTimeout, minBond);
     }
+}
 
+contract AskQuestionTest is Base {
     function testConstructor() public view {
-        assertEq(address(realityAdapter.oracle()), address(fakeRealityEth));
+        assertEq(address(realityAdapter.oracle()), address(reality));
         assertEq(realityAdapter.arbitrator(), arbitrator);
         assertEq(realityAdapter.questionTimeout(), questionTimeout);
         assertEq(realityAdapter.minBond(), minBond);
@@ -44,13 +48,12 @@ contract CFMRealityAdapterWithMockTest is Test {
         flatCFMQuestionParams.outcomeNames[1] = "No";
 
         vm.mockCall(
-            address(fakeRealityEth),
-            abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
+            address(reality),
+            abi.encodeWithSelector(DummyRealityETH.askQuestionWithMinBond.selector),
             abi.encode(bytes32("fakeDecisionQuestionId"))
         );
         bytes32 questionId = realityAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQuestionParams);
 
-        // TODO: add integrated test.
         assertEq(questionId, bytes32("fakeDecisionQuestionId"));
     }
 
@@ -64,26 +67,12 @@ contract CFMRealityAdapterWithMockTest is Test {
         });
 
         vm.mockCall(
-            address(fakeRealityEth),
-            abi.encodeWithSelector(FakeRealityETH.askQuestionWithMinBond.selector),
+            address(reality),
+            abi.encodeWithSelector(DummyRealityETH.askQuestionWithMinBond.selector),
             abi.encode(bytes32("fakeMetricQuestionId"))
         );
         bytes32 questionId = realityAdapter.askMetricQuestion(metricTemplateId, params, "Above $2000");
         assertEq(questionId, bytes32("fakeMetricQuestionId"));
-    }
-
-    function testGetAnswer() public view {
-        bytes32 questionId = bytes32("someQuestionId");
-        bytes32 answer = realityAdapter.getAnswer(questionId);
-        assertEq(answer, bytes32(0)); // Adjust expected value based on mock
-    }
-
-    function testIsInvalid() public view {
-        bytes32 invalidAnswer = bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff));
-        assertTrue(realityAdapter.isInvalid(invalidAnswer));
-
-        bytes32 validAnswer = bytes32(uint256(1));
-        assertFalse(realityAdapter.isInvalid(validAnswer));
     }
 
     function testEmptyOutcomeNames() public {
@@ -95,5 +84,38 @@ contract CFMRealityAdapterWithMockTest is Test {
 
         vm.expectRevert(); // Should revert with empty outcomes
         realityAdapter.askDecisionQuestion(decisionTemplateId, params);
+    }
+}
+
+// From Reality //
+// `resultForOnceSettled` reverts if TOO SOON.
+// solhint-disable-next-line
+// https://github.com/RealityETH/reality-eth-monorepo/blob/13f0556b72059e4a4d402fd75999d2ce320bd3c4/packages/contracts/tests/python/test.py#L2429
+contract AnswerTest is Base {
+    function testGetAnswer() public view {
+        bytes32 questionId = bytes32("someQuestionId");
+        bytes32 answer = realityAdapter.getAnswer(questionId);
+        assertEq(answer, bytes32(0)); // Adjust expected value based on mock
+    }
+
+    function testGetAnswerRevertsIfNotSettled() public {
+        bytes32 questionId = bytes32("someQuestionId");
+
+        vm.mockCallRevert(
+            address(reality),
+            abi.encodeWithSelector(IRealityETHCore.resultForOnceSettled.selector, questionId),
+            "whatever"
+        );
+
+        vm.expectRevert();
+        realityAdapter.getAnswer(questionId);
+    }
+
+    function testIsInvalid() public view {
+        bytes32 invalidAnswer = bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff));
+        assertTrue(realityAdapter.isInvalid(invalidAnswer));
+
+        bytes32 validAnswer = bytes32(uint256(1));
+        assertFalse(realityAdapter.isInvalid(validAnswer));
     }
 }
