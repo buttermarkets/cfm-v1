@@ -34,11 +34,12 @@ contract FlatCFMFactory {
 
     error InvalidOutcomeCount(uint256 outcomeCount);
     error InvalidOutcomeNameLength(string outcomeName);
-    error InvalidString31Length(string _string);
 
     event FlatCFMCreated(address indexed market);
 
-    event ConditionalMarketCreated(address indexed decisionMarket, address indexed conditionalMarket);
+    event ConditionalMarketCreated(
+        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
+    );
 
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
@@ -76,7 +77,7 @@ contract FlatCFMFactory {
                 metricTemplateId, flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId
             );
 
-            emit ConditionalMarketCreated(address(cfm), address(csm));
+            emit ConditionalMarketCreated(address(cfm), address(csm), i);
 
             unchecked {
                 ++i;
