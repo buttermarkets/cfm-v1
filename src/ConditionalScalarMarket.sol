@@ -49,6 +49,7 @@ contract ConditionalScalarMarket is ERC1155Holder {
         wrappedCTData = _wrappedCTData;
     }
 
+    // XXX move to oracleAdapter
     /// @notice Reports payouts corresponding to the scalar value reported by
     ///     the oracle. If the oracle value is invalid, report 50/50.
     /// @dev 3rd outcome gets everything if market ends up invalid.

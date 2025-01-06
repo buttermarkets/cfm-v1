@@ -29,6 +29,7 @@ contract FlatCFM {
         conditionId = _conditionId;
     }
 
+    // XXX move to oracleAdapter
     /// @notice A resolver must call submitAnswer on Reality then
     ///     resolve here.
     /// @dev `reportPayouts` requires that the condition is already

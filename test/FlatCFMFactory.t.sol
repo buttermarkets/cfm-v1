@@ -28,7 +28,7 @@ contract Base is Test {
     FlatCFMFactory public factory;
     // This could be a dummy.
     FlatCFMRealityAdapter public oracleAdapter;
-    IConditionalTokens public conditionalTokens;
+    DummyConditionalTokens public conditionalTokens;
     DummyRealityETH public oracle;
     IWrapped1155Factory public wrapped1155Factory;
     IERC20 public collateralToken;
@@ -192,6 +192,22 @@ contract CreateMarketTestBase is Base {
             scalarParams: ScalarParams({minValue: MIN_VALUE, maxValue: MAX_VALUE}),
             openingTime: METRIC_OPENING_TIME
         });
+    }
+
+    function _getFirstConditionalScalarMarket() internal returns (ConditionalScalarMarket) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                // topics[2] because address is the second indexed param
+                ConditionalScalarMarket _csm = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
+                (uint256 outcomeIndex) = abi.decode(logs[i].data, (uint256));
+                if (outcomeIndex == 0) {
+                    return _csm;
+                }
+            }
+        }
+        revert("No ConditionalMarketCreated event found");
     }
 }
 
@@ -431,22 +447,6 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         assertEq(paramsLPId, LONG_POSID);
         assertEq(address(ws), address(0x42244224));
         assertEq(address(wl), address(0x24422442));
-    }
-
-    function _getFirstConditionalScalarMarket() internal returns (ConditionalScalarMarket) {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == eventSignature) {
-                // topics[2] because address is the second indexed param
-                ConditionalScalarMarket _csm = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
-                (uint256 outcomeIndex) = abi.decode(logs[i].data, (uint256));
-                if (outcomeIndex == 0) {
-                    return _csm;
-                }
-            }
-        }
-        revert("No ConditionalMarketCreated event found");
     }
 }
 

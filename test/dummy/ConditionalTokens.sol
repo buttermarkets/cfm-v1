@@ -71,7 +71,13 @@ contract DummyConditionalTokens is IConditionalTokens {
     }
 
     function prepareCondition(address, bytes32, uint256) external override {}
-    function reportPayouts(bytes32, uint256[] calldata) external override {}
+
+    address public _test_reportPayouts_caller;
+
+    function reportPayouts(bytes32, uint256[] calldata) external override {
+        _test_reportPayouts_caller = msg.sender;
+    }
+
     function splitPosition(IERC20, bytes32, bytes32, uint256[] calldata, uint256) external override {}
     function mergePositions(IERC20, bytes32, bytes32, uint256[] calldata, uint256) external override {}
     function redeemPositions(IERC20, bytes32, bytes32, uint256[] calldata) external override {}
