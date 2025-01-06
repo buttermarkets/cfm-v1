@@ -108,8 +108,10 @@ contract FlatCFMFactory {
     ) private returns (FlatCFM, bytes32) {
         bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
 
-        conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount);
-        bytes32 cfmConditionId = conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount);
+        // +1 counts for Invalid.
+        conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
+        bytes32 cfmConditionId =
+            conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
 
         FlatCFM cfm = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
 

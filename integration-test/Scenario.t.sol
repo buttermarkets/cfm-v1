@@ -174,8 +174,8 @@ contract SplitTestBase is CreateDecisionMarketBase {
     IERC20 wrappedLongC;
 
     function decisionDiscreetPartition() public view returns (uint256[] memory) {
-        uint256[] memory partition = new uint256[](cfm.outcomeCount());
-        for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
+        uint256[] memory partition = new uint256[](cfm.outcomeCount() + 1);
+        for (uint256 i = 0; i < cfm.outcomeCount() + 1; i++) {
             partition[i] = 1 << i;
         }
         return partition;
