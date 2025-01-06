@@ -20,7 +20,9 @@ import {
 contract FlatCFMFactory {
     using Clones for address;
 
-    uint256 constant MAX_OUTCOMES = 50;
+    uint256 public constant MAX_OUTCOMES = 50;
+    // So that the outcome can fit in String31.
+    uint256 public constant MAX_OUTCOME_NAME_LENGTH = 25;
 
     FlatCFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
@@ -28,22 +30,13 @@ contract FlatCFMFactory {
 
     address public immutable conditionalScalarMarketImplementation;
 
-    error InvalidOutcomeCount(uint256 outcomeCount, uint256 maxOutcomeCount);
-    error InvalidOutcomeNameLength(string outcomeName, uint256 maxLength);
+    error InvalidOutcomeCount(uint256 outcomeCount);
+    error InvalidOutcomeNameLength(string outcomeName);
     error InvalidString31Length(string _string);
 
-    event FlatCFMCreated(
-        address indexed market,
-        string roundName,
-        string metricName,
-        string startDate,
-        string endDate,
-        address collateralToken
-    );
+    event FlatCFMCreated(address indexed market);
 
-    event ConditionalMarketCreated(
-        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex, string outcomeName
-    );
+    event ConditionalMarketCreated(address indexed decisionMarket, address indexed conditionalMarket);
 
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
@@ -69,26 +62,19 @@ contract FlatCFMFactory {
     ) external returns (FlatCFM) {
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
         if (outcomeCount == 0 || outcomeCount > MAX_OUTCOMES) {
-            revert InvalidOutcomeCount(outcomeCount, MAX_OUTCOMES);
+            revert InvalidOutcomeCount(outcomeCount);
         }
 
         (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(decisionTemplateId, flatCFMQParams, outcomeCount);
 
-        emit FlatCFMCreated(
-            address(cfm),
-            flatCFMQParams.roundName,
-            genericScalarQParams.metricName,
-            genericScalarQParams.startDate,
-            genericScalarQParams.endDate,
-            address(collateralToken)
-        );
+        emit FlatCFMCreated(address(cfm));
 
         for (uint256 i = 0; i < outcomeCount;) {
             ConditionalScalarMarket csm = createConditionalMarket(
                 metricTemplateId, flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId
             );
 
-            emit ConditionalMarketCreated(address(cfm), address(csm), i, flatCFMQParams.outcomeNames[i]);
+            emit ConditionalMarketCreated(address(cfm), address(csm));
 
             unchecked {
                 ++i;
@@ -135,7 +121,7 @@ contract FlatCFMFactory {
         ConditionalScalarCTParams memory conditionalScalarCTParams;
         {
             string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
-            if (bytes(outcomeName).length > 25) revert InvalidOutcomeNameLength(outcomeName, 25);
+            if (bytes(outcomeName).length > MAX_OUTCOME_NAME_LENGTH) revert InvalidOutcomeNameLength(outcomeName);
 
             bytes32 metricQ = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
 
