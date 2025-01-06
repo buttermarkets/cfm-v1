@@ -6,6 +6,7 @@ import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IWrapped1155Factory.sol";
 import "./interfaces/IConditionalTokens.sol";
+import "./libs/String31.sol";
 import "./FlatCFMOracleAdapter.sol";
 import "./FlatCFM.sol";
 import "./ConditionalScalarMarket.sol";
@@ -19,6 +20,7 @@ import {
 
 contract FlatCFMFactory {
     using Clones for address;
+    using String31 for string;
 
     uint256 public constant MAX_OUTCOMES = 50;
     // So that the outcome can fit in String31.
@@ -166,10 +168,10 @@ contract FlatCFMFactory {
         bytes32 conditionalConditionId
     ) private returns (WrappedConditionalTokensData memory) {
         bytes memory shortData = abi.encodePacked(
-            toString31(string.concat(outcomeName, "-Short")), toString31(string.concat(outcomeName, "-ST")), uint8(18)
+            string.concat(outcomeName, "-Short").toString31(), string.concat(outcomeName, "-ST").toString31(), uint8(18)
         );
         bytes memory longData = abi.encodePacked(
-            toString31(string.concat(outcomeName, "-Long")), toString31(string.concat(outcomeName, "-LG")), uint8(18)
+            string.concat(outcomeName, "-Long").toString31(), string.concat(outcomeName, "-LG").toString31(), uint8(18)
         );
 
         uint256 shortPosId = conditionalTokens.getPositionId(
@@ -190,29 +192,5 @@ contract FlatCFMFactory {
             wrappedShort: wrappedShort,
             wrappedLong: wrappedLong
         });
-    }
-
-    // TODO test this.
-    // From https://github.com/gnosis/1155-to-20/pull/4#discussion_r573630922
-    /// @dev Encodes a short string (less than than 31 bytes long) as for storage as expected by Solidity.
-    /// <https://docs.soliditylang.org/en/v0.8.1/internals/layout_in_storage.html#bytes-and-string>
-    function toString31(string memory value) private pure returns (bytes32 encodedString) {
-        uint256 length = bytes(value).length;
-        if (length > 31) revert InvalidString31Length(value);
-
-        // Read the right-padded string data, which is guaranteed to fit into a single
-        // word because its length is less than 32.
-        assembly {
-            encodedString := mload(add(value, 0x20))
-        }
-
-        // Now mask the string data, this ensures that the bytes past the string length
-        // are all 0s.
-        bytes32 mask = bytes32(type(uint256).max << ((32 - length) << 3));
-        encodedString = encodedString & mask;
-
-        // Finally, set the least significant byte to be the hex length of the encoded
-        // string, that is its byte-length times two.
-        encodedString = encodedString | bytes32(length << 1);
     }
 }
