@@ -86,6 +86,7 @@ contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTest {
                 IConditionalTokens.prepareCondition.selector, address(oracleAdapter), CONDITIONAL_QID, 3
             )
         );
+        vm.recordLogs();
         factory.create(
             DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
         );

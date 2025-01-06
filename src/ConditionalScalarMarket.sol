@@ -49,35 +49,15 @@ contract ConditionalScalarMarket is ERC1155Holder {
         wrappedCTData = _wrappedCTData;
     }
 
-    // XXX move to oracleAdapter
     /// @notice Reports payouts corresponding to the scalar value reported by
     ///     the oracle. If the oracle value is invalid, report 50/50.
     /// @dev 3rd outcome gets everything if market ends up invalid.
     function resolve() external {
-        bytes32 answer = oracleAdapter.getAnswer(ctParams.questionId);
-        uint256[] memory payouts = new uint256[](3);
-        uint256 numericAnswer = uint256(answer);
-
-        if (oracleAdapter.isInvalid(answer)) {
-            payouts[2] = 1;
-        } else {
-            if (numericAnswer <= scalarParams.minValue) {
-                payouts[0] = 1;
-            } else if (numericAnswer >= scalarParams.maxValue) {
-                payouts[1] = 1;
-            } else {
-                payouts[0] = scalarParams.maxValue - numericAnswer;
-                payouts[1] = numericAnswer - scalarParams.minValue;
-            }
-        }
-
-        // `reportPayouts` requires that the condition is already prepared and
-        // payouts aren't reported yet.
-        conditionalTokens.reportPayouts(ctParams.questionId, payouts);
+        oracleAdapter.reportMetricPayouts(
+            conditionalTokens, ctParams.questionId, scalarParams.minValue, scalarParams.maxValue
+        );
     }
 
-    // FIXME Test split/m/r in all different state cases: DecisionResolved? x
-    // ConditionalResolved?
     /// @notice Splits decision outcome into wrapped Long/Short.
     function split(uint256 amount) external {
         // User transfers decision outcome ERC1155 to this contract.

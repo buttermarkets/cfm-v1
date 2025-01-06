@@ -29,7 +29,6 @@ contract FlatCFM {
         conditionId = _conditionId;
     }
 
-    // XXX move to oracleAdapter
     /// @notice A resolver must call submitAnswer on Reality then
     ///     resolve here.
     /// @dev `reportPayouts` requires that the condition is already
@@ -37,18 +36,6 @@ contract FlatCFM {
     // solhint-disable-next-line
     // See https://github.com/gnosis/conditional-tokens-contracts/blob/eeefca66eb46c800a9aaab88db2064a99026fde5/contracts/ConditionalTokens.sol#L75
     function resolve() external {
-        bytes32 answer = oracleAdapter.getAnswer(questionId);
-        uint256[] memory payouts = new uint256[](outcomeCount + 1);
-        uint256 numericAnswer = uint256(answer);
-
-        if (oracleAdapter.isInvalid(answer) || numericAnswer == 0) {
-            payouts[outcomeCount] = 1;
-        } else {
-            for (uint256 i = 0; i < outcomeCount; i++) {
-                payouts[i] = (numericAnswer >> i) & 1;
-            }
-        }
-
-        conditionalTokens.reportPayouts(questionId, payouts);
+        oracleAdapter.reportDecisionPayouts(conditionalTokens, questionId, outcomeCount);
     }
 }

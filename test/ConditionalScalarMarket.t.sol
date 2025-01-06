@@ -29,6 +29,8 @@ contract BaseTest is Test {
     bytes32 constant QUESTION_ID = bytes32("some question id");
     bytes32 constant CONDITION_ID = bytes32("some condition id");
     bytes32 constant PARENT_COLLECTION_ID = bytes32("someParentCollectionId");
+    uint256 constant MIN_VALUE = 1000;
+    uint256 constant MAX_VALUE = 11000;
 
     function setUp() public virtual {
         // 1. Deploy or mock the external dependencies
@@ -51,7 +53,7 @@ contract BaseTest is Test {
                 parentCollectionId: PARENT_COLLECTION_ID,
                 collateralToken: collateralToken
             }),
-            ScalarParams({minValue: 1000, maxValue: 11000}),
+            ScalarParams({minValue: MIN_VALUE, maxValue: MAX_VALUE}),
             WrappedConditionalTokensData({
                 shortData: "",
                 longData: "",
@@ -64,7 +66,9 @@ contract BaseTest is Test {
     }
 }
 
-// TODO add Split.
+// TODO test split
+// TODO Test split/m/r in all different state cases: DecisionResolved? x
+// ConditionalResolved?
 
 contract Mergetest is BaseTest {
     function setUp() public override {
@@ -202,116 +206,17 @@ contract Redeemtest is BaseTest {
 }
 
 contract ResolveTest is BaseTest {
-    function testResolveGoodAnswerCallsReportPayouts() public {
-        uint256 answer = 9000;
-
-        uint256[] memory expectedPayout = new uint256[](3);
-        expectedPayout[0] = 2000;
-        expectedPayout[1] = 8000;
-        expectedPayout[2] = 0;
-
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
-            abi.encode(answer)
-        );
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector, answer),
-            abi.encode(false)
-        );
-
+    function testResolveToAdapter() public {
         vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
-        );
-        csm.resolve();
-    }
-
-    function testResolveAboveMaxAnswerReportsPayouts() public {
-        uint256 answer = 1000000;
-
-        uint256[] memory expectedPayout = new uint256[](3);
-        expectedPayout[0] = 0;
-        expectedPayout[1] = 1;
-        expectedPayout[2] = 0;
-
-        vm.mockCall(
             address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
-            abi.encode(answer)
+            abi.encodeWithSelector(
+                DummyFlatCFMOracleAdapter.reportMetricPayouts.selector,
+                conditionalTokens,
+                QUESTION_ID,
+                MIN_VALUE,
+                MAX_VALUE
+            )
         );
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector, answer),
-            abi.encode(false)
-        );
-
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
-        );
-        csm.resolve();
-    }
-
-    function testResolveBelowMinAnswerReportsPayouts() public {
-        uint256 answer = 0;
-
-        uint256[] memory expectedPayout = new uint256[](3);
-        expectedPayout[0] = 1;
-        expectedPayout[1] = 0;
-        expectedPayout[2] = 0;
-
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
-            abi.encode(answer)
-        );
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector, answer),
-            abi.encode(false)
-        );
-
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
-        );
-        csm.resolve();
-    }
-
-    function testResolveInvalidReturnsLastPayout() public {
-        bytes32 answer = bytes32(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-
-        uint256[] memory expectedPayout = new uint256[](3);
-        expectedPayout[2] = 1;
-
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
-            abi.encode(answer)
-        );
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector, answer),
-            abi.encode(true)
-        );
-
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
-        );
-        csm.resolve();
-    }
-
-    function testResolveRevertsWithRevertingGetAnswer() public {
-        vm.mockCallRevert(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
-            "whatever"
-        );
-
-        vm.expectRevert("whatever");
         csm.resolve();
     }
 }

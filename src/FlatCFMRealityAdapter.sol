@@ -2,6 +2,8 @@
 pragma solidity 0.8.20;
 
 import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
+
+import "./interfaces/IConditionalTokens.sol";
 import "./FlatCFMOracleAdapter.sol";
 import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
 
@@ -100,6 +102,52 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         string memory formattedMetricQuestionParams =
             _formatMetricQuestionParams(genericScalarQuestionParams, outcomeName);
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, genericScalarQuestionParams.openingTime);
+    }
+
+    function reportDecisionPayouts(IConditionalTokens conditionalTokens, bytes32 questionId, uint256 outcomeCount)
+        external
+        override
+    {
+        bytes32 answer = getAnswer(questionId);
+        uint256[] memory payouts = new uint256[](outcomeCount + 1);
+        uint256 numericAnswer = uint256(answer);
+
+        if (isInvalid(answer) || numericAnswer == 0) {
+            payouts[outcomeCount] = 1;
+        } else {
+            for (uint256 i = 0; i < outcomeCount; i++) {
+                payouts[i] = (numericAnswer >> i) & 1;
+            }
+        }
+        conditionalTokens.reportPayouts(questionId, payouts);
+    }
+
+    function reportMetricPayouts(
+        IConditionalTokens conditionalTokens,
+        bytes32 questionId,
+        uint256 minValue,
+        uint256 maxValue
+    ) external override {
+        bytes32 answer = getAnswer(questionId);
+        uint256[] memory payouts = new uint256[](3);
+        uint256 numericAnswer = uint256(answer);
+
+        if (isInvalid(answer)) {
+            payouts[2] = 1;
+        } else {
+            if (numericAnswer <= minValue) {
+                payouts[0] = 1;
+            } else if (numericAnswer >= maxValue) {
+                payouts[1] = 1;
+            } else {
+                payouts[0] = maxValue - numericAnswer;
+                payouts[1] = numericAnswer - minValue;
+            }
+        }
+
+        // `reportPayouts` requires that the condition is already prepared and
+        // payouts aren't reported yet.
+        conditionalTokens.reportPayouts(questionId, payouts);
     }
 
     /// @dev `resultForOnceSettled` reverts if the question is not finalized.
