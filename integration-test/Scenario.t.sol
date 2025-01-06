@@ -128,7 +128,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
 
     function recordScalarMarkets() public {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256,string)");
+        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
 
         uint256 found = 0;
         for (uint256 i = 0; i < logs.length; i++) {
