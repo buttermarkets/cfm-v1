@@ -50,16 +50,16 @@ contract ConditionalScalarMarket is ERC1155Holder {
     }
 
     /// @notice Reports payouts corresponding to the scalar value reported by
-    /// the oracle. If the oracle value is invalid, report 50/50.
+    ///     the oracle. If the oracle value is invalid, report 50/50.
+    /// @dev 3rd outcome gets everything if market ends up invalid.
     function resolve() external {
         bytes32 answer = oracleAdapter.getAnswer(ctParams.questionId);
-        uint256[] memory payouts = new uint256[](2);
+        uint256[] memory payouts = new uint256[](3);
+        uint256 numericAnswer = uint256(answer);
 
-        // If the answer is invalid, no payouts are returned.
-        // TODO: test all cases, including invalid. In invalid, the user should
-        // still be able to merge positions.
-        if (!oracleAdapter.isInvalid(answer)) {
-            uint256 numericAnswer = uint256(answer);
+        if (oracleAdapter.isInvalid(answer)) {
+            payouts[2] = 1;
+        } else {
             if (numericAnswer <= scalarParams.minValue) {
                 payouts[0] = 1;
             } else if (numericAnswer >= scalarParams.maxValue) {
@@ -68,9 +68,6 @@ contract ConditionalScalarMarket is ERC1155Holder {
                 payouts[0] = scalarParams.maxValue - numericAnswer;
                 payouts[1] = numericAnswer - scalarParams.minValue;
             }
-        } else {
-            payouts[0] = 1;
-            payouts[1] = 1;
         }
 
         // `reportPayouts` requires that the condition is already prepared and
@@ -192,9 +189,10 @@ contract ConditionalScalarMarket is ERC1155Holder {
     }
 
     function discreetPartition() private pure returns (uint256[] memory) {
-        uint256[] memory partition = new uint256[](2);
+        uint256[] memory partition = new uint256[](3);
         partition[0] = 1;
         partition[1] = 2;
+        partition[2] = 4;
         return partition;
     }
 }

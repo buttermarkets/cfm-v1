@@ -139,8 +139,9 @@ contract FlatCFMFactory {
 
             bytes32 metricQ = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
 
-            conditionalTokens.prepareCondition(address(this), metricQ, 2);
-            bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), metricQ, 2);
+            // 3: Short, Long, Invalid.
+            conditionalTokens.prepareCondition(address(this), metricQ, 3);
+            bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(this), metricQ, 3);
 
             bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
             wrappedCTData = deployWrappedConditiontalTokens(
