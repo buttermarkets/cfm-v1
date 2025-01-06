@@ -63,51 +63,12 @@ The mechanism implemented here is a simplified version of
 [CFMs](https://community.ggresear.ch/t/conditional-funding-markets/27) called
 ["Flat CFM"](https://butterd.notion.site/cfm-v1-mech-v0-2-Flat-CFM-13657e477193802f8abce08cd13aa979?pvs=74).
 
-## codebase status and caveats
-
-Core contracts are in a stable state in terms of functionality and state
-management.
-
-We still plan on doing the following changes:
-
-- Refactorings to ease testing.
-- Improve tests.
-- Add events.
-- Add deployment scripts.
-- Natspecs.
-- Implement some gas savings.
-
-## codebase structure
-
-- `src/*`: Main contracts.
-- `src/interfaces/*`: Interfaces to external contracts.
-- `src/vendor/<github org name>/<github repo name>/*`: External contracts,
-  ported to 8.20.0 as plainly as possible.
-
-## note on vendored contracts
-
-The vendored contracts have both been audited in their original version: [ConditionalTokens](https://github.com/gnosis/conditional-tokens-contracts/tree/master/docs/audit),
-[Wrapped1155Factory](https://github.com/gnosis/1155-to-20/blob/master/AuditReport.md).
-
-If we deploy on a chain where verified instances of these contracts already
-live (mapping to the audited versions), we will use these deployed instances
-directly.
-
-If we end up deploying to a chain where such instances don't exist, we'll need
-to deploy the contracts. We understand that porting might introduce some risks
-and void part of the previous audits
-
-If auditing these ported contracts anew introduces a noticeable addition in
-total audit time, we suggest that we might revert to deploying the original
-non-ported versions (Solidity 0.5.x) so as to be able to rely on the previous
-audits and avoid extra audit cost.
-
 ## design
 
 `FlatCFM` represents the condition of funding. It's a market but it won't
-be traded. It creates a `ConditionalScalarMarket` for each outcome it has. It
-prepares an oracle question and condition (as in `ConditionalTokens`) during
-construction. 
+be traded. It creates a `ConditionalScalarMarket` for each outcome it has (apart
+from the special "Invalid" outcome, see below). It prepares an oracle question
+and condition (as in `ConditionalTokens`) during construction. 
 
 `ConditionalScalarMarket` represents the scalar market which is on the condition
 of parent `FlatCFM`. This will be traded. It prepares an oracle question
@@ -150,37 +111,27 @@ The system follows these general steps:
    payouts.
 1. Users can redeem their positions for payouts.
 
-Things to consider:
 
-- To prevent tight-coupling and have oracle modularity, markets do not know
-  implementation details of Reality.ETH, and instead all Reality details go into
-  `RealityAdapter` contract.
-- In this application there are many tokens therefore user has to approve many
-  token transaction. If possible these should be eliminated, perhaps via a
-  custom logic in `ERC20.transfer()` function. At very least, we can use gasless
-  token approvals to improve UX. 
-- The question ID is important and can be an attack vector if it's not carefully
-  considered. See:
-  https://github.com/seer-pm/demo/blob/4943119bf6526ac4c8decf696703fb986ae6e66b/contracts/src/MarketFactory.sol#L295
-  for example. We believe the code mitigates any such issue.
-- We can use contract cloning pattern to reduce gas costs since the system is
-  deploying almost identical contracts many times.
-
-
-## oracle: invalid case
+## edge case: RealityETH's invalid case
 
 Reality can return
 ['invalid'](https://realityeth.github.io/docs/html/contracts.html?highlight=invalid)
 in case the question can't be answered.
 
-At the projects outcome level, an invalid case means CFM contracts can't figure
+At the decision outcome level, an invalid case means CFM contracts can't figure
 whether any project has succeeded in getting funded. Hence, it is equivalent to
 the fact that none of the outcomes was returned by the oracle, ie that no
-project got funded.
+project got funded.  
+In such a case, collateral redemption will be made available to participants in
+a direct way, not accounting for any of the trading that happened in
+`ConditionalScalarMarket`s.  
+This is achieved by adding a supplementary decision outcome in `FlatCFM`s, which
+will get the whole payout in such cases (no project got funded or Invalid).
 
 At the individual project level with a scalar outcome, invalid means that CFM's
 scalar markets can't know how to reward traders. It thus means that the market
 should return collateral deposits as-is, hence allow merging of tokens but not
 redemption.  
-This is imperfect as traders might feel abused as some of them will make a loss
-(or a profit) in case this happens.
+This is achieved by the same principle as above: `ConditionalScalarMarket`s
+create 3 outcomes: Short, Long, Invalid. No facility is provided for trading
+Invalid tokens.
