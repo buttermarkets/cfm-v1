@@ -4,7 +4,7 @@
 // Repository: <https://github.com/gnosis/conditional-tokens-contracts>
 // Note: This contract is a port of the original work, with minor modifications for compatibility with the latest EVM and toolchain.
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin-contracts/token/ERC1155/extensions/ERC1155Burnable.sol";

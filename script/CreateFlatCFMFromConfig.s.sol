@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* solhint-disable no-console */
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 import "forge-std/src/Script.sol";
 

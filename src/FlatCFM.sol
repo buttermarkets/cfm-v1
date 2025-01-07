@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // TODO: move all solidity files to latest version
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 import "./interfaces/IConditionalTokens.sol";
 import "./FlatCFMOracleAdapter.sol";

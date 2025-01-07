@@ -2,7 +2,7 @@
 // Origin: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/58a3368215581509d05bd3ec4d53cd381c9bb40e/contracts/math/SafeMath.sol
 // Note: This contract is a port of the original work, with minor modifications for compatibility with the latest EVM and toolchain.
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow

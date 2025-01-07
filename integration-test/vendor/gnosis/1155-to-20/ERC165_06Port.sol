@@ -5,7 +5,7 @@
 // The version of openzeppelin-contracts matches with
 // Wrapped1155Factory.
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 import "@openzeppelin-contracts/utils/introspection/IERC165.sol";
 

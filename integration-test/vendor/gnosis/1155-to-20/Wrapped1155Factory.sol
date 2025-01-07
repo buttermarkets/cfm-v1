@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // From https://github.com/gnosis/1155-to-20/blob/master/contracts/Wrapped1155Factory.sol
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 import "@openzeppelin-contracts/utils/Address.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";

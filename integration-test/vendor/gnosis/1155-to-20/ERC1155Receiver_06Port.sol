@@ -5,7 +5,7 @@
 // The version of openzeppelin-contracts matches with
 // Wrapped1155Factory.
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 import "@openzeppelin-contracts/token/ERC1155/IERC1155Receiver.sol";
 import "./ERC165_06Port.sol";
