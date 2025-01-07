@@ -70,7 +70,13 @@ contract DummyConditionalTokens is IConditionalTokens {
         data;
     }
 
-    function prepareCondition(address, bytes32, uint256) external override {}
+    function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external override {
+        require(outcomeSlotCount <= 256, "too many outcome slots");
+        require(outcomeSlotCount > 1, "there should be more than one outcome slot");
+        bytes32 conditionId = keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount));
+        require(payoutNumerators[conditionId].length == 0, "condition already prepared");
+        payoutNumerators[conditionId] = new uint256[](outcomeSlotCount);
+    }
 
     address public _test_reportPayouts_caller;
 
@@ -82,8 +88,13 @@ contract DummyConditionalTokens is IConditionalTokens {
     function mergePositions(IERC20, bytes32, bytes32, uint256[] calldata, uint256) external override {}
     function redeemPositions(IERC20, bytes32, bytes32, uint256[] calldata) external override {}
 
-    function getConditionId(address, bytes32, uint256) external pure override returns (bytes32) {
-        return keccak256("condId");
+    function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount)
+        external
+        pure
+        override
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount));
     }
 
     function getCollectionId(bytes32, bytes32, uint256) external pure override returns (bytes32) {
@@ -94,8 +105,8 @@ contract DummyConditionalTokens is IConditionalTokens {
         return uint256(keccak256("posId"));
     }
 
-    function getOutcomeSlotCount(bytes32) external pure override returns (uint256) {
-        return 2;
+    function getOutcomeSlotCount(bytes32 conditionId) external view returns (uint256) {
+        return payoutNumerators[conditionId].length;
     }
 
     function _mint(address to, uint256 id, uint256 amount) internal {

@@ -14,7 +14,7 @@ import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
 // could decouple other attributes, if we expect templates to change more often
 // than these.
 contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
-    string private constant SEPARATOR = "\u241f";
+    string public constant SEPARATOR = "\u241f";
 
     IRealityETH public immutable oracle;
     address public immutable arbitrator;
@@ -30,7 +30,6 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         minBond = _minBond;
     }
 
-    // TODO unit test
     function _formatDecisionQuestionParams(FlatCFMQuestionParams calldata flatCFMQuestionParams)
         private
         pure
@@ -62,22 +61,25 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         );
     }
 
-    /// @return The ID of the newly created Reality question.
+    /// @notice Looks up if there is an existing Reality question, otherwise
+    ///     creates one.
+    /// @return The Reality question ID.
     function _askQuestion(
         uint256 templateId,
         string memory formattedQuestionParams, // output of formatQuestionParams
         uint32 openingTime
     ) private returns (bytes32) {
-        bytes32 content_hash = keccak256(abi.encodePacked(templateId, openingTime, formattedQuestionParams));
-
-        bytes32 question_id = keccak256(
+        // solhint-disable-next-line
+        // See https://github.com/RealityETH/reality-eth-monorepo/blob/13f0556b72059e4a4d402fd75999d2ce320bd3c4/packages/contracts/flat/RealityETH-3.0.sol#L324
+        bytes32 contentHash = keccak256(abi.encodePacked(templateId, openingTime, formattedQuestionParams));
+        bytes32 questionId = keccak256(
             abi.encodePacked(
-                content_hash, arbitrator, questionTimeout, minBond, address(oracle), address(this), uint256(0)
+                contentHash, arbitrator, questionTimeout, minBond, address(oracle), address(this), uint256(0)
             )
         );
 
-        if (oracle.getTimeout(question_id) != 0) {
-            return question_id;
+        if (oracle.getTimeout(questionId) != 0) {
+            return questionId;
         }
 
         return oracle.askQuestionWithMinBond(
@@ -130,11 +132,11 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     ) external override {
         bytes32 answer = getAnswer(questionId);
         uint256[] memory payouts = new uint256[](3);
-        uint256 numericAnswer = uint256(answer);
 
         if (isInvalid(answer)) {
             payouts[2] = 1;
         } else {
+            uint256 numericAnswer = uint256(answer);
             if (numericAnswer <= minValue) {
                 payouts[0] = 1;
             } else if (numericAnswer >= maxValue) {

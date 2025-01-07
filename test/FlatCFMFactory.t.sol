@@ -29,15 +29,19 @@ contract Base is Test {
     // This could be a dummy.
     FlatCFMRealityAdapter public oracleAdapter;
     DummyConditionalTokens public conditionalTokens;
-    DummyRealityETH public oracle;
+    DummyRealityETH public reality;
     IWrapped1155Factory public wrapped1155Factory;
     IERC20 public collateralToken;
 
+    uint32 constant QUESTION_TIMEOUT = 1000;
+    uint256 constant MIN_BOND = 1000000000000;
+
     function setUp() public virtual {
         conditionalTokens = new DummyConditionalTokens();
-        oracle = new DummyRealityETH();
+        reality = new DummyRealityETH();
         wrapped1155Factory = new DummyWrapped1155Factory();
-        oracleAdapter = new FlatCFMRealityAdapter(IRealityETH(address(oracle)), address(0x00), 1000, 10000000000);
+        oracleAdapter =
+            new FlatCFMRealityAdapter(IRealityETH(address(reality)), address(0x00), QUESTION_TIMEOUT, MIN_BOND);
         collateralToken = new TestERC20();
 
         factory = new FlatCFMFactory(
@@ -47,9 +51,9 @@ contract Base is Test {
         );
 
         vm.label(address(factory), "factory");
-        vm.label(address(oracleAdapter), "oracle adapter");
+        vm.label(address(oracleAdapter), "reality adapter");
         vm.label(address(conditionalTokens), "CT");
-        vm.label(address(oracle), "oracle");
+        vm.label(address(reality), "reality");
         vm.label(address(wrapped1155Factory), "wrapped 1155 factory");
         vm.label(address(collateralToken), "$COL");
     }
@@ -135,11 +139,6 @@ contract CreateBadMarketTest is Base {
     }
 }
 
-// XXX test create with same params still works: uses the same question
-// XXX test create with same params still works: uses the same condition
-// XXX test create another Factory and adapter then create with same params still works: same question
-// XXX test create another Factory and adapter then create with same params still works: different condition
-// XXX test create another Factory and same adapter then create with same params still works: same condition
 contract CreateMarketTestBase is Base {
     string[] outcomeNames;
     uint256 constant DECISION_TEMPLATE_ID = 42;
@@ -154,9 +153,9 @@ contract CreateMarketTestBase is Base {
     uint32 constant METRIC_OPENING_TIME = 1750118400; // 2025-06-17
 
     bytes32 constant DECISION_QID = bytes32("decision question id");
-    bytes32 constant DECISION_CID = bytes32("decision condition id");
+    //bytes32 constant DECISION_CID = bytes32("decision condition id");
     bytes32 constant CONDITIONAL_QID = bytes32("conditional question id");
-    bytes32 constant CONDITIONAL_CID = bytes32("conditional condition id");
+    //bytes32 constant CONDITIONAL_CID = bytes32("conditional condition id");
     bytes32 constant COND1_PARENT_COLLEC_ID = bytes32("cond 1 parent collection id");
     bytes32 constant SHORT_COLLEC_ID = bytes32("short collection id");
     uint256 constant SHORT_POSID = uint256(bytes32("short position id"));
@@ -300,17 +299,10 @@ contract CreateMarketTest is CreateMarketTestBase {
     }
 
     function testCallsPrepareConditionForMetric() public {
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMRealityAdapter.askMetricQuestion.selector),
-            abi.encode(CONDITIONAL_QID)
-        );
-
         vm.expectCall(
             address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.prepareCondition.selector, address(oracleAdapter), CONDITIONAL_QID, 3
-            )
+            abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector, address(oracleAdapter)),
+            5
         );
         factory.create(
             DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
@@ -321,6 +313,8 @@ contract CreateMarketTest is CreateMarketTestBase {
 contract CreateMarketDeploymentTest is CreateMarketTestBase {
     using String31 for string;
 
+    bytes32 decisionConditionId;
+    bytes32 metricConditionId;
     bytes shortData;
     bytes longData;
     FlatCFM cfm;
@@ -328,6 +322,13 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
 
     function setUp() public override {
         super.setUp();
+
+        decisionConditionId = keccak256(abi.encodePacked(address(oracleAdapter), DECISION_QID, outcomeNames.length + 1));
+        //console.log("expected decision condition id");
+        //console.logBytes32(DECISION_QID);
+        //console.log(outcomeNames.length + 1);
+        //console.logBytes32(decisionConditionId);
+        metricConditionId = keccak256(abi.encodePacked(address(oracleAdapter), CONDITIONAL_QID, uint256(3)));
 
         shortData = abi.encodePacked(
             string.concat(outcomeNames[0], "-Short").toString31(),
@@ -357,25 +358,25 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
                 DECISION_QID,
                 outcomeNames.length + 1
             ),
-            abi.encode(DECISION_CID)
+            abi.encode(decisionConditionId)
         );
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getConditionId.selector, address(oracleAdapter), CONDITIONAL_QID, 3
+                IConditionalTokens.getConditionId.selector, address(oracleAdapter), metricConditionId, 3
             ),
-            abi.encode(CONDITIONAL_CID)
+            abi.encode(metricConditionId)
         );
         vm.mockCall(
             address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, 0, DECISION_CID, 1),
+            abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, 0, decisionConditionId, 1),
             abi.encode(COND1_PARENT_COLLEC_ID)
         );
 
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITIONAL_CID, 1
+                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, metricConditionId, 1
             ),
             abi.encode(SHORT_COLLEC_ID)
         );
@@ -387,7 +388,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITIONAL_CID, 1 << 1
+                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, metricConditionId, 1 << 1
             ),
             abi.encode(LONG_COLLEC_ID)
         );
@@ -422,19 +423,19 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
     function testDeploysAFlatCFM() public view {
         assertEq(address(cfm.conditionalTokens()), address(conditionalTokens));
         assertEq(address(cfm.oracleAdapter()), address(oracleAdapter));
-        assertEq(cfm.outcomeCount(), outcomeNames.length);
+        assertEq(cfm.outcomeCount(), 4);
         assertEq(cfm.questionId(), DECISION_QID);
-        assertEq(cfm.conditionId(), DECISION_CID);
+        assertEq(cfm.conditionId(), decisionConditionId);
     }
 
-    function testDeploysAConditionalScalarMarketTokens() public view {
+    function testDeploysAConditionalScalarMarket() public view {
         assertEq(address(csm1.oracleAdapter()), address(oracleAdapter));
-        assertEq(address(csm1.conditionalTokens()), address(conditionalTokens));
-        assertEq(address(csm1.wrapped1155Factory()), address(wrapped1155Factory));
+        assertEq(address(csm1.conditionalTokens()), address(conditionalTokens), "CT mismatch");
+        assertEq(address(csm1.wrapped1155Factory()), address(wrapped1155Factory), "1155 factory mismatch");
         (bytes32 paramsQId, bytes32 paramsCId, bytes32 paramsColId, IERC20 paramsCollat) = csm1.ctParams();
-        assertEq(paramsQId, CONDITIONAL_QID);
-        assertEq(paramsCId, CONDITIONAL_CID);
-        assertEq(paramsColId, COND1_PARENT_COLLEC_ID);
+        assertEq(paramsQId, CONDITIONAL_QID, "metric q id mismatch");
+        assertEq(paramsCId, metricConditionId, "metric condition id mismatch");
+        assertEq(paramsColId, COND1_PARENT_COLLEC_ID, "metric parent collection id mismatch");
         assertEq(address(paramsCollat), address(collateralToken));
         (uint256 paramsMin, uint256 paramsMax) = csm1.scalarParams();
         assertEq(paramsMin, MIN_VALUE);

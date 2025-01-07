@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 import {IRealityETH} from "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
 
 contract DummyRealityETH is IRealityETH {
+    mapping(bytes32 => Question) public questions;
+
     function claimWinnings(
         bytes32 question_id,
         bytes32[] calldata history_hashes,
@@ -141,33 +143,12 @@ contract DummyRealityETH is IRealityETH {
         return false;
     }
 
-    function questions(bytes32)
-        external
-        pure
-        override
-        returns (
-            bytes32 content_hash,
-            address arbitrator,
-            uint32 opening_ts,
-            uint32 timeout,
-            uint32 finalize_ts,
-            bool is_pending_arbitration,
-            uint256 bounty,
-            bytes32 best_answer,
-            bytes32 history_hash,
-            uint256 bond,
-            uint256 min_bond
-        )
-    {
-        return (bytes32(0), address(0), 0, 0, 0, false, 0, bytes32(0), bytes32(0), 0, 0);
-    }
-
     function getOpeningTS(bytes32) external pure override returns (uint32) {
         return 0;
     }
 
-    function getTimeout(bytes32) external pure override returns (uint32) {
-        return 0;
+    function getTimeout(bytes32 question_id) public view returns (uint32) {
+        return questions[question_id].timeout;
     }
 
     function createTemplateAndAskQuestion(
@@ -231,8 +212,6 @@ contract DummyRealityETH is IRealityETH {
         // Mock implementation
     }
 
-    // Add these functions to MockRealityETH
-
     function askQuestionWithMinBond(
         uint256 template_id,
         string memory question,
@@ -241,10 +220,15 @@ contract DummyRealityETH is IRealityETH {
         uint32 opening_ts,
         uint256 nonce,
         uint256 min_bond
-    ) external payable returns (bytes32) {
+    ) external payable virtual returns (bytes32) {
         bytes32 content_hash = keccak256(abi.encodePacked(template_id, opening_ts, question));
         bytes32 question_id =
             keccak256(abi.encodePacked(content_hash, arbitrator, timeout, min_bond, address(this), msg.sender, nonce));
+        require(questions[question_id].timeout == 0, "question must not exist");
+        questions[question_id].content_hash = content_hash;
+        questions[question_id].arbitrator = arbitrator;
+        questions[question_id].opening_ts = opening_ts;
+        questions[question_id].timeout = timeout;
         return question_id;
     }
 

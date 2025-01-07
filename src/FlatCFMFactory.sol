@@ -98,9 +98,11 @@ contract FlatCFMFactory {
         bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
 
         // +1 counts for Invalid.
-        conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
         bytes32 cfmConditionId =
             conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
+        if (conditionalTokens.getOutcomeSlotCount(cfmConditionId) == 0) {
+            conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
+        }
 
         FlatCFM cfm = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
 
@@ -126,20 +128,21 @@ contract FlatCFMFactory {
             string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
             if (bytes(outcomeName).length > MAX_OUTCOME_NAME_LENGTH) revert InvalidOutcomeNameLength(outcomeName);
 
-            bytes32 metricQ = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
+            bytes32 csmQuestionId = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
 
             // 3: Short, Long, Invalid.
-            conditionalTokens.prepareCondition(address(oracleAdapter), metricQ, 3);
-            bytes32 conditionalConditionId = conditionalTokens.getConditionId(address(oracleAdapter), metricQ, 3);
+            bytes32 csmConditionId = conditionalTokens.getConditionId(address(oracleAdapter), csmQuestionId, 3);
+            if (conditionalTokens.getOutcomeSlotCount(csmConditionId) == 0) {
+                conditionalTokens.prepareCondition(address(oracleAdapter), csmQuestionId, 3);
+            }
 
             bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
-            wrappedCTData = deployWrappedConditiontalTokens(
-                outcomeName, collateralToken, decisionCollectionId, conditionalConditionId
-            );
+            wrappedCTData =
+                deployWrappedConditiontalTokens(outcomeName, collateralToken, decisionCollectionId, csmConditionId);
 
             conditionalScalarCTParams = ConditionalScalarCTParams({
-                questionId: metricQ,
-                conditionId: conditionalConditionId,
+                questionId: csmQuestionId,
+                conditionId: csmConditionId,
                 parentCollectionId: decisionCollectionId,
                 collateralToken: collateralToken
             });
@@ -166,7 +169,7 @@ contract FlatCFMFactory {
         string calldata outcomeName,
         IERC20 collateralToken,
         bytes32 decisionCollectionId,
-        bytes32 conditionalConditionId
+        bytes32 csmConditionId
     ) private returns (WrappedConditionalTokensData memory) {
         bytes memory shortData = abi.encodePacked(
             string.concat(outcomeName, "-Short").toString31(), string.concat(outcomeName, "-ST").toString31(), uint8(18)
@@ -176,10 +179,10 @@ contract FlatCFMFactory {
         );
 
         uint256 shortPosId = conditionalTokens.getPositionId(
-            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, conditionalConditionId, 1)
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 1)
         );
         uint256 longPosId = conditionalTokens.getPositionId(
-            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, conditionalConditionId, 2)
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 2)
         );
 
         IERC20 wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPosId, shortData);
