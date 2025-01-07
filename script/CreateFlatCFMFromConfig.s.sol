@@ -63,8 +63,6 @@ contract CreateFlatCFMFromConfig is Script {
 
     /// @dev Reads `FlatCFMQuestionParams` from JSON
     function _parseFlatCFMQuestionParams(string memory json) private pure returns (FlatCFMQuestionParams memory) {
-        string memory roundName = vm.parseJsonString(json, ".roundName");
-
         // outcomeNames is an array of strings
         bytes memory outcomeNamesRaw = vm.parseJson(json, ".outcomeNames");
         string[] memory outcomeNames = abi.decode(outcomeNamesRaw, (string[]));
@@ -72,11 +70,7 @@ contract CreateFlatCFMFromConfig is Script {
         uint256 openingTimeDecision = vm.parseJsonUint(json, ".openingTimeDecision");
         require(openingTimeDecision <= type(uint32).max, "openingTime overflow");
 
-        return FlatCFMQuestionParams({
-            roundName: roundName,
-            outcomeNames: outcomeNames,
-            openingTime: uint32(openingTimeDecision)
-        });
+        return FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: uint32(openingTimeDecision)});
     }
 
     /// @dev Reads `GenericScalarQuestionParams` from JSON
@@ -85,10 +79,6 @@ contract CreateFlatCFMFromConfig is Script {
         pure
         returns (GenericScalarQuestionParams memory)
     {
-        string memory metricName = vm.parseJsonString(json, ".metricName");
-        string memory startDate = vm.parseJsonString(json, ".startDate");
-        string memory endDate = vm.parseJsonString(json, ".endDate");
-
         // minValue & maxValue
         uint256 minValue = vm.parseJsonUint(json, ".minValue");
         uint256 maxValue = vm.parseJsonUint(json, ".maxValue");
@@ -98,9 +88,6 @@ contract CreateFlatCFMFromConfig is Script {
         require(openingTimeMetric <= type(uint32).max, "openingTime overflow");
 
         return GenericScalarQuestionParams({
-            metricName: metricName,
-            startDate: startDate,
-            endDate: endDate,
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: uint32(openingTimeMetric)
         });

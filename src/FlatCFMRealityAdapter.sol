@@ -41,24 +41,11 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
             formattedOutcomes = abi.encodePacked(formattedOutcomes, ',"', flatCFMQuestionParams.outcomeNames[i], '"');
         }
 
-        return string(abi.encodePacked(flatCFMQuestionParams.roundName, SEPARATOR, formattedOutcomes));
+        return string(abi.encodePacked(formattedOutcomes));
     }
 
-    function _formatMetricQuestionParams(
-        GenericScalarQuestionParams calldata genericScalarQuestionParams,
-        string memory outcomeName
-    ) private pure returns (string memory) {
-        return string(
-            abi.encodePacked(
-                genericScalarQuestionParams.metricName,
-                SEPARATOR,
-                outcomeName,
-                SEPARATOR,
-                genericScalarQuestionParams.startDate,
-                SEPARATOR,
-                genericScalarQuestionParams.endDate
-            )
-        );
+    function _formatMetricQuestionParams(string memory outcomeName) private pure returns (string memory) {
+        return string(abi.encodePacked(outcomeName));
     }
 
     /// @notice Looks up if there is an existing Reality question, otherwise
@@ -101,8 +88,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
     ) public override returns (bytes32) {
-        string memory formattedMetricQuestionParams =
-            _formatMetricQuestionParams(genericScalarQuestionParams, outcomeName);
+        string memory formattedMetricQuestionParams = _formatMetricQuestionParams(outcomeName);
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, genericScalarQuestionParams.openingTime);
     }
 

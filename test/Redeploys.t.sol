@@ -60,16 +60,10 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         outcomeNames2.push("Project A");
         outcomeNames2.push("Project B");
 
-        decisionQuestionParams2 = FlatCFMQuestionParams({
-            roundName: ROUND_NAME_2,
-            outcomeNames: outcomeNames2,
-            openingTime: DECISION_OPENING_TIME_2
-        });
+        decisionQuestionParams2 =
+            FlatCFMQuestionParams({outcomeNames: outcomeNames2, openingTime: DECISION_OPENING_TIME_2});
 
         conditionalQuestionParams = GenericScalarQuestionParams({
-            metricName: METRIC_NAME_2,
-            startDate: START_DATE_2,
-            endDate: END_DATE_2,
             scalarParams: ScalarParams({minValue: MIN_VALUE_2, maxValue: MAX_VALUE_2}),
             openingTime: METRIC_OPENING_TIME_2
         });
@@ -79,7 +73,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         bytes memory args = abi.encodeWithSelector(
             IRealityETHCore.askQuestionWithMinBond.selector,
             DECISION_TEMPLATE_ID,
-            "round\u241f\"Project A\",\"Project B\",\"Project C\",\"Project D\"",
+            "\"Project A\",\"Project B\",\"Project C\",\"Project D\"",
             oracleAdapter.arbitrator(),
             QUESTION_TIMEOUT,
             DECISION_OPENING_TIME,
@@ -93,7 +87,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         bytes memory args2 = abi.encodeWithSelector(
             IRealityETHCore.askQuestionWithMinBond.selector,
             DECISION_TEMPLATE_ID_2,
-            "other round\u241f\"Project A\",\"Project B\"",
+            "\"Project A\",\"Project B\"",
             oracleAdapter.arbitrator(),
             QUESTION_TIMEOUT,
             DECISION_OPENING_TIME_2,
@@ -123,7 +117,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
     function setUp() public override {
         super.setUp();
 
-        realityQuestion = "round\u241f\"Project A\",\"Project B\",\"Project C\",\"Project D\"";
+        realityQuestion = "\"Project A\",\"Project B\",\"Project C\",\"Project D\"";
         bytes32 content_hash = keccak256(abi.encodePacked(DECISION_TEMPLATE_ID, DECISION_OPENING_TIME, realityQuestion));
         questionId = keccak256(
             abi.encodePacked(

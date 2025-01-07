@@ -103,16 +103,10 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         outcomes[1] = "Project B";
         outcomes[2] = "Project C";
 
-        cfmQuestionParams = FlatCFMQuestionParams({
-            roundName: "Which project will get funded?",
-            outcomeNames: outcomes,
-            openingTime: uint32(block.timestamp + 2 * 24 * 3600)
-        });
+        cfmQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomes, openingTime: uint32(block.timestamp + 2 * 24 * 3600)});
 
         genericScalarQuestionParams = GenericScalarQuestionParams({
-            metricName: "ETH Price",
-            startDate: "2024-01-01",
-            endDate: "2024-12-31",
             scalarParams: ScalarParams({minValue: 0, maxValue: 10000}),
             openingTime: uint32(block.timestamp + 90 * 24 * 3600)
         });

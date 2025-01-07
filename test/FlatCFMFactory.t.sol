@@ -74,11 +74,8 @@ contract CreateBadMarketTest is Base {
     function test0Outcomes(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime) public {
         string[] memory outcomeNames = new string[](0);
         FlatCFMQuestionParams memory decisionQuestionParams =
-            FlatCFMQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
         GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
-            metricName: "metric",
-            startDate: "2024-01-01",
-            endDate: "2025-01-01",
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
@@ -96,11 +93,8 @@ contract CreateBadMarketTest is Base {
     {
         string[] memory outcomeNames = new string[](factory.MAX_OUTCOMES() + 1);
         FlatCFMQuestionParams memory decisionQuestionParams =
-            FlatCFMQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
         GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
-            metricName: "metric",
-            startDate: "2024-01-01",
-            endDate: "2025-01-01",
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
@@ -119,11 +113,8 @@ contract CreateBadMarketTest is Base {
         string[] memory outcomeNames = new string[](1);
         outcomeNames[0] = "01234567890123456789012345";
         FlatCFMQuestionParams memory decisionQuestionParams =
-            FlatCFMQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
         GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
-            metricName: "metric",
-            startDate: "2024-01-01",
-            endDate: "2025-01-01",
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
@@ -180,16 +171,9 @@ contract CreateMarketTestBase is Base {
         outcomeNames.push("Project C");
         outcomeNames.push("Project D");
 
-        decisionQuestionParams = FlatCFMQuestionParams({
-            roundName: ROUND_NAME,
-            outcomeNames: outcomeNames,
-            openingTime: DECISION_OPENING_TIME
-        });
+        decisionQuestionParams = FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: DECISION_OPENING_TIME});
 
         conditionalQuestionParams = GenericScalarQuestionParams({
-            metricName: METRIC_NAME,
-            startDate: START_DATE,
-            endDate: END_DATE,
             scalarParams: ScalarParams({minValue: MIN_VALUE, maxValue: MAX_VALUE}),
             openingTime: METRIC_OPENING_TIME
         });
@@ -507,12 +491,9 @@ contract CreateMarketFuzzTest is Base {
         }
 
         FlatCFMQuestionParams memory decisionQuestionParams =
-            FlatCFMQuestionParams({roundName: "round", outcomeNames: outcomeNames, openingTime: openingTime});
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
 
         GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
-            metricName: "metric",
-            startDate: "2024-01-01",
-            endDate: "2025-01-01",
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });

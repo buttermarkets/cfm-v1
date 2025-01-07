@@ -39,11 +39,8 @@ contract AskQuestionTest is Base {
     }
 
     function testAskDecisionQuestion() public {
-        FlatCFMQuestionParams memory flatCFMQuestionParams = FlatCFMQuestionParams({
-            roundName: "Round 1",
-            outcomeNames: new string[](2),
-            openingTime: uint32(block.timestamp + 1000)
-        });
+        FlatCFMQuestionParams memory flatCFMQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: new string[](2), openingTime: uint32(block.timestamp + 1000)});
         flatCFMQuestionParams.outcomeNames[0] = "Yes";
         flatCFMQuestionParams.outcomeNames[1] = "No";
 
@@ -59,9 +56,6 @@ contract AskQuestionTest is Base {
 
     function testAskMetricQuestion() public {
         GenericScalarQuestionParams memory params = GenericScalarQuestionParams({
-            metricName: "ETH price",
-            startDate: "2024-01-01",
-            endDate: "2025-01-01",
             scalarParams: ScalarParams({minValue: 0, maxValue: 10000000}),
             openingTime: uint32(block.timestamp + 1000)
         });
@@ -76,11 +70,8 @@ contract AskQuestionTest is Base {
     }
 
     function testEmptyOutcomeNames() public {
-        FlatCFMQuestionParams memory params = FlatCFMQuestionParams({
-            roundName: "Round 1",
-            outcomeNames: new string[](0),
-            openingTime: uint32(block.timestamp + 1000)
-        });
+        FlatCFMQuestionParams memory params =
+            FlatCFMQuestionParams({outcomeNames: new string[](0), openingTime: uint32(block.timestamp + 1000)});
 
         vm.expectRevert(); // Should revert with empty outcomes
         realityAdapter.askDecisionQuestion(decisionTemplateId, params);
