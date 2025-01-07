@@ -28,6 +28,7 @@ contract ConditionalScalarMarket is ERC1155Holder {
     error AlreadyInitialized();
     error WrappedShortTransferFailed(address wrappedShort, address from, address to, uint256 amount);
     error WrappedLongTransferFailed(address wrappedShort, address from, address to, uint256 amount);
+    error WrappedInvalidTransferFailed(address wrappedShort, address from, address to, uint256 amount);
 
     /// @notice Initialize function called by each clone.
     function initialize(
@@ -50,7 +51,7 @@ contract ConditionalScalarMarket is ERC1155Holder {
     }
 
     /// @notice Reports payouts corresponding to the scalar value reported by
-    ///     the oracle. If the oracle value is invalid, report 50/50.
+    ///     the oracle.
     /// @dev 3rd outcome gets everything if market ends up invalid.
     function resolve() external {
         oracleAdapter.reportMetricPayouts(
@@ -70,7 +71,7 @@ contract ConditionalScalarMarket is ERC1155Holder {
         );
 
         // Split position. Decision outcome ERC1155 are burnt. Conditional
-        // Long/Short ERC1155 are minted to the contract.
+        // Long/Short/Invalid ERC1155 are minted to the contract.
         conditionalTokens.splitPosition(
             ctParams.collateralToken, ctParams.parentCollectionId, ctParams.conditionId, discreetPartition(), amount
         );
@@ -83,6 +84,13 @@ contract ConditionalScalarMarket is ERC1155Holder {
         conditionalTokens.safeTransferFrom(
             address(this), address(wrapped1155Factory), wrappedCTData.longPositionId, amount, wrappedCTData.longData
         );
+        conditionalTokens.safeTransferFrom(
+            address(this),
+            address(wrapped1155Factory),
+            wrappedCTData.invalidPositionId,
+            amount,
+            wrappedCTData.invalidData
+        );
 
         // Contract transfers Long/Short ERC20 to user.
         if (!wrappedCTData.wrappedShort.transfer(msg.sender, amount)) {
@@ -90,6 +98,11 @@ contract ConditionalScalarMarket is ERC1155Holder {
         }
         if (!wrappedCTData.wrappedLong.transfer(msg.sender, amount)) {
             revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), address(this), msg.sender, amount);
+        }
+        if (!wrappedCTData.wrappedInvalid.transfer(msg.sender, amount)) {
+            revert WrappedInvalidTransferFailed(
+                address(wrappedCTData.wrappedInvalid), address(this), msg.sender, amount
+            );
         }
     }
 
@@ -102,6 +115,11 @@ contract ConditionalScalarMarket is ERC1155Holder {
         if (!wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), amount)) {
             revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), msg.sender, address(this), amount);
         }
+        if (!wrappedCTData.wrappedInvalid.transferFrom(msg.sender, address(this), amount)) {
+            revert WrappedInvalidTransferFailed(
+                address(wrappedCTData.wrappedInvalid), msg.sender, address(this), amount
+            );
+        }
 
         // Contract transfers Long/Short ERC20 to wrapped1155Factory and gets
         // back Long/Short ERC1155.
@@ -110,6 +128,9 @@ contract ConditionalScalarMarket is ERC1155Holder {
         );
         wrapped1155Factory.unwrap(
             conditionalTokens, wrappedCTData.longPositionId, amount, address(this), wrappedCTData.longData
+        );
+        wrapped1155Factory.unwrap(
+            conditionalTokens, wrappedCTData.invalidPositionId, amount, address(this), wrappedCTData.invalidData
         );
 
         // Merge position. Long/Short ERC1155 are burnt. Decision outcome
@@ -133,7 +154,7 @@ contract ConditionalScalarMarket is ERC1155Holder {
     ///      haven’t been reported yet (i.e., `payoutDenominator(conditionId) == 0`).
     /// @param shortAmount Amount of Short tokens to redeem (can be 0).
     /// @param longAmount Amount of Long tokens to redeem (can be 0).
-    function redeem(uint256 shortAmount, uint256 longAmount) external {
+    function redeem(uint256 shortAmount, uint256 longAmount, uint256 invalidAmount) external {
         // User transfers Long/Short ERC20 to contract.
         if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), shortAmount)) {
             revert WrappedShortTransferFailed(
@@ -142,6 +163,11 @@ contract ConditionalScalarMarket is ERC1155Holder {
         }
         if (!wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), longAmount)) {
             revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), msg.sender, address(this), longAmount);
+        }
+        if (!wrappedCTData.wrappedInvalid.transferFrom(msg.sender, address(this), invalidAmount)) {
+            revert WrappedInvalidTransferFailed(
+                address(wrappedCTData.wrappedInvalid), msg.sender, address(this), invalidAmount
+            );
         }
 
         // Contracts transfers Long/Short ERC20 to wrapped1155Factory and gets
@@ -152,12 +178,15 @@ contract ConditionalScalarMarket is ERC1155Holder {
         wrapped1155Factory.unwrap(
             conditionalTokens, wrappedCTData.longPositionId, longAmount, address(this), wrappedCTData.longData
         );
+        wrapped1155Factory.unwrap(
+            conditionalTokens, wrappedCTData.invalidPositionId, invalidAmount, address(this), wrappedCTData.invalidData
+        );
 
         uint256 decisionPositionId =
             conditionalTokens.getPositionId(ctParams.collateralToken, ctParams.parentCollectionId);
         uint256 initialBalance = conditionalTokens.balanceOf(address(this), decisionPositionId);
 
-        // Redeem positions. Long/Short ERC1155 are burnt. Decision outcome
+        // Redeem positions. Long/Short/Invalid ERC1155 are burnt. Decision outcome
         // ERC1155 are minted in proportion of payouts.
         conditionalTokens.redeemPositions(
             ctParams.collateralToken, ctParams.parentCollectionId, ctParams.conditionId, discreetPartition()

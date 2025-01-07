@@ -161,6 +161,8 @@ contract CreateMarketTestBase is Base {
     uint256 constant SHORT_POSID = uint256(bytes32("short position id"));
     bytes32 constant LONG_COLLEC_ID = bytes32("long collection id");
     uint256 constant LONG_POSID = uint256(bytes32("long position id"));
+    bytes32 constant INVALID_COLLEC_ID = bytes32("invalid collection id");
+    uint256 constant INVALID_POSID = uint256(bytes32("invalid position id"));
 
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams conditionalQuestionParams;
@@ -317,6 +319,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
     bytes32 metricConditionId;
     bytes shortData;
     bytes longData;
+    bytes invalidData;
     FlatCFM cfm;
     ConditionalScalarMarket csm1;
 
@@ -338,6 +341,11 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         longData = abi.encodePacked(
             string.concat(outcomeNames[0], "-Long").toString31(),
             string.concat(outcomeNames[0], "-LG").toString31(),
+            uint8(18)
+        );
+        invalidData = abi.encodePacked(
+            string.concat(outcomeNames[0], "-Inv").toString31(),
+            string.concat(outcomeNames[0], "-XX").toString31(),
             uint8(18)
         );
         vm.mockCall(
@@ -398,6 +406,18 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
             abi.encode(LONG_POSID)
         );
         vm.mockCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(
+                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, metricConditionId, 1 << 2
+            ),
+            abi.encode(INVALID_COLLEC_ID)
+        );
+        vm.mockCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.getPositionId.selector, collateralToken, INVALID_COLLEC_ID),
+            abi.encode(INVALID_POSID)
+        );
+        vm.mockCall(
             address(wrapped1155Factory),
             abi.encodeWithSelector(
                 IWrapped1155Factory.requireWrapped1155.selector, conditionalTokens, SHORT_POSID, shortData
@@ -410,6 +430,14 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
                 IWrapped1155Factory.requireWrapped1155.selector, conditionalTokens, LONG_POSID, longData
             ),
             abi.encode(IERC20(address(0x24422442)))
+        );
+
+        vm.mockCall(
+            address(wrapped1155Factory),
+            abi.encodeWithSelector(
+                IWrapped1155Factory.requireWrapped1155.selector, conditionalTokens, INVALID_POSID, invalidData
+            ),
+            abi.encode(IERC20(address(0xfefefefe)))
         );
 
         vm.recordLogs();
@@ -440,14 +468,26 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         (uint256 paramsMin, uint256 paramsMax) = csm1.scalarParams();
         assertEq(paramsMin, MIN_VALUE);
         assertEq(paramsMax, MAX_VALUE);
-        (bytes memory paramsSD, bytes memory paramsLD, uint256 paramsSPId, uint256 paramsLPId, IERC20 ws, IERC20 wl) =
-            csm1.wrappedCTData();
+        (
+            bytes memory paramsSD,
+            bytes memory paramsLD,
+            bytes memory paramsID,
+            uint256 paramsSPId,
+            uint256 paramsLPId,
+            uint256 paramsIPId,
+            IERC20 ws,
+            IERC20 wl,
+            IERC20 wi
+        ) = csm1.wrappedCTData();
         assertEq(paramsSD, shortData, "short token data should match");
         assertEq(paramsLD, longData, "long token data should match");
+        assertEq(paramsID, invalidData, "invalid token data should match");
         assertEq(paramsSPId, SHORT_POSID);
         assertEq(paramsLPId, LONG_POSID);
+        assertEq(paramsIPId, INVALID_POSID);
         assertEq(address(ws), address(0x42244224));
         assertEq(address(wl), address(0x24422442));
+        assertEq(address(wi), address(0xfefefefe));
     }
 }
 

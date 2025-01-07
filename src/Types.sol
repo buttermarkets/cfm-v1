@@ -32,8 +32,11 @@ struct ConditionalScalarCTParams {
 struct WrappedConditionalTokensData {
     bytes shortData;
     bytes longData;
+    bytes invalidData;
     uint256 shortPositionId;
     uint256 longPositionId;
+    uint256 invalidPositionId;
     IERC20 wrappedShort;
     IERC20 wrappedLong;
+    IERC20 wrappedInvalid;
 }

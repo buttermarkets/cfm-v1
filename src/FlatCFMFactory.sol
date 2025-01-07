@@ -177,6 +177,9 @@ contract FlatCFMFactory {
         bytes memory longData = abi.encodePacked(
             string.concat(outcomeName, "-Long").toString31(), string.concat(outcomeName, "-LG").toString31(), uint8(18)
         );
+        bytes memory invalidData = abi.encodePacked(
+            string.concat(outcomeName, "-Inv").toString31(), string.concat(outcomeName, "-XX").toString31(), uint8(18)
+        );
 
         uint256 shortPosId = conditionalTokens.getPositionId(
             collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 1)
@@ -184,17 +187,24 @@ contract FlatCFMFactory {
         uint256 longPosId = conditionalTokens.getPositionId(
             collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 2)
         );
+        uint256 invalidPosId = conditionalTokens.getPositionId(
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 4)
+        );
 
         IERC20 wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPosId, shortData);
         IERC20 wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPosId, longData);
+        IERC20 wrappedInvalid = wrapped1155Factory.requireWrapped1155(conditionalTokens, invalidPosId, invalidData);
 
         return WrappedConditionalTokensData({
             shortData: shortData,
             longData: longData,
+            invalidData: invalidData,
             shortPositionId: shortPosId,
             longPositionId: longPosId,
+            invalidPositionId: invalidPosId,
             wrappedShort: wrappedShort,
-            wrappedLong: wrappedLong
+            wrappedLong: wrappedLong,
+            wrappedInvalid: wrappedInvalid
         });
     }
 }

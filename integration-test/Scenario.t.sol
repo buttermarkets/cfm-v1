@@ -168,10 +168,13 @@ contract SplitTestBase is CreateDecisionMarketBase {
 
     IERC20 wrappedShortA;
     IERC20 wrappedLongA;
+    IERC20 wrappedInvalidA;
     IERC20 wrappedShortB;
     IERC20 wrappedLongB;
+    IERC20 wrappedInvalidB;
     IERC20 wrappedShortC;
     IERC20 wrappedLongC;
+    IERC20 wrappedInvalidC;
 
     function decisionDiscreetPartition() public view returns (uint256[] memory) {
         uint256[] memory partition = new uint256[](cfm.outcomeCount() + 1);
@@ -201,9 +204,9 @@ contract SplitTestBase is CreateDecisionMarketBase {
 
         vm.stopPrank();
 
-        (,,,, wrappedShortA, wrappedLongA) = conditionalMarketA.wrappedCTData();
-        (,,,, wrappedShortB, wrappedLongB) = conditionalMarketB.wrappedCTData();
-        (,,,, wrappedShortC, wrappedLongC) = conditionalMarketC.wrappedCTData();
+        (,,,,,, wrappedShortA, wrappedLongA, wrappedInvalidA) = conditionalMarketA.wrappedCTData();
+        (,,,,,, wrappedShortB, wrappedLongB, wrappedInvalidB) = conditionalMarketB.wrappedCTData();
+        (,,,,,, wrappedShortC, wrappedLongC, wrappedInvalidC) = conditionalMarketC.wrappedCTData();
     }
 }
 
@@ -211,18 +214,21 @@ contract SplitTest is SplitTestBase {
     function testSplitPositionA() public view {
         assertEq(wrappedShortA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(wrappedLongA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
+        assertEq(wrappedInvalidA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(userBalanceOutcomeA(), DECISION_SPLIT_AMOUNT - DECISION_SPLIT_AMOUNT_A);
     }
 
     function testSplitPositionB() public view {
         assertEq(wrappedShortB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(wrappedLongB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
+        assertEq(wrappedInvalidB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(userBalanceOutcomeB(), DECISION_SPLIT_AMOUNT - DECISION_SPLIT_AMOUNT_B);
     }
 
     function testSplitPositionC() public view {
         assertEq(wrappedShortC.balanceOf(USER), 0);
         assertEq(wrappedLongC.balanceOf(USER), 0);
+        assertEq(wrappedInvalidC.balanceOf(USER), 0);
         assertEq(userBalanceOutcomeC(), DECISION_SPLIT_AMOUNT);
     }
 
@@ -348,10 +354,13 @@ contract MergeTestBase is TradeTestBase {
     struct UserBalance {
         uint256 AShort;
         uint256 ALong;
+        uint256 AInvalid;
         uint256 BShort;
         uint256 BLong;
+        uint256 BInvalid;
         uint256 CShort;
         uint256 CLong;
+        uint256 CInvalid;
     }
 
     UserBalance userBalanceBeforeMerge;
@@ -369,18 +378,24 @@ contract MergeTestBase is TradeTestBase {
         userBalanceBeforeMerge = UserBalance({
             AShort: wrappedShortA.balanceOf(USER),
             ALong: wrappedLongA.balanceOf(USER),
+            AInvalid: wrappedInvalidA.balanceOf(USER),
             BShort: wrappedShortB.balanceOf(USER),
             BLong: wrappedLongB.balanceOf(USER),
+            BInvalid: wrappedInvalidB.balanceOf(USER),
             CShort: wrappedShortC.balanceOf(USER),
-            CLong: wrappedLongC.balanceOf(USER)
+            CLong: wrappedLongC.balanceOf(USER),
+            CInvalid: wrappedInvalidC.balanceOf(USER)
         });
 
         wrappedLongA.approve(address(conditionalMarketA), MERGE_AMOUNT);
         wrappedShortA.approve(address(conditionalMarketA), MERGE_AMOUNT);
+        wrappedInvalidA.approve(address(conditionalMarketA), MERGE_AMOUNT);
         wrappedLongB.approve(address(conditionalMarketB), MERGE_AMOUNT);
         wrappedShortB.approve(address(conditionalMarketB), MERGE_AMOUNT);
+        wrappedInvalidB.approve(address(conditionalMarketB), MERGE_AMOUNT);
         wrappedLongC.approve(address(conditionalMarketC), mergeMax);
         wrappedShortC.approve(address(conditionalMarketC), mergeMax);
+        wrappedInvalidC.approve(address(conditionalMarketC), mergeMax);
 
         conditionalMarketA.merge(MERGE_AMOUNT);
         conditionalMarketB.merge(MERGE_AMOUNT);
