@@ -2,9 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/src/Test.sol";
-import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
-import "@realityeth/packages/contracts/development/contracts/IRealityETHCore.sol";
 
+import {IRealityETH, IRealityETHCore} from "src/interfaces/IRealityETH.sol";
 import "src/interfaces/IConditionalTokens.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import {GenericScalarQuestionParams, ScalarParams} from "src/Types.sol";

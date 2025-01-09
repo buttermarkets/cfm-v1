@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test, console, Vm} from "forge-std/src/Test.sol";
 
+import {IRealityETHCore} from "src/interfaces/IRealityETH.sol";
 import "src/FlatCFMFactory.sol";
 import "src/FlatCFM.sol";
 import "src/ConditionalScalarMarket.sol";

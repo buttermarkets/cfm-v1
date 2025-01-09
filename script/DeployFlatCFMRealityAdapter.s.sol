@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import "forge-std/src/Script.sol";
-import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
 
+import {IRealityETH} from "src/interfaces/IRealityETH.sol";
 import "src/FlatCFMRealityAdapter.sol";
 
 contract DeployFlatCFMRealityAdapter is Script {

@@ -3,7 +3,7 @@
 /* solhint-disable var-name-mixedcase, no-unused-vars */
 pragma solidity 0.8.28;
 
-import {IRealityETH} from "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
+import {IRealityETH} from "src/interfaces/IRealityETH.sol";
 
 contract DummyRealityETH is IRealityETH {
     mapping(bytes32 => Question) public questions;

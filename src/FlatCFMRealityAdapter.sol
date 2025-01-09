@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.28;
 
-import "@realityeth/packages/contracts/development/contracts/IRealityETH.sol";
-
+import {IRealityETH} from "./interfaces/IRealityETH.sol";
 import "./interfaces/IConditionalTokens.sol";
 import "./FlatCFMOracleAdapter.sol";
 import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
