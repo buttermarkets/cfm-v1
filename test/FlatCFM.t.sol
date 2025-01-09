@@ -18,12 +18,14 @@ contract BaseTest is Test {
     uint256 constant OUTCOME_COUNT = 50;
     bytes32 constant QUESTION_ID = bytes32("some question id");
     bytes32 constant CONDITION_ID = bytes32("some condition id");
+    string metadataUri;
 
     function setUp() public virtual {
         oracleAdapter = new DummyFlatCFMOracleAdapter();
         conditionalTokens = new DummyConditionalTokens();
+        metadataUri = "ipfs://whatever";
 
-        cfm = new FlatCFM(oracleAdapter, conditionalTokens, OUTCOME_COUNT, QUESTION_ID, CONDITION_ID);
+        cfm = new FlatCFM(oracleAdapter, conditionalTokens, OUTCOME_COUNT, QUESTION_ID, CONDITION_ID, metadataUri);
     }
 }
 
