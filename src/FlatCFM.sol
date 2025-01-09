@@ -14,19 +14,22 @@ contract FlatCFM {
     bytes32 public immutable questionId;
     uint256 public immutable outcomeCount;
     bytes32 public immutable conditionId;
+    string public metadataUri;
 
     constructor(
         FlatCFMOracleAdapter _oracleAdapter,
         IConditionalTokens _conditionalTokens,
         uint256 _outcomeCount,
         bytes32 _questionId,
-        bytes32 _conditionId
+        bytes32 _conditionId,
+        string memory _metadataUri
     ) {
         oracleAdapter = _oracleAdapter;
         conditionalTokens = _conditionalTokens;
         outcomeCount = _outcomeCount;
         questionId = _questionId;
         conditionId = _conditionId;
+        metadataUri = _metadataUri;
     }
 
     /// @notice A resolver must call submitAnswer on Reality then

@@ -25,10 +25,12 @@ contract CreateFlatCFMFromConfig is Script {
         FlatCFMQuestionParams memory flatQParams = _parseFlatCFMQuestionParams(jsonContent);
         GenericScalarQuestionParams memory scalarQParams = _parseGenericScalarQuestionParams(jsonContent);
         address collateralAddr = _parseCollateralAddress(jsonContent);
+        string memory metadataUri = _parseMetadataUri(jsonContent);
 
         // 5. Call create
-        FlatCFM market =
-            factory.create(decisionTemplateId, metricTemplateId, flatQParams, scalarQParams, IERC20(collateralAddr));
+        FlatCFM market = factory.create(
+            decisionTemplateId, metricTemplateId, flatQParams, scalarQParams, IERC20(collateralAddr), metadataUri
+        );
 
         // Log the newly created FlatCFM contract
         console.log("Deployed FlatCFM at:", address(market));
@@ -97,5 +99,9 @@ contract CreateFlatCFMFromConfig is Script {
     function _parseCollateralAddress(string memory json) private pure returns (address) {
         // parseJsonAddress is available in Foundry's newer versions
         return vm.parseJsonAddress(json, ".collateralToken");
+    }
+
+    function _parseMetadataUri(string memory json) private pure returns (string memory) {
+        return vm.parseJsonString(json, ".metadataUri");
     }
 }
