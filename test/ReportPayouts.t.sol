@@ -33,7 +33,12 @@ contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTest {
             )
         );
         FlatCFM cfm = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
 
         // Provoke call to `reportPayout`.
@@ -88,7 +93,12 @@ contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTest {
         );
         vm.recordLogs();
         factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
 
         // Provoke call to `reportPayout`.

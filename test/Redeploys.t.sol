@@ -37,6 +37,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
     uint256 constant MIN_VALUE_2 = 111;
     uint256 constant MAX_VALUE_2 = 333;
     uint32 constant METRIC_OPENING_TIME_2 = METRIC_OPENING_TIME; // 2025-06-17
+    string METADATA_URI_2 = "";
 
     bytes32 constant DECISION_QID_2 = bytes32("different decision question id");
     bytes32 constant DECISION_CID_2 = bytes32("different decision condition id");
@@ -82,7 +83,12 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         );
         vm.expectCall(address(reality), args);
         factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
         bytes memory args2 = abi.encodeWithSelector(
             IRealityETHCore.askQuestionWithMinBond.selector,
@@ -100,7 +106,8 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID_2,
             decisionQuestionParams2,
             conditionalQuestionParams2,
-            collateralToken2
+            collateralToken2,
+            METADATA_URI_2
         );
         assertNotEq(args, args2);
     }
@@ -147,10 +154,20 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
         // Expect askQuestionWithMinBond to be called only once.
         vm.expectCall(address(reality), args, 1);
         FlatCFM cfm1 = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
         FlatCFM cfm2 = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
         assertEq(cfm1.questionId(), cfm2.questionId());
     }
@@ -168,10 +185,20 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
             1
         );
         FlatCFM cfm1 = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
         FlatCFM cfm2 = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
         assertEq(cfm1.conditionId(), cfm2.conditionId());
     }

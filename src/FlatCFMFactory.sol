@@ -61,14 +61,16 @@ contract FlatCFMFactory {
         uint256 metricTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
         GenericScalarQuestionParams calldata genericScalarQParams,
-        IERC20 collateralToken
+        IERC20 collateralToken,
+        string calldata metadataUri
     ) external returns (FlatCFM) {
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
         if (outcomeCount == 0 || outcomeCount > MAX_OUTCOMES) {
             revert InvalidOutcomeCount(outcomeCount);
         }
 
-        (FlatCFM cfm, bytes32 cfmConditionId) = createDecisionMarket(decisionTemplateId, flatCFMQParams, outcomeCount);
+        (FlatCFM cfm, bytes32 cfmConditionId) =
+            createDecisionMarket(decisionTemplateId, flatCFMQParams, outcomeCount, metadataUri);
 
         emit FlatCFMCreated(address(cfm));
 
@@ -93,7 +95,8 @@ contract FlatCFMFactory {
     function createDecisionMarket(
         uint256 decisionTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
-        uint256 outcomeCount
+        uint256 outcomeCount,
+        string calldata metadataUri
     ) private returns (FlatCFM, bytes32) {
         bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
 
@@ -104,7 +107,8 @@ contract FlatCFMFactory {
             conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
         }
 
-        FlatCFM cfm = new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId);
+        FlatCFM cfm =
+            new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId, metadataUri);
 
         return (cfm, cfmConditionId);
     }

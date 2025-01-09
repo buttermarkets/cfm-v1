@@ -71,6 +71,10 @@ contract ConstructorTest is Base {
 }
 
 contract CreateBadMarketTest is Base {
+    uint256 constant DECISION_TEMPLATE_ID = 4242;
+    uint256 constant METRIC_TEMPLATE_ID = 2424;
+    string METADATA_URI = "ipfs://sfpi";
+
     function test0Outcomes(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime) public {
         string[] memory outcomeNames = new string[](0);
         FlatCFMQuestionParams memory decisionQuestionParams =
@@ -79,12 +83,15 @@ contract CreateBadMarketTest is Base {
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
-        uint256 decisionTemplateId = 4242;
-        uint256 metricTemplateId = 2424;
 
         vm.expectRevert(abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeCount.selector, 0));
         factory.create(
-            decisionTemplateId, metricTemplateId, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 
@@ -98,12 +105,15 @@ contract CreateBadMarketTest is Base {
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
-        uint256 decisionTemplateId = 4242;
-        uint256 metricTemplateId = 2424;
 
         vm.expectRevert(abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeCount.selector, factory.MAX_OUTCOMES() + 1));
         factory.create(
-            decisionTemplateId, metricTemplateId, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 
@@ -118,14 +128,17 @@ contract CreateBadMarketTest is Base {
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
-        uint256 decisionTemplateId = 4242;
-        uint256 metricTemplateId = 2424;
 
         vm.expectRevert(
             abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeNameLength.selector, "01234567890123456789012345")
         );
         factory.create(
-            decisionTemplateId, metricTemplateId, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 }
@@ -142,6 +155,7 @@ contract CreateMarketTestBase is Base {
     uint256 constant MIN_VALUE = 0;
     uint256 constant MAX_VALUE = 1000000;
     uint32 constant METRIC_OPENING_TIME = 1750118400; // 2025-06-17
+    string METADATA_URI = "ipfs://sfpi";
 
     bytes32 constant DECISION_QID = bytes32("decision question id");
     //bytes32 constant DECISION_CID = bytes32("decision condition id");
@@ -204,7 +218,12 @@ contract CreateMarketTest is CreateMarketTestBase {
         vm.recordLogs();
 
         FlatCFM cfm = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
 
         bytes32 eventSignature = keccak256("FlatCFMCreated(address)");
@@ -225,7 +244,12 @@ contract CreateMarketTest is CreateMarketTestBase {
             )
         );
         factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 
@@ -247,7 +271,12 @@ contract CreateMarketTest is CreateMarketTestBase {
             )
         );
         factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 
@@ -256,7 +285,12 @@ contract CreateMarketTest is CreateMarketTestBase {
         vm.recordLogs();
 
         FlatCFM cfm = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
 
         bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
@@ -280,7 +314,12 @@ contract CreateMarketTest is CreateMarketTestBase {
             )
         );
         factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 
@@ -291,7 +330,12 @@ contract CreateMarketTest is CreateMarketTestBase {
             5
         );
         factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
     }
 }
@@ -426,7 +470,12 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
 
         vm.recordLogs();
         cfm = factory.create(
-            DECISION_TEMPLATE_ID, METRIC_TEMPLATE_ID, decisionQuestionParams, conditionalQuestionParams, collateralToken
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
         );
 
         csm1 = _getFirstConditionalScalarMarket();
@@ -499,7 +548,9 @@ contract CreateMarketFuzzTest is Base {
         });
 
         vm.recordLogs();
-        FlatCFM cfm = factory.create(4242, 2424, decisionQuestionParams, conditionalQuestionParams, collateralToken);
+        FlatCFM cfm = factory.create(
+            4242, 2424, decisionQuestionParams, conditionalQuestionParams, collateralToken, "ipfs://hello"
+        );
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
