@@ -261,16 +261,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             ),
             abi.encode(DECISION_QID)
         );
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.prepareCondition.selector,
-                address(oracleAdapter),
-                DECISION_QID,
-                outcomeNames.length + 1
-            )
-        );
-        factory.create(
+        FlatCFM cfm = factory.create(
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -278,6 +269,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             collateralToken,
             METADATA_URI
         );
+        assertEq(conditionalTokens._test_prepareCondition_oracle(DECISION_QID), address(cfm));
     }
 
     function testEmitsConditionalMarketCreated() public {
@@ -325,9 +317,7 @@ contract CreateMarketTest is CreateMarketTestBase {
 
     function testCallsPrepareConditionForMetric() public {
         vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector, address(oracleAdapter)),
-            5
+            address(conditionalTokens), abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector), 5
         );
         factory.create(
             DECISION_TEMPLATE_ID,
@@ -343,8 +333,8 @@ contract CreateMarketTest is CreateMarketTestBase {
 contract CreateMarketDeploymentTest is CreateMarketTestBase {
     using String31 for string;
 
-    bytes32 decisionConditionId;
-    bytes32 metricConditionId;
+    bytes32 constant CONDITION_ID = "test condition id";
+
     bytes shortData;
     bytes longData;
     bytes invalidData;
@@ -353,13 +343,6 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
 
     function setUp() public override {
         super.setUp();
-
-        decisionConditionId = keccak256(abi.encodePacked(address(oracleAdapter), DECISION_QID, outcomeNames.length + 1));
-        //console.log("expected decision condition id");
-        //console.logBytes32(DECISION_QID);
-        //console.log(outcomeNames.length + 1);
-        //console.logBytes32(decisionConditionId);
-        metricConditionId = keccak256(abi.encodePacked(address(oracleAdapter), CONDITIONAL_QID, uint256(3)));
 
         shortData = abi.encodePacked(
             string.concat(outcomeNames[0], "-Short").toString31(),
@@ -388,32 +371,18 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         );
         vm.mockCall(
             address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.getConditionId.selector,
-                address(oracleAdapter),
-                DECISION_QID,
-                outcomeNames.length + 1
-            ),
-            abi.encode(decisionConditionId)
+            abi.encodeWithSelector(IConditionalTokens.getConditionId.selector),
+            abi.encode(CONDITION_ID)
         );
         vm.mockCall(
             address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.getConditionId.selector, address(oracleAdapter), metricConditionId, 3
-            ),
-            abi.encode(metricConditionId)
-        );
-        vm.mockCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, 0, decisionConditionId, 1),
+            abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, 0),
             abi.encode(COND1_PARENT_COLLEC_ID)
         );
 
         vm.mockCall(
             address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, metricConditionId, 1
-            ),
+            abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITION_ID, 1),
             abi.encode(SHORT_COLLEC_ID)
         );
         vm.mockCall(
@@ -424,7 +393,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, metricConditionId, 1 << 1
+                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITION_ID, 1 << 1
             ),
             abi.encode(LONG_COLLEC_ID)
         );
@@ -436,7 +405,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, metricConditionId, 1 << 2
+                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITION_ID, 1 << 2
             ),
             abi.encode(INVALID_COLLEC_ID)
         );
@@ -486,7 +455,6 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         assertEq(address(cfm.oracleAdapter()), address(oracleAdapter));
         assertEq(cfm.outcomeCount(), 4);
         assertEq(cfm.questionId(), DECISION_QID);
-        assertEq(cfm.conditionId(), decisionConditionId);
     }
 
     function testDeploysAConditionalScalarMarket() public view {
@@ -495,7 +463,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         assertEq(address(csm1.wrapped1155Factory()), address(wrapped1155Factory), "1155 factory mismatch");
         (bytes32 paramsQId, bytes32 paramsCId, bytes32 paramsColId, IERC20 paramsCollat) = csm1.ctParams();
         assertEq(paramsQId, CONDITIONAL_QID, "metric q id mismatch");
-        assertEq(paramsCId, metricConditionId, "metric condition id mismatch");
+        assertEq(paramsCId, CONDITION_ID, "metric condition id mismatch");
         assertEq(paramsColId, COND1_PARENT_COLLEC_ID, "metric parent collection id mismatch");
         assertEq(address(paramsCollat), address(collateralToken));
         (uint256 paramsMin, uint256 paramsMax) = csm1.scalarParams();

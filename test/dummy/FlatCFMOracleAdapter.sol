@@ -16,17 +16,6 @@ contract DummyFlatCFMOracleAdapter is FlatCFMOracleAdapter {
         string memory outcomeName
     ) external override returns (bytes32) {}
 
-    function reportDecisionPayouts(IConditionalTokens conditionalTokens, bytes32 questionId, uint256 outcomeCount)
-        external
-        override
-    {}
-    function reportMetricPayouts(
-        IConditionalTokens conditionalTokens,
-        bytes32 questionId,
-        uint256 minValue,
-        uint256 maxValue
-    ) external override {}
-
     function getAnswer(bytes32 questionID) external view override returns (bytes32) {}
 
     function isInvalid(bytes32 answer) external pure override returns (bool) {}

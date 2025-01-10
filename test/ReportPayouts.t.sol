@@ -7,16 +7,9 @@ import "src/FlatCFMRealityAdapter.sol";
 import "src/interfaces/IConditionalTokens.sol";
 import "src/FlatCFM.sol";
 import "src/ConditionalScalarMarket.sol";
-import {CreateMarketTest} from "./FlatCFMFactory.t.sol";
+import {CreateMarketTestBase} from "./FlatCFMFactory.t.sol";
 
-contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTest {
-    address coherentAddress;
-
-    function setUp() public override {
-        super.setUp();
-        coherentAddress = address(oracleAdapter);
-    }
-
+contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTestBase {
     function testPrepareConditionCoherentWithReportPayouts() public {
         // Provoke call to `prepareCondition`.
         vm.mockCall(
@@ -26,12 +19,7 @@ contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTest {
             ),
             abi.encode(DECISION_QID)
         );
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.prepareCondition.selector, coherentAddress, DECISION_QID, outcomeNames.length + 1
-            )
-        );
+        vm.recordLogs();
         FlatCFM cfm = factory.create(
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
@@ -40,6 +28,7 @@ contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTest {
             collateralToken,
             METADATA_URI
         );
+        address firstOracle = conditionalTokens._test_prepareCondition_oracle(DECISION_QID);
 
         // Provoke call to `reportPayout`.
         uint256[] memory plainAnswer = new uint256[](outcomeNames.length);
@@ -57,7 +46,9 @@ contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTest {
             abi.encode(false)
         );
         cfm.resolve();
-        assertEq(conditionalTokens._test_reportPayouts_caller(), coherentAddress);
+        address secondOracle = conditionalTokens._test_reportPayouts_caller(DECISION_QID);
+
+        assertEq(firstOracle, secondOracle);
     }
 
     function _toBitArray(uint256[] memory plainAnswer) private pure returns (bytes32) {
@@ -69,12 +60,19 @@ contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTest {
     }
 }
 
-contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTest {
-    address coherentAddress;
-
-    function setUp() public override {
+contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTestBase {
+    function setUp() public virtual override {
         super.setUp();
-        coherentAddress = address(oracleAdapter);
+        outcomeNames.pop();
+        outcomeNames.pop();
+        outcomeNames.pop();
+
+        decisionQuestionParams = FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: DECISION_OPENING_TIME});
+
+        conditionalQuestionParams = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: MIN_VALUE, maxValue: MAX_VALUE}),
+            openingTime: METRIC_OPENING_TIME
+        });
     }
 
     function testPrepareConditionCoherentWithReportPayouts() public {
@@ -85,12 +83,6 @@ contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTest {
             abi.encode(CONDITIONAL_QID)
         );
 
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.prepareCondition.selector, address(oracleAdapter), CONDITIONAL_QID, 3
-            )
-        );
         vm.recordLogs();
         factory.create(
             DECISION_TEMPLATE_ID,
@@ -100,6 +92,7 @@ contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTest {
             collateralToken,
             METADATA_URI
         );
+        address firstOracle = conditionalTokens._test_prepareCondition_oracle(CONDITIONAL_QID);
 
         // Provoke call to `reportPayout`.
         uint256 answer = MAX_VALUE;
@@ -115,7 +108,9 @@ contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTest {
         );
         ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
         csm1.resolve();
-        assertEq(conditionalTokens._test_reportPayouts_caller(), coherentAddress);
+        address secondOracle = conditionalTokens._test_reportPayouts_caller(CONDITIONAL_QID);
+
+        assertEq(firstOracle, secondOracle);
     }
 
     function _toBitArray(uint256[] memory plainAnswer) private pure returns (bytes32) {

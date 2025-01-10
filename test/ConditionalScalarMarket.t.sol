@@ -296,17 +296,99 @@ contract Redeemtest is BaseTest {
 }
 
 contract ResolveTest is BaseTest {
-    function testResolveToAdapter() public {
-        vm.expectCall(
+    function testResolveGoodAnswerCallsReportPayouts() public {
+        uint256 answer = 9000;
+
+        uint256[] memory expectedPayout = new uint256[](3);
+        expectedPayout[0] = 2000;
+        expectedPayout[1] = 8000;
+        expectedPayout[2] = 0;
+
+        vm.mockCall(
             address(oracleAdapter),
-            abi.encodeWithSelector(
-                DummyFlatCFMOracleAdapter.reportMetricPayouts.selector,
-                conditionalTokens,
-                QUESTION_ID,
-                MIN_VALUE,
-                MAX_VALUE
-            )
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
         );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        csm.resolve();
+    }
+
+    function testResolveAboveMaxAnswerReportsPayouts() public {
+        uint256 answer = 1000000;
+
+        uint256[] memory expectedPayout = new uint256[](3);
+        expectedPayout[0] = 0;
+        expectedPayout[1] = 1;
+        expectedPayout[2] = 0;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        csm.resolve();
+    }
+
+    function testResolveBelowMinAnswerReportsPayouts() public {
+        uint256 answer = 0;
+
+        uint256[] memory expectedPayout = new uint256[](3);
+        expectedPayout[0] = 1;
+        expectedPayout[1] = 0;
+        expectedPayout[2] = 0;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        csm.resolve();
+    }
+
+    function testResolveInvalidReturnsLastPayout() public {
+        bytes32 answer = bytes32(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+
+        uint256[] memory expectedPayout = new uint256[](3);
+        expectedPayout[2] = 1;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+        vm.mockCall(
+            address(oracleAdapter), abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector), abi.encode(true)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        csm.resolve();
+    }
+
+    function testResolveRevertsWithRevertingGetAnswer() public {
+        vm.mockCallRevert(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            "whatever"
+        );
+
+        vm.expectRevert("whatever");
         csm.resolve();
     }
 }

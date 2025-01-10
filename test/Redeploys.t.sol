@@ -117,70 +117,27 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
 // TODO this should rather be split in an interface test between FlatCFMFactory
 // and FlatCFMRealityAdapter then a unit test in FlatCFMRealityAdapter.
 contract CreateSameMarketsTest is CreateMarketTestBase {
-    string realityQuestion;
-    bytes32 questionId;
-    bytes args;
+    string decisionRealityQuestion;
 
     function setUp() public override {
         super.setUp();
 
-        realityQuestion = "\"Project A\",\"Project B\",\"Project C\",\"Project D\"";
-        bytes32 content_hash = keccak256(abi.encodePacked(DECISION_TEMPLATE_ID, DECISION_OPENING_TIME, realityQuestion));
-        questionId = keccak256(
-            abi.encodePacked(
-                content_hash,
+        decisionRealityQuestion = "\"Project A\",\"Project B\",\"Project C\",\"Project D\"";
+    }
+
+    function testOneCallToAskQuestionWithMinBondDecision() public {
+        // Expect askQuestionWithMinBond to be called only once.
+        vm.expectCall(
+            address(reality),
+            abi.encodeWithSelector(
+                IRealityETHCore.askQuestionWithMinBond.selector,
+                DECISION_TEMPLATE_ID,
+                decisionRealityQuestion,
                 oracleAdapter.arbitrator(),
                 QUESTION_TIMEOUT,
-                MIN_BOND,
-                address(reality),
-                address(oracleAdapter),
-                uint256(0)
-            )
-        );
-
-        args = abi.encodeWithSelector(
-            IRealityETHCore.askQuestionWithMinBond.selector,
-            DECISION_TEMPLATE_ID,
-            realityQuestion,
-            oracleAdapter.arbitrator(),
-            QUESTION_TIMEOUT,
-            DECISION_OPENING_TIME,
-            0,
-            MIN_BOND
-        );
-    }
-
-    function testOneCallToAskQuestionWithMinBond() public {
-        // Expect askQuestionWithMinBond to be called only once.
-        vm.expectCall(address(reality), args, 1);
-        FlatCFM cfm1 = factory.create(
-            DECISION_TEMPLATE_ID,
-            METRIC_TEMPLATE_ID,
-            decisionQuestionParams,
-            conditionalQuestionParams,
-            collateralToken,
-            METADATA_URI
-        );
-        FlatCFM cfm2 = factory.create(
-            DECISION_TEMPLATE_ID,
-            METRIC_TEMPLATE_ID,
-            decisionQuestionParams,
-            conditionalQuestionParams,
-            collateralToken,
-            METADATA_URI
-        );
-        assertEq(cfm1.questionId(), cfm2.questionId());
-    }
-
-    function testOneCallToPrepareCondition() public {
-        // Expect prepareCondition to be called once only.
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(
-                IConditionalTokens.prepareCondition.selector,
-                address(oracleAdapter),
-                questionId,
-                outcomeNames.length + 1
+                DECISION_OPENING_TIME,
+                0,
+                MIN_BOND
             ),
             1
         );
@@ -200,7 +157,80 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
             collateralToken,
             METADATA_URI
         );
-        assertEq(cfm1.conditionId(), cfm2.conditionId());
+        assertEq(cfm1.questionId(), cfm2.questionId());
+    }
+
+    function testOneCallToAskQuestionWithMinBondScalar() public {
+        // Expect askQuestionWithMinBond to be called only once.
+        vm.expectCall(
+            address(reality),
+            abi.encodeWithSelector(
+                IRealityETHCore.askQuestionWithMinBond.selector,
+                METRIC_TEMPLATE_ID,
+                "Project A",
+                oracleAdapter.arbitrator(),
+                QUESTION_TIMEOUT,
+                METRIC_OPENING_TIME,
+                0,
+                MIN_BOND
+            ),
+            1
+        );
+        vm.recordLogs();
+        factory.create(
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+        ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
+        factory.create(
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+        ConditionalScalarMarket csm2 = _getFirstConditionalScalarMarket();
+        assertNotEq(address(csm1), address(csm2));
+        (bytes32 qid1,,,) = csm1.ctParams();
+        (bytes32 qid2,,,) = csm2.ctParams();
+        assertEq(qid1, qid2);
+    }
+
+    function testDuplicateCallsToPrepareCondition() public {
+        uint64 count = 2 * 1 + 2 * uint64(decisionQuestionParams.outcomeNames.length);
+        vm.expectCall(
+            address(conditionalTokens), abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector), count
+        );
+        vm.recordLogs();
+        FlatCFM cfm1 = factory.create(
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+        ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
+        FlatCFM cfm2 = factory.create(
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+        ConditionalScalarMarket csm2 = _getFirstConditionalScalarMarket();
+        assertNotEq(address(csm1), address(csm2));
+        assertEq(cfm1.questionId(), cfm2.questionId());
+        assertEq(cfm1.outcomeCount(), cfm2.outcomeCount());
+        (bytes32 qid1,,,) = csm1.ctParams();
+        (bytes32 qid2,,,) = csm2.ctParams();
+        assertEq(qid1, qid2);
     }
 }
 

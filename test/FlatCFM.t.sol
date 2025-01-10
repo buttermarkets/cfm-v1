@@ -17,7 +17,6 @@ contract BaseTest is Test {
 
     uint256 constant OUTCOME_COUNT = 50;
     bytes32 constant QUESTION_ID = bytes32("some question id");
-    bytes32 constant CONDITION_ID = bytes32("some condition id");
     string metadataUri;
 
     function setUp() public virtual {
@@ -25,18 +24,118 @@ contract BaseTest is Test {
         conditionalTokens = new DummyConditionalTokens();
         metadataUri = "ipfs://whatever";
 
-        cfm = new FlatCFM(oracleAdapter, conditionalTokens, OUTCOME_COUNT, QUESTION_ID, CONDITION_ID, metadataUri);
+        cfm = new FlatCFM();
+        cfm.initialize(oracleAdapter, conditionalTokens, OUTCOME_COUNT, QUESTION_ID, metadataUri);
     }
 }
 
 contract TestResolve is BaseTest {
-    function testResolveToAdapter() public {
-        vm.expectCall(
+    function testResolveGoodAnswerCallsReportPayouts() public {
+        uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT);
+        plainAnswer[0] = 1;
+        plainAnswer[OUTCOME_COUNT - 1] = 1;
+        bytes32 answer = _toBitArray(plainAnswer);
+
+        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
+        expectedPayout[0] = 1;
+        expectedPayout[OUTCOME_COUNT - 1] = 1;
+
+        vm.mockCall(
             address(oracleAdapter),
-            abi.encodeWithSelector(
-                DummyFlatCFMOracleAdapter.reportDecisionPayouts.selector, conditionalTokens, QUESTION_ID, OUTCOME_COUNT
-            )
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
         );
         cfm.resolve();
+    }
+
+    function testResolveWrongAnswerCallsReportPayoutsWithTruncatedContents() public {
+        uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT + 2);
+        plainAnswer[0] = 1;
+        plainAnswer[OUTCOME_COUNT - 1] = 1;
+        plainAnswer[OUTCOME_COUNT] = 1;
+        bytes32 answer = _toBitArray(plainAnswer);
+
+        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
+        expectedPayout[0] = 1;
+        expectedPayout[OUTCOME_COUNT - 1] = 1;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        cfm.resolve();
+    }
+
+    function testResolveEmptyAnswerReturnsLastPayout() public {
+        uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT);
+        bytes32 answer = _toBitArray(plainAnswer);
+
+        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
+        expectedPayout[OUTCOME_COUNT] = 1;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        cfm.resolve();
+    }
+
+    function testResolveInvalidReturnsLastPayout() public {
+        bytes32 answer = bytes32(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+
+        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
+        expectedPayout[OUTCOME_COUNT] = 1;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+        vm.mockCall(
+            address(oracleAdapter), abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector), abi.encode(true)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        cfm.resolve();
+    }
+
+    function testResolveRevertsWithRevertingResultForOnceSettled() public {
+        vm.mockCallRevert(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            "whatever"
+        );
+
+        vm.expectRevert("whatever");
+        cfm.resolve();
+    }
+
+    // For example, [1,0,1] -> 0b101 represented by 0x05
+    function _toBitArray(uint256[] memory plainAnswer) private pure returns (bytes32) {
+        uint256 numericAnswer;
+        for (uint256 i = 0; i < plainAnswer.length; i++) {
+            numericAnswer |= (1 & plainAnswer[i]) << i;
+        }
+        return bytes32(numericAnswer);
     }
 }

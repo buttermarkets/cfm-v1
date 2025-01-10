@@ -16,16 +16,6 @@ abstract contract FlatCFMOracleAdapter {
         string memory outcomeName
     ) external virtual returns (bytes32);
 
-    function reportDecisionPayouts(IConditionalTokens conditionalTokens, bytes32 questionId, uint256 outcomeCount)
-        external
-        virtual;
-    function reportMetricPayouts(
-        IConditionalTokens conditionalTokens,
-        bytes32 questionId,
-        uint256 minValue,
-        uint256 maxValue
-    ) external virtual;
-
     function getAnswer(bytes32 questionId) external view virtual returns (bytes32);
 
     function isInvalid(bytes32 answer) external pure virtual returns (bool);

@@ -70,18 +70,21 @@ contract DummyConditionalTokens is IConditionalTokens {
         data;
     }
 
+    mapping(bytes32 => address) public _test_prepareCondition_oracle;
+
     function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external override {
         require(outcomeSlotCount <= 256, "too many outcome slots");
         require(outcomeSlotCount > 1, "there should be more than one outcome slot");
         bytes32 conditionId = keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount));
         require(payoutNumerators[conditionId].length == 0, "condition already prepared");
         payoutNumerators[conditionId] = new uint256[](outcomeSlotCount);
+        _test_prepareCondition_oracle[questionId] = oracle;
     }
 
-    address public _test_reportPayouts_caller;
+    mapping(bytes32 => address) public _test_reportPayouts_caller;
 
-    function reportPayouts(bytes32, uint256[] calldata) external override {
-        _test_reportPayouts_caller = msg.sender;
+    function reportPayouts(bytes32 questionId, uint256[] calldata) external override {
+        _test_reportPayouts_caller[questionId] = msg.sender;
     }
 
     function splitPosition(IERC20, bytes32, bytes32, uint256[] calldata, uint256) external override {}

@@ -30,6 +30,7 @@ contract FlatCFMFactory {
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
+    address public immutable flatCfmImplementation;
     address public immutable conditionalScalarMarketImplementation;
 
     error InvalidOutcomeCount(uint256 outcomeCount);
@@ -50,9 +51,9 @@ contract FlatCFMFactory {
         conditionalTokens = _conditionalTokens;
         wrapped1155Factory = _wrapped1155Factory;
 
-        // This contract is never used directly; only cloned via EIP-1167.
-        ConditionalScalarMarket master = new ConditionalScalarMarket();
-        conditionalScalarMarketImplementation = address(master);
+        // These contracts are never used directly; only cloned via EIP-1167.
+        flatCfmImplementation = address(new FlatCFM());
+        conditionalScalarMarketImplementation = address(new ConditionalScalarMarket());
     }
 
     /// @notice Creates a FlatCFM and corresponding nested conditional markets.
@@ -76,7 +77,12 @@ contract FlatCFMFactory {
 
         for (uint256 i = 0; i < outcomeCount;) {
             ConditionalScalarMarket csm = createConditionalMarket(
-                metricTemplateId, flatCFMQParams, i, genericScalarQParams, collateralToken, cfmConditionId
+                metricTemplateId,
+                flatCFMQParams.outcomeNames[i],
+                i,
+                genericScalarQParams,
+                collateralToken,
+                cfmConditionId
             );
 
             emit ConditionalMarketCreated(address(cfm), address(csm), i);
@@ -99,16 +105,15 @@ contract FlatCFMFactory {
         string calldata metadataUri
     ) private returns (FlatCFM, bytes32) {
         bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
+        FlatCFM cfm = FlatCFM(flatCfmImplementation.clone());
 
         // +1 counts for Invalid.
-        bytes32 cfmConditionId =
-            conditionalTokens.getConditionId(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
+        bytes32 cfmConditionId = conditionalTokens.getConditionId(address(cfm), cfmQuestionId, outcomeCount + 1);
         if (conditionalTokens.getOutcomeSlotCount(cfmConditionId) == 0) {
-            conditionalTokens.prepareCondition(address(oracleAdapter), cfmQuestionId, outcomeCount + 1);
+            conditionalTokens.prepareCondition(address(cfm), cfmQuestionId, outcomeCount + 1);
         }
 
-        FlatCFM cfm =
-            new FlatCFM(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, cfmConditionId, metadataUri);
+        cfm.initialize(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, metadataUri);
 
         return (cfm, cfmConditionId);
     }
@@ -120,7 +125,7 @@ contract FlatCFMFactory {
     ///     4) Deploy the ConditionalScalarMarket contract.
     function createConditionalMarket(
         uint256 metricTemplateId,
-        FlatCFMQuestionParams calldata flatCFMQParams,
+        string calldata outcomeName,
         uint256 outcomeIndex,
         GenericScalarQuestionParams calldata genericScalarQParams,
         IERC20 collateralToken,
@@ -128,16 +133,16 @@ contract FlatCFMFactory {
     ) private returns (ConditionalScalarMarket) {
         WrappedConditionalTokensData memory wrappedCTData;
         ConditionalScalarCTParams memory conditionalScalarCTParams;
+        ConditionalScalarMarket csm = ConditionalScalarMarket(conditionalScalarMarketImplementation.clone());
         {
-            string calldata outcomeName = flatCFMQParams.outcomeNames[outcomeIndex];
             if (bytes(outcomeName).length > MAX_OUTCOME_NAME_LENGTH) revert InvalidOutcomeNameLength(outcomeName);
 
             bytes32 csmQuestionId = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
 
             // 3: Short, Long, Invalid.
-            bytes32 csmConditionId = conditionalTokens.getConditionId(address(oracleAdapter), csmQuestionId, 3);
+            bytes32 csmConditionId = conditionalTokens.getConditionId(address(csm), csmQuestionId, 3);
             if (conditionalTokens.getOutcomeSlotCount(csmConditionId) == 0) {
-                conditionalTokens.prepareCondition(address(oracleAdapter), csmQuestionId, 3);
+                conditionalTokens.prepareCondition(address(csm), csmQuestionId, 3);
             }
 
             bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
@@ -152,7 +157,6 @@ contract FlatCFMFactory {
             });
         }
 
-        ConditionalScalarMarket csm = ConditionalScalarMarket(conditionalScalarMarketImplementation.clone());
         csm.initialize(
             oracleAdapter,
             conditionalTokens,
