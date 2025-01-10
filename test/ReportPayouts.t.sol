@@ -21,6 +21,7 @@ contract FlatCFMReportPayoutsCoherenceTest is CreateMarketTestBase {
         );
         vm.recordLogs();
         FlatCFM cfm = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -85,6 +86,7 @@ contract ConditionalScalarMarketReportPayoutsCoherenceTest is CreateMarketTestBa
 
         vm.recordLogs();
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,

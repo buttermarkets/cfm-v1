@@ -14,17 +14,15 @@ contract DeployFlatCFMFactory is Script {
         vm.startBroadcast();
 
         // Try reading environment variables.
-        address oracleAdapterAddr = _requireEnvAddress("ORACLE_ADAPTER");
         address conditionalTokensAddr = _requireEnvAddress("CONDITIONAL_TOKENS");
         address wrapped1155FactoryAddr = _requireEnvAddress("WRAPPED_1155_FACTORY");
 
         // Convert to interfaces.
-        FlatCFMOracleAdapter oracleAdapter = FlatCFMOracleAdapter(oracleAdapterAddr);
         IConditionalTokens conditionalTokens = IConditionalTokens(conditionalTokensAddr);
         IWrapped1155Factory wrapped1155Factory = IWrapped1155Factory(wrapped1155FactoryAddr);
 
         // Deploy.
-        FlatCFMFactory factory = new FlatCFMFactory(oracleAdapter, conditionalTokens, wrapped1155Factory);
+        FlatCFMFactory factory = new FlatCFMFactory(conditionalTokens, wrapped1155Factory);
         console.log("FlatCFMFactory deployed at:", address(factory));
 
         vm.stopBroadcast();

@@ -20,6 +20,7 @@ contract CreateFlatCFMFromConfig is Script {
         string memory jsonContent = vm.readFile(configPath);
 
         FlatCFMFactory factory = FlatCFMFactory(_parseFactoryAddress(jsonContent));
+        FlatCFMOracleAdapter oracleAdapter = FlatCFMOracleAdapter(_parseOracleAdapterAddress(jsonContent));
         uint256 decisionTemplateId = _parseDecisionTemplateId(jsonContent);
         uint256 metricTemplateId = _parseMetricTemplateId(jsonContent);
         FlatCFMQuestionParams memory flatQParams = _parseFlatCFMQuestionParams(jsonContent);
@@ -29,7 +30,13 @@ contract CreateFlatCFMFromConfig is Script {
 
         // 5. Call create
         FlatCFM market = factory.create(
-            decisionTemplateId, metricTemplateId, flatQParams, scalarQParams, IERC20(collateralAddr), metadataUri
+            oracleAdapter,
+            decisionTemplateId,
+            metricTemplateId,
+            flatQParams,
+            scalarQParams,
+            IERC20(collateralAddr),
+            metadataUri
         );
 
         // Log the newly created FlatCFM contract
@@ -53,6 +60,10 @@ contract CreateFlatCFMFromConfig is Script {
 
     function _parseFactoryAddress(string memory json) private pure returns (address) {
         return vm.parseJsonAddress(json, ".factoryAddress");
+    }
+
+    function _parseOracleAdapterAddress(string memory json) private pure returns (address) {
+        return vm.parseJsonAddress(json, ".oracleAdapterAddress");
     }
 
     function _parseDecisionTemplateId(string memory json) private pure returns (uint256) {

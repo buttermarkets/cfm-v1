@@ -26,7 +26,6 @@ contract FlatCFMFactory {
     // So that the outcome can fit in String31.
     uint256 public constant MAX_OUTCOME_NAME_LENGTH = 25;
 
-    FlatCFMOracleAdapter public immutable oracleAdapter;
     IConditionalTokens public immutable conditionalTokens;
     IWrapped1155Factory public immutable wrapped1155Factory;
 
@@ -42,12 +41,7 @@ contract FlatCFMFactory {
         address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
     );
 
-    constructor(
-        FlatCFMOracleAdapter _oracleAdapter,
-        IConditionalTokens _conditionalTokens,
-        IWrapped1155Factory _wrapped1155Factory
-    ) {
-        oracleAdapter = _oracleAdapter;
+    constructor(IConditionalTokens _conditionalTokens, IWrapped1155Factory _wrapped1155Factory) {
         conditionalTokens = _conditionalTokens;
         wrapped1155Factory = _wrapped1155Factory;
 
@@ -58,6 +52,7 @@ contract FlatCFMFactory {
 
     /// @notice Creates a FlatCFM and corresponding nested conditional markets.
     function create(
+        FlatCFMOracleAdapter oracleAdapter,
         uint256 decisionTemplateId,
         uint256 metricTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
@@ -71,12 +66,13 @@ contract FlatCFMFactory {
         }
 
         (FlatCFM cfm, bytes32 cfmConditionId) =
-            createDecisionMarket(decisionTemplateId, flatCFMQParams, outcomeCount, metadataUri);
+            createDecisionMarket(oracleAdapter, decisionTemplateId, flatCFMQParams, outcomeCount, metadataUri);
 
         emit FlatCFMCreated(address(cfm), cfmConditionId);
 
         for (uint256 i = 0; i < outcomeCount;) {
             ConditionalScalarMarket csm = createConditionalMarket(
+                oracleAdapter,
                 metricTemplateId,
                 flatCFMQParams.outcomeNames[i],
                 i,
@@ -99,6 +95,7 @@ contract FlatCFMFactory {
     ///      2) Prepares the condition in ConditionalTokens,
     ///      3) Deploys the FlatCFM contract.
     function createDecisionMarket(
+        FlatCFMOracleAdapter oracleAdapter,
         uint256 decisionTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
         uint256 outcomeCount,
@@ -124,6 +121,7 @@ contract FlatCFMFactory {
     ///     3) Deploy short/long ERC20 tokens,
     ///     4) Deploy the ConditionalScalarMarket contract.
     function createConditionalMarket(
+        FlatCFMOracleAdapter oracleAdapter,
         uint256 metricTemplateId,
         string calldata outcomeName,
         uint256 outcomeIndex,

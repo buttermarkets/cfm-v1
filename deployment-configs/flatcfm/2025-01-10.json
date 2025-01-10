@@ -1,0 +1,19 @@
+{
+  "oracleAdapter": "0x741b9f25977fbf22f6e5ab774ef5f9ec1c4aa2f8",
+  "factoryAddress": "0x10Dd6b715421bF9edDA0fEd32506fB54B6e8eEA3",
+  "decisionTemplateId": 7,
+  "metricTemplateId": 8,
+  "collateralToken": "0xf475407d72f1961409e8d7d3eb8381128e6c51a6",
+  "outcomeNames": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F"
+  ],
+  "openingTimeDecision": 1739487600,
+  "minValue": 0,
+  "maxValue": 10000000,
+  "openingTimeMetric": 1750024800
+}

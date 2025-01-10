@@ -64,9 +64,7 @@ contract DeployCoreContractsBase is BaseIntegratedTest {
         oracleAdapter =
             new FlatCFMRealityAdapter(IRealityETH(address(realityEth)), DUMMY_ARBITRATOR, QUESTION_TIMEOUT, MIN_BOND);
         decisionMarketFactory = new FlatCFMFactory(
-            oracleAdapter,
-            IConditionalTokens(address(conditionalTokens)),
-            IWrapped1155Factory(address(wrapped1155Factory))
+            IConditionalTokens(address(conditionalTokens)), IWrapped1155Factory(address(wrapped1155Factory))
         );
     }
 }
@@ -114,7 +112,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
 
         vm.recordLogs();
         cfm = decisionMarketFactory.create(
-            1, 2, cfmQuestionParams, genericScalarQuestionParams, collateralToken, "ipfs://hello world"
+            oracleAdapter, 1, 2, cfmQuestionParams, genericScalarQuestionParams, collateralToken, "ipfs://hello world"
         );
         _recordConditionIdAndScalarMarkets();
         vm.label(address(cfm), "DecisionMarket");

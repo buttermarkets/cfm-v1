@@ -83,6 +83,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         );
         vm.expectCall(address(reality), args);
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -102,6 +103,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         );
         vm.expectCall(address(reality), args2);
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID_2,
             METRIC_TEMPLATE_ID_2,
             decisionQuestionParams2,
@@ -142,6 +144,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
             1
         );
         FlatCFM cfm1 = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -150,6 +153,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
             METADATA_URI
         );
         FlatCFM cfm2 = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -178,6 +182,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
         );
         vm.recordLogs();
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -187,6 +192,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
         );
         ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -208,6 +214,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
         );
         vm.recordLogs();
         FlatCFM cfm1 = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -217,6 +224,7 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
         );
         ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
         FlatCFM cfm2 = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,

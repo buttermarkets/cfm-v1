@@ -45,9 +45,7 @@ contract Base is Test {
         collateralToken = new TestERC20();
 
         factory = new FlatCFMFactory(
-            oracleAdapter,
-            IConditionalTokens(address(conditionalTokens)),
-            IWrapped1155Factory(address(wrapped1155Factory))
+            IConditionalTokens(address(conditionalTokens)), IWrapped1155Factory(address(wrapped1155Factory))
         );
 
         vm.label(address(factory), "factory");
@@ -61,7 +59,6 @@ contract Base is Test {
 
 contract ConstructorTest is Base {
     function testConstructorSetsAttributes() public view {
-        assertEq(address(factory.oracleAdapter()), address(oracleAdapter), "Market oracle address mismatch");
         assertEq(
             address(factory.conditionalTokens()),
             address(conditionalTokens),
@@ -86,6 +83,7 @@ contract CreateBadMarketTest is Base {
 
         vm.expectRevert(abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeCount.selector, 0));
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -108,6 +106,7 @@ contract CreateBadMarketTest is Base {
 
         vm.expectRevert(abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeCount.selector, factory.MAX_OUTCOMES() + 1));
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -133,6 +132,7 @@ contract CreateBadMarketTest is Base {
             abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeNameLength.selector, "01234567890123456789012345")
         );
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -210,6 +210,8 @@ contract CreateMarketTestBase is Base {
     }
 }
 
+// TODO test against a mocked version of FlatCFM and DecisionScalarMarket that
+// records the initialize call args.
 contract CreateMarketTest is CreateMarketTestBase {
     using String31 for string;
 
@@ -225,6 +227,7 @@ contract CreateMarketTest is CreateMarketTestBase {
         vm.recordLogs();
 
         FlatCFM cfm = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -253,6 +256,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             )
         );
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -271,6 +275,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             abi.encode(DECISION_QID)
         );
         FlatCFM cfm = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -286,6 +291,7 @@ contract CreateMarketTest is CreateMarketTestBase {
         vm.recordLogs();
 
         FlatCFM cfm = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -315,6 +321,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             )
         );
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -329,6 +336,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             address(conditionalTokens), abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector), 5
         );
         factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -448,6 +456,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
 
         vm.recordLogs();
         cfm = factory.create(
+            oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
@@ -526,7 +535,13 @@ contract CreateMarketFuzzTest is Base {
 
         vm.recordLogs();
         FlatCFM cfm = factory.create(
-            4242, 2424, decisionQuestionParams, conditionalQuestionParams, collateralToken, "ipfs://hello"
+            oracleAdapter,
+            4242,
+            2424,
+            decisionQuestionParams,
+            conditionalQuestionParams,
+            collateralToken,
+            "ipfs://hello"
         );
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
