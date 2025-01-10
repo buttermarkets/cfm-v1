@@ -213,7 +213,14 @@ contract CreateMarketTestBase is Base {
 contract CreateMarketTest is CreateMarketTestBase {
     using String31 for string;
 
+    bytes32 constant CONDITION_ID = bytes32("some condition id");
+
     function testEmitsFlatCFMCreated() public {
+        vm.mockCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.getConditionId.selector),
+            abi.encode(CONDITION_ID)
+        );
         bool found;
         vm.recordLogs();
 
@@ -226,11 +233,13 @@ contract CreateMarketTest is CreateMarketTestBase {
             METADATA_URI
         );
 
-        bytes32 eventSignature = keccak256("FlatCFMCreated(address)");
+        bytes32 eventSignature = keccak256("FlatCFMCreated(address,bytes32)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == eventSignature) {
-                found = found || (address(cfm) == address(uint160(uint256(logs[i].topics[1]))));
+                address eventAddr = address(uint160(uint256(logs[i].topics[1])));
+                bytes32 eventConditionId = abi.decode(logs[i].data, (bytes32));
+                found = found || ((eventAddr == address(cfm)) && (eventConditionId == CONDITION_ID));
             }
         }
         assertTrue(found);

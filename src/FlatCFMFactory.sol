@@ -36,7 +36,7 @@ contract FlatCFMFactory {
     error InvalidOutcomeCount(uint256 outcomeCount);
     error InvalidOutcomeNameLength(string outcomeName);
 
-    event FlatCFMCreated(address indexed market);
+    event FlatCFMCreated(address indexed market, bytes32 conditionId);
 
     event ConditionalMarketCreated(
         address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
@@ -73,7 +73,7 @@ contract FlatCFMFactory {
         (FlatCFM cfm, bytes32 cfmConditionId) =
             createDecisionMarket(decisionTemplateId, flatCFMQParams, outcomeCount, metadataUri);
 
-        emit FlatCFMCreated(address(cfm));
+        emit FlatCFMCreated(address(cfm), cfmConditionId);
 
         for (uint256 i = 0; i < outcomeCount;) {
             ConditionalScalarMarket csm = createConditionalMarket(

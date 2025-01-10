@@ -89,6 +89,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
     ConditionalScalarMarket conditionalMarketA;
     ConditionalScalarMarket conditionalMarketB;
     ConditionalScalarMarket conditionalMarketC;
+    bytes32 cfmConditionId;
 
     function setUp() public virtual override {
         super.setUp();
@@ -115,20 +116,28 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         cfm = decisionMarketFactory.create(
             1, 2, cfmQuestionParams, genericScalarQuestionParams, collateralToken, "ipfs://hello world"
         );
-        recordScalarMarkets();
+        _recordConditionIdAndScalarMarkets();
         vm.label(address(cfm), "DecisionMarket");
         vm.label(address(conditionalMarketA), "ConditionalMarketA");
         vm.label(address(conditionalMarketB), "ConditionalMarketB");
         vm.label(address(conditionalMarketC), "ConditionalMarketC");
     }
 
-    function recordScalarMarkets() public {
+    function _recordConditionIdAndScalarMarkets() internal {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
 
         uint256 found = 0;
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == eventSignature && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)) {
+            if (
+                logs[i].topics[0] == keccak256("FlatCFMCreated(address,bytes32)")
+                    && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
+            ) {
+                cfmConditionId = abi.decode(logs[i].data, (bytes32));
+            }
+            if (
+                logs[i].topics[0] == keccak256("ConditionalMarketCreated(address,address,uint256)")
+                    && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
+            ) {
                 if (found == 0) {
                     conditionalMarketA = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
                 }
@@ -141,6 +150,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
                 found++;
             }
         }
+        assertTrue(cfmConditionId != bytes32(0), "conditionId not found");
         assertTrue(address(conditionalMarketA) != address(0), "Conditional market not found");
     }
 }
@@ -188,7 +198,7 @@ contract SplitTestBase is CreateDecisionMarketBase {
         collateralToken.approve(address(conditionalTokens), DECISION_SPLIT_AMOUNT);
 
         conditionalTokens.splitPosition(
-            collateralToken, bytes32(0), cfm.conditionId(), decisionDiscreetPartition(), DECISION_SPLIT_AMOUNT
+            collateralToken, bytes32(0), cfmConditionId, decisionDiscreetPartition(), DECISION_SPLIT_AMOUNT
         );
 
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
@@ -257,7 +267,7 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
 
         collateralToken.approve(address(conditionalTokens), CONTRACT_LIQUIDITY);
         conditionalTokens.splitPosition(
-            collateralToken, bytes32(0), cfm.conditionId(), decisionDiscreetPartition(), CONTRACT_LIQUIDITY
+            collateralToken, bytes32(0), cfmConditionId, decisionDiscreetPartition(), CONTRACT_LIQUIDITY
         );
 
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
