@@ -1,5 +1,5 @@
 {
-  "oracleAdapter": "0x741b9f25977fbf22f6e5ab774ef5f9ec1c4aa2f8",
+  "oracleAdapterAddress": "0x741b9f25977fbf22f6e5ab774ef5f9ec1c4aa2f8",
   "factoryAddress": "0x10Dd6b715421bF9edDA0fEd32506fB54B6e8eEA3",
   "decisionTemplateId": 7,
   "metricTemplateId": 8,
@@ -15,5 +15,6 @@
   "openingTimeDecision": 1739487600,
   "minValue": 0,
   "maxValue": 10000000,
-  "openingTimeMetric": 1750024800
+  "openingTimeMetric": 1750024800,
+  "metadataUri": "ipfs://something"
 }

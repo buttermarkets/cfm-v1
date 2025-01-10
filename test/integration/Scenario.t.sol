@@ -8,7 +8,7 @@ import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "src/FlatCFMFactory.sol";
 import "src/FlatCFMRealityAdapter.sol";
 
-import "test/dummy/RealityETH.sol";
+import "test/unit/dummy/RealityETH.sol";
 
 import "./vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import "./vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";

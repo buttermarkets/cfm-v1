@@ -2,6 +2,7 @@
 src = "src"
 out = "out"
 libs = ["dependencies"]
+test = "test/unit"
 auto_detect_remappings = false
 chain_id = 1
 auto_detect_solc = true
@@ -15,7 +16,7 @@ allowed_paths = ["./deployment-configs"]
 fs_permissions = [{ access = "read", path = "./deployment-configs"}]
 
 [profile.itest]
-test = "integration-test"
+test = "test/integration"
 via_ir = true
 
 [soldeer]
