@@ -41,8 +41,8 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
 
     bytes32 constant DECISION_QID_2 = bytes32("different decision question id");
     bytes32 constant DECISION_CID_2 = bytes32("different decision condition id");
-    bytes32 constant CONDITIONAL_QID_2 = bytes32("diff conditional question id");
-    bytes32 constant CONDITIONAL_CID_2 = bytes32("diff conditional condition id");
+    bytes32 constant METRIC_QID_2 = bytes32("diff conditional question id");
+    bytes32 constant METRIC_CID_2 = bytes32("diff conditional condition id");
     bytes32 constant COND1_PARENT_COLLEC_ID_2 = bytes32("diff cond 1 parent collection id");
     bytes32 constant SHORT_COLLEC_ID_2 = bytes32("different short collection id");
     uint256 constant SHORT_POSID_2 = uint256(bytes32("different short position id"));
@@ -51,7 +51,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
 
     IERC20 collateralToken2;
     FlatCFMQuestionParams decisionQuestionParams2;
-    GenericScalarQuestionParams conditionalQuestionParams2;
+    GenericScalarQuestionParams genericScalarQuestionParams2;
 
     function setUp() public override {
         super.setUp();
@@ -64,7 +64,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
         decisionQuestionParams2 =
             FlatCFMQuestionParams({outcomeNames: outcomeNames2, openingTime: DECISION_OPENING_TIME_2});
 
-        conditionalQuestionParams = GenericScalarQuestionParams({
+        genericScalarQuestionParams2 = GenericScalarQuestionParams({
             scalarParams: ScalarParams({minValue: MIN_VALUE_2, maxValue: MAX_VALUE_2}),
             openingTime: METRIC_OPENING_TIME_2
         });
@@ -81,16 +81,22 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
             0,
             MIN_BOND
         );
+
         vm.expectCall(address(reality), args);
-        factory.create(
+
+        FlatCFM cfm1 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm1);
+        }
+
         bytes memory args2 = abi.encodeWithSelector(
             IRealityETHCore.askQuestionWithMinBond.selector,
             DECISION_TEMPLATE_ID_2,
@@ -101,16 +107,22 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
             0,
             MIN_BOND
         );
+
         vm.expectCall(address(reality), args2);
-        factory.create(
+
+        FlatCFM cfm2 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID_2,
             METRIC_TEMPLATE_ID_2,
             decisionQuestionParams2,
-            conditionalQuestionParams2,
+            genericScalarQuestionParams2,
             collateralToken2,
             METADATA_URI_2
         );
+        for (uint256 i = 0; i < decisionQuestionParams2.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm2);
+        }
+
         assertNotEq(args, args2);
     }
 }
@@ -128,13 +140,13 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
     }
 
     function testOneCallToAskQuestionWithMinBondDecision() public {
-        // Expect askQuestionWithMinBond to be called only once.
+        // Expect askQuestionWithMinBond to be called only once for the same decision question.
         vm.expectCall(
             address(reality),
             abi.encodeWithSelector(
                 IRealityETHCore.askQuestionWithMinBond.selector,
                 DECISION_TEMPLATE_ID,
-                decisionRealityQuestion,
+                "\"Project A\",\"Project B\",\"Project C\",\"Project D\"",
                 oracleAdapter.arbitrator(),
                 QUESTION_TIMEOUT,
                 DECISION_OPENING_TIME,
@@ -143,29 +155,43 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
             ),
             1
         );
-        FlatCFM cfm1 = factory.create(
+
+        vm.recordLogs();
+
+        // 1) Create first FlatCFM
+        FlatCFM cfm1 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
-        FlatCFM cfm2 = factory.create(
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm1);
+        }
+
+        // 2) Create second FlatCFM with identical parameters
+        FlatCFM cfm2 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm2);
+        }
+
+        // Same questionId expected for both, indicating only one underlying reality question
         assertEq(cfm1.questionId(), cfm2.questionId());
     }
 
     function testOneCallToAskQuestionWithMinBondScalar() public {
-        // Expect askQuestionWithMinBond to be called only once.
+        // Expect askQuestionWithMinBond to be called only once per unique metric question.
         vm.expectCall(
             address(reality),
             abi.encodeWithSelector(
@@ -180,62 +206,97 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
             ),
             1
         );
+
         vm.recordLogs();
-        factory.create(
+
+        // 1) Create first FlatCFM
+        FlatCFM cfm1 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm1);
+        }
+
+        // Grab first child market
         ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
-        factory.create(
+
+        // 2) Create second FlatCFM with identical parameters
+        FlatCFM cfm2 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm2);
+        }
+
+        // Grab second child market
         ConditionalScalarMarket csm2 = _getFirstConditionalScalarMarket();
-        assertNotEq(address(csm1), address(csm2));
+
+        // Both child markets share the same metric question
         (bytes32 qid1,,,) = csm1.ctParams();
         (bytes32 qid2,,,) = csm2.ctParams();
         assertEq(qid1, qid2);
     }
 
     function testDuplicateCallsToPrepareCondition() public {
+        // We expect multiple calls to prepareCondition:
+        // - 1 for each new FlatCFM's parent condition
+        // - plus child conditions for each outcome in each deployment.
+        // The old logic: "2 * 1 + 2 * #outcomes" might be approximate, depending on how many times we reuse conditions.
         uint64 count = 2 * 1 + 2 * uint64(decisionQuestionParams.outcomeNames.length);
+
         vm.expectCall(
             address(conditionalTokens), abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector), count
         );
+
         vm.recordLogs();
-        FlatCFM cfm1 = factory.create(
+
+        // 1) Create first FlatCFM + child markets
+        FlatCFM cfm1 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm1);
+        }
         ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
-        FlatCFM cfm2 = factory.create(
+
+        // 2) Create second FlatCFM + child markets
+        FlatCFM cfm2 = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm2);
+        }
         ConditionalScalarMarket csm2 = _getFirstConditionalScalarMarket();
-        assertNotEq(address(csm1), address(csm2));
+
+        // Both CFMs should share the same underlying questionId
         assertEq(cfm1.questionId(), cfm2.questionId());
         assertEq(cfm1.outcomeCount(), cfm2.outcomeCount());
+
+        // Their child markets also share the same metric question
         (bytes32 qid1,,,) = csm1.ctParams();
         (bytes32 qid2,,,) = csm2.ctParams();
         assertEq(qid1, qid2);

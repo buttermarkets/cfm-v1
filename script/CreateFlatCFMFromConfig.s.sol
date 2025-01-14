@@ -23,24 +23,26 @@ contract CreateFlatCFMFromConfig is Script {
         FlatCFMOracleAdapter oracleAdapter = FlatCFMOracleAdapter(_parseOracleAdapterAddress(jsonContent));
         uint256 decisionTemplateId = _parseDecisionTemplateId(jsonContent);
         uint256 metricTemplateId = _parseMetricTemplateId(jsonContent);
-        FlatCFMQuestionParams memory flatQParams = _parseFlatCFMQuestionParams(jsonContent);
-        GenericScalarQuestionParams memory scalarQParams = _parseGenericScalarQuestionParams(jsonContent);
+        FlatCFMQuestionParams memory decisionQuestionParams = _parseFlatCFMQuestionParams(jsonContent);
+        GenericScalarQuestionParams memory genericScalarQuestionParams = _parseGenericScalarQuestionParams(jsonContent);
         address collateralAddr = _parseCollateralAddress(jsonContent);
         string memory metadataUri = _parseMetadataUri(jsonContent);
 
-        // 5. Call create
-        FlatCFM market = factory.create(
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             decisionTemplateId,
             metricTemplateId,
-            flatQParams,
-            scalarQParams,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
             IERC20(collateralAddr),
             metadataUri
         );
+        console.log("Deployed FlatCFM at:", address(cfm));
 
-        // Log the newly created FlatCFM contract
-        console.log("Deployed FlatCFM at:", address(market));
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            ConditionalScalarMarket csm = factory.createConditionalScalarMarket(cfm);
+            console.log("Deployed ConditionalScalarMarket at:", address(csm));
+        }
 
         vm.stopBroadcast();
     }
@@ -48,7 +50,7 @@ contract CreateFlatCFMFromConfig is Script {
     /**
      * @dev Reads `MARKET_CONFIG_FILE` from env if present, otherwise returns DEFAULT_CONFIG_FILE_PATH
      */
-    function _getJsonFilePath() internal view returns (string memory) {
+    function _getJsonFilePath() public view returns (string memory) {
         string memory path;
         try vm.envString("MARKET_CONFIG_FILE") returns (string memory envPath) {
             path = envPath;
@@ -58,24 +60,24 @@ contract CreateFlatCFMFromConfig is Script {
         return path;
     }
 
-    function _parseFactoryAddress(string memory json) private pure returns (address) {
+    function _parseFactoryAddress(string memory json) public pure returns (address) {
         return vm.parseJsonAddress(json, ".factoryAddress");
     }
 
-    function _parseOracleAdapterAddress(string memory json) private pure returns (address) {
+    function _parseOracleAdapterAddress(string memory json) public pure returns (address) {
         return vm.parseJsonAddress(json, ".oracleAdapterAddress");
     }
 
-    function _parseDecisionTemplateId(string memory json) private pure returns (uint256) {
+    function _parseDecisionTemplateId(string memory json) public pure returns (uint256) {
         return vm.parseJsonUint(json, ".decisionTemplateId");
     }
 
-    function _parseMetricTemplateId(string memory json) private pure returns (uint256) {
+    function _parseMetricTemplateId(string memory json) public pure returns (uint256) {
         return vm.parseJsonUint(json, ".metricTemplateId");
     }
 
     /// @dev Reads `FlatCFMQuestionParams` from JSON
-    function _parseFlatCFMQuestionParams(string memory json) private pure returns (FlatCFMQuestionParams memory) {
+    function _parseFlatCFMQuestionParams(string memory json) public pure returns (FlatCFMQuestionParams memory) {
         // outcomeNames is an array of strings
         bytes memory outcomeNamesRaw = vm.parseJson(json, ".outcomeNames");
         string[] memory outcomeNames = abi.decode(outcomeNamesRaw, (string[]));
@@ -88,7 +90,7 @@ contract CreateFlatCFMFromConfig is Script {
 
     /// @dev Reads `GenericScalarQuestionParams` from JSON
     function _parseGenericScalarQuestionParams(string memory json)
-        private
+        public
         pure
         returns (GenericScalarQuestionParams memory)
     {
@@ -107,12 +109,12 @@ contract CreateFlatCFMFromConfig is Script {
     }
 
     /// @dev Reads the collateral token address from JSON
-    function _parseCollateralAddress(string memory json) private pure returns (address) {
-        // parseJsonAddress is available in Foundry's newer versions
+    function _parseCollateralAddress(string memory json) public pure returns (address) {
+        // _parseJsonAddress is available in Foundry's newer versions
         return vm.parseJsonAddress(json, ".collateralToken");
     }
 
-    function _parseMetadataUri(string memory json) private pure returns (string memory) {
+    function _parseMetadataUri(string memory json) public pure returns (string memory) {
         return vm.parseJsonString(json, ".metadataUri");
     }
 }

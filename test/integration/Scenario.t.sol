@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.20;
 
-import "forge-std/src/Test.sol";
-import "forge-std/src/console.sol";
+import {Test, console, Vm} from "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 
 import "src/FlatCFMFactory.sol";
@@ -20,7 +19,7 @@ contract CollateralToken is ERC20 {
     }
 }
 
-contract BaseIntegratedTest is Test {
+contract Base is Test {
     ConditionalTokens public conditionalTokens;
     Wrapped1155Factory public wrapped1155Factory;
     DummyRealityETH public realityEth;
@@ -28,9 +27,9 @@ contract BaseIntegratedTest is Test {
     address USER = address(1);
     address DUMMY_ARBITRATOR = address(0x42424242);
 
-    uint256 public constant INITIAL_SUPPLY = 1000000 * 10 ** 18;
-    uint256 public constant USER_SUPPLY = 5000 * 10 ** 18;
-    uint256 public constant INITIAL_LIQUIDITY = 1000 * 10 ** 18;
+    uint256 public constant INITIAL_SUPPLY = 1000000 ether;
+    uint256 public constant USER_SUPPLY = 5000 ether;
+    uint256 public constant INITIAL_LIQUIDITY = 1000 ether;
     uint32 public constant QUESTION_TIMEOUT = 86400;
     uint256 public constant MIN_BOND = 100;
 
@@ -47,7 +46,7 @@ contract BaseIntegratedTest is Test {
     }
 }
 
-contract BaseIntegratedTestCheck is BaseIntegratedTest {
+contract DependenciesTest is Base {
     function testDependenciesDeployments() public view {
         assertTrue(address(conditionalTokens) != address(0));
         assertTrue(address(wrapped1155Factory) != address(0));
@@ -55,15 +54,15 @@ contract BaseIntegratedTestCheck is BaseIntegratedTest {
     }
 }
 
-contract DeployCoreContractsBase is BaseIntegratedTest {
+contract DeployCoreContractsBase is Base {
     FlatCFMOracleAdapter public oracleAdapter;
-    FlatCFMFactory public decisionMarketFactory;
+    FlatCFMFactory public factory;
 
     function setUp() public virtual override {
         super.setUp();
         oracleAdapter =
             new FlatCFMRealityAdapter(IRealityETH(address(realityEth)), DUMMY_ARBITRATOR, QUESTION_TIMEOUT, MIN_BOND);
-        decisionMarketFactory = new FlatCFMFactory(
+        factory = new FlatCFMFactory(
             IConditionalTokens(address(conditionalTokens)), IWrapped1155Factory(address(wrapped1155Factory))
         );
     }
@@ -71,7 +70,7 @@ contract DeployCoreContractsBase is BaseIntegratedTest {
 
 contract DeployCoreContractsTest is DeployCoreContractsBase {
     function testDecisionMarketFactoryDeployment() public view {
-        assertTrue(address(decisionMarketFactory) != address(0));
+        assertTrue(address(factory) != address(0));
     }
 
     function testOracleAdapterDeployment() public view {
@@ -80,7 +79,7 @@ contract DeployCoreContractsTest is DeployCoreContractsBase {
 }
 
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
-    FlatCFMQuestionParams cfmQuestionParams;
+    FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
     CollateralToken public collateralToken;
     FlatCFM cfm;
@@ -88,6 +87,45 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
     ConditionalScalarMarket conditionalMarketB;
     ConditionalScalarMarket conditionalMarketC;
     bytes32 cfmConditionId;
+
+    function _recordConditionIdAndScalarMarkets() internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        uint256 found = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].topics[0] == keccak256("FlatCFMCreated(address,bytes32)")
+                    && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
+            ) {
+                cfmConditionId = abi.decode(logs[i].data, (bytes32));
+            }
+            if (
+                logs[i].topics[0] == keccak256("ConditionalScalarMarketCreated(address,address,uint256)")
+                    && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
+            ) {
+                address csmAddr = address(uint160(uint256(logs[i].topics[2])));
+                if (found == 0) {
+                    conditionalMarketA = ConditionalScalarMarket(csmAddr);
+                } else if (found == 1) {
+                    conditionalMarketB = ConditionalScalarMarket(csmAddr);
+                } else if (found == 2) {
+                    conditionalMarketC = ConditionalScalarMarket(csmAddr);
+                }
+                found++;
+            }
+        }
+
+        assertEq(found, 3, "wrong number of CSMs");
+    }
+
+    function _decisionDiscreetPartition() public view returns (uint256[] memory) {
+        // +1 for Invalid
+        uint256[] memory partition = new uint256[](cfm.outcomeCount() + 1);
+        for (uint256 i = 0; i < cfm.outcomeCount() + 1; i++) {
+            partition[i] = 1 << i;
+        }
+        return partition;
+    }
 
     function setUp() public virtual override {
         super.setUp();
@@ -102,54 +140,32 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         outcomes[1] = "Project B";
         outcomes[2] = "Project C";
 
-        cfmQuestionParams =
-            FlatCFMQuestionParams({outcomeNames: outcomes, openingTime: uint32(block.timestamp + 2 * 24 * 3600)});
-
+        decisionQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomes, openingTime: uint32(block.timestamp + 2 days)});
         genericScalarQuestionParams = GenericScalarQuestionParams({
             scalarParams: ScalarParams({minValue: 0, maxValue: 10000}),
-            openingTime: uint32(block.timestamp + 90 * 24 * 3600)
+            openingTime: uint32(block.timestamp + 90 days)
         });
 
         vm.recordLogs();
-        cfm = decisionMarketFactory.create(
-            oracleAdapter, 1, 2, cfmQuestionParams, genericScalarQuestionParams, collateralToken, "ipfs://hello world"
+        cfm = factory.createFlatCFM(
+            oracleAdapter,
+            1,
+            2,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            "ipfs://hello world"
         );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
         _recordConditionIdAndScalarMarkets();
+
         vm.label(address(cfm), "DecisionMarket");
         vm.label(address(conditionalMarketA), "ConditionalMarketA");
         vm.label(address(conditionalMarketB), "ConditionalMarketB");
         vm.label(address(conditionalMarketC), "ConditionalMarketC");
-    }
-
-    function _recordConditionIdAndScalarMarkets() internal {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        uint256 found = 0;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (
-                logs[i].topics[0] == keccak256("FlatCFMCreated(address,bytes32)")
-                    && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
-            ) {
-                cfmConditionId = abi.decode(logs[i].data, (bytes32));
-            }
-            if (
-                logs[i].topics[0] == keccak256("ConditionalMarketCreated(address,address,uint256)")
-                    && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
-            ) {
-                if (found == 0) {
-                    conditionalMarketA = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
-                }
-                if (found == 1) {
-                    conditionalMarketB = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
-                }
-                if (found == 2) {
-                    conditionalMarketC = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
-                }
-                found++;
-            }
-        }
-        assertTrue(cfmConditionId != bytes32(0), "conditionId not found");
-        assertTrue(address(conditionalMarketA) != address(0), "Conditional market not found");
     }
 }
 
@@ -157,18 +173,126 @@ contract CreateDecisionMarketTest is CreateDecisionMarketBase {
     function testDecisionMarketCreated() public view {
         assertTrue(address(cfm) != address(0));
     }
-}
 
-contract CreateConditionalMarketsTest is CreateDecisionMarketBase {
+    function testCfmConditionIdSet() public view {
+        assertTrue(cfmConditionId != bytes32(0), "conditionId not found");
+    }
+
     function testOutcomeCount() public view {
         assertEq(cfm.outcomeCount(), 3);
     }
 }
 
-contract SplitTestBase is CreateDecisionMarketBase {
+contract CreateConditionalMarketsTest is CreateDecisionMarketBase {
+    function testConditionalScalarMarketsCreated() public view {
+        assertTrue(address(conditionalMarketA) != address(0), "Conditional market A not found");
+        assertTrue(address(conditionalMarketB) != address(0), "Conditional market B not found");
+        assertTrue(address(conditionalMarketC) != address(0), "Conditional market C not found");
+    }
+
+    function testParentCollectionIdA() public view {
+        (,, bytes32 parentCollectionId,) = conditionalMarketA.ctParams();
+        assertEq(
+            parentCollectionId,
+            conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 0),
+            "parent collection ID mismatch A"
+        );
+    }
+
+    function testParentCollectionIdB() public view {
+        (,, bytes32 parentCollectionId,) = conditionalMarketB.ctParams();
+        assertEq(
+            parentCollectionId,
+            conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 1),
+            "parent collection ID mismatch B"
+        );
+    }
+
+    function testParentCollectionIdC() public view {
+        (,, bytes32 parentCollectionId,) = conditionalMarketC.ctParams();
+        assertEq(
+            parentCollectionId,
+            conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 2),
+            "parent collection ID mismatch C"
+        );
+    }
+}
+
+contract SplitPositionTestBase is CreateDecisionMarketBase {
     uint256 constant DECISION_SPLIT_AMOUNT = USER_SUPPLY / 10;
-    uint256 constant DECISION_SPLIT_AMOUNT_A = DECISION_SPLIT_AMOUNT;
-    uint256 constant DECISION_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.startPrank(USER);
+        collateralToken.approve(address(conditionalTokens), DECISION_SPLIT_AMOUNT);
+        conditionalTokens.splitPosition(
+            collateralToken, bytes32(0), cfmConditionId, _decisionDiscreetPartition(), DECISION_SPLIT_AMOUNT
+        );
+        vm.stopPrank();
+    }
+}
+
+contract SplitPositionTest is SplitPositionTestBase {
+    function testSplitPositionABalance() public view {
+        (,, bytes32 parentCollectionId,) = conditionalMarketA.ctParams();
+        assertEq(
+            parentCollectionId,
+            conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 0),
+            "parent collection ID mismatch A"
+        );
+        assertEq(
+            conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId)),
+            DECISION_SPLIT_AMOUNT,
+            "Decision split amount mismatch"
+        );
+    }
+
+    function testSplitPositionBBalance() public view {
+        (,, bytes32 parentCollectionId,) = conditionalMarketB.ctParams();
+        assertEq(
+            parentCollectionId,
+            conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 1),
+            "parent collection ID mismatch B"
+        );
+        assertEq(
+            conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId)),
+            DECISION_SPLIT_AMOUNT,
+            "Decision split amount mismatch B"
+        );
+    }
+
+    function testSplitPositionCBalance() public view {
+        (,, bytes32 parentCollectionId,) = conditionalMarketC.ctParams();
+        assertEq(
+            parentCollectionId,
+            conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 2),
+            "parent collection ID mismatch C"
+        );
+        assertEq(
+            conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId)),
+            DECISION_SPLIT_AMOUNT,
+            "Decision split amount mismatch C"
+        );
+    }
+
+    function testSplitPositionInvalidBalance() public view {
+        assertEq(
+            conditionalTokens.balanceOf(
+                USER,
+                conditionalTokens.getPositionId(
+                    collateralToken, conditionalTokens.getCollectionId(0, cfmConditionId, 1 << 3)
+                )
+            ),
+            DECISION_SPLIT_AMOUNT,
+            "Decision split amount mismatch Invalid"
+        );
+    }
+}
+
+contract SplitTestBase is SplitPositionTestBase {
+    uint256 constant METRIC_SPLIT_AMOUNT_A = DECISION_SPLIT_AMOUNT;
+    uint256 constant METRIC_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;
 
     IERC20 wrappedShortA;
     IERC20 wrappedLongA;
@@ -180,31 +304,17 @@ contract SplitTestBase is CreateDecisionMarketBase {
     IERC20 wrappedLongC;
     IERC20 wrappedInvalidC;
 
-    function decisionDiscreetPartition() public view returns (uint256[] memory) {
-        uint256[] memory partition = new uint256[](cfm.outcomeCount() + 1);
-        for (uint256 i = 0; i < cfm.outcomeCount() + 1; i++) {
-            partition[i] = 1 << i;
-        }
-        return partition;
-    }
-
     function setUp() public virtual override {
         super.setUp();
 
         vm.startPrank(USER);
 
-        collateralToken.approve(address(conditionalTokens), DECISION_SPLIT_AMOUNT);
-
-        conditionalTokens.splitPosition(
-            collateralToken, bytes32(0), cfmConditionId, decisionDiscreetPartition(), DECISION_SPLIT_AMOUNT
-        );
-
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
         conditionalTokens.setApprovalForAll(address(conditionalMarketB), true);
         conditionalTokens.setApprovalForAll(address(conditionalMarketC), true);
 
-        conditionalMarketA.split(DECISION_SPLIT_AMOUNT_A);
-        conditionalMarketB.split(DECISION_SPLIT_AMOUNT_B);
+        conditionalMarketA.split(METRIC_SPLIT_AMOUNT_A);
+        conditionalMarketB.split(METRIC_SPLIT_AMOUNT_B);
 
         vm.stopPrank();
 
@@ -219,14 +329,14 @@ contract SplitTest is SplitTestBase {
         assertEq(wrappedShortA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(wrappedLongA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(wrappedInvalidA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
-        assertEq(userBalanceOutcomeA(), DECISION_SPLIT_AMOUNT - DECISION_SPLIT_AMOUNT_A);
+        assertEq(userBalanceOutcomeA(), DECISION_SPLIT_AMOUNT - METRIC_SPLIT_AMOUNT_A);
     }
 
     function testSplitPositionB() public view {
         assertEq(wrappedShortB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(wrappedLongB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(wrappedInvalidB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
-        assertEq(userBalanceOutcomeB(), DECISION_SPLIT_AMOUNT - DECISION_SPLIT_AMOUNT_B);
+        assertEq(userBalanceOutcomeB(), DECISION_SPLIT_AMOUNT - METRIC_SPLIT_AMOUNT_B);
     }
 
     function testSplitPositionC() public view {
@@ -253,19 +363,19 @@ contract SplitTest is SplitTestBase {
 }
 
 contract TradeTestBase is SplitTestBase, ERC1155Holder {
-    uint256 constant TRADE_AMOUNT = DECISION_SPLIT_AMOUNT / 4;
+    uint256 constant TRADE_AMOUNT = USER_SUPPLY / 40;
     uint256 constant CONTRACT_LIQUIDITY = INITIAL_SUPPLY / 100;
     SimpleAMM public ammA;
     SimpleAMM public ammB;
     SimpleAMM public ammC;
-    uint256 constant DECISION_SPLIT_AMOUNT_C = DECISION_SPLIT_AMOUNT / 2;
+    uint256 constant METRIC_SPLIT_AMOUNT_C = DECISION_SPLIT_AMOUNT / 2;
 
     function setUp() public virtual override {
         super.setUp();
 
         collateralToken.approve(address(conditionalTokens), CONTRACT_LIQUIDITY);
         conditionalTokens.splitPosition(
-            collateralToken, bytes32(0), cfmConditionId, decisionDiscreetPartition(), CONTRACT_LIQUIDITY
+            collateralToken, bytes32(0), cfmConditionId, _decisionDiscreetPartition(), CONTRACT_LIQUIDITY
         );
 
         conditionalTokens.setApprovalForAll(address(conditionalMarketA), true);
@@ -276,10 +386,13 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
         conditionalMarketB.split(CONTRACT_LIQUIDITY);
         conditionalMarketC.split(CONTRACT_LIQUIDITY);
 
+        //(,,,,,, IERC20 shortA, IERC20 longA,) = conditionalMarketA.wrappedCTData();
         ammA = new SimpleAMM(wrappedShortA, wrappedLongA);
         vm.label(address(ammA), "amm A");
+        //(,,,,,, IERC20 shortB, IERC20 longB,) = conditionalMarketB.wrappedCTData();
         ammB = new SimpleAMM(wrappedShortB, wrappedLongB);
         vm.label(address(ammB), "amm B");
+        // (,,,,,, IERC20 shortC, IERC20 longC,) = conditionalMarketC.wrappedCTData();
         ammC = new SimpleAMM(wrappedShortC, wrappedLongC);
         vm.label(address(ammC), "amm C");
 
@@ -303,7 +416,7 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
         wrappedShortB.approve(address(ammB), TRADE_AMOUNT);
         ammB.swap(true, TRADE_AMOUNT);
 
-        conditionalMarketC.split(DECISION_SPLIT_AMOUNT_C);
+        conditionalMarketC.split(METRIC_SPLIT_AMOUNT_C);
         wrappedShortC.approve(address(ammC), TRADE_AMOUNT * 2);
         ammC.swap(true, TRADE_AMOUNT * 2);
 
@@ -311,20 +424,24 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
     }
 
     function marketBalanceA(bool short) internal view returns (uint256) {
+        //(,,,,,, IERC20 _short, IERC20 _long,) = conditionalMarketA.wrappedCTData();
         return short ? wrappedShortA.balanceOf(address(ammA)) : wrappedLongA.balanceOf(address(ammA));
     }
 
     function marketBalanceB(bool short) internal view returns (uint256) {
+        //(,,,,,, IERC20 _short, IERC20 _long,) = conditionalMarketB.wrappedCTData();
         return short ? wrappedShortB.balanceOf(address(ammB)) : wrappedLongB.balanceOf(address(ammB));
     }
 
     function marketBalanceC(bool short) internal view returns (uint256) {
+        //(,,,,,, IERC20 _short, IERC20 _long,) = conditionalMarketC.wrappedCTData();
         return short ? wrappedShortC.balanceOf(address(ammC)) : wrappedLongC.balanceOf(address(ammC));
     }
 }
 
 contract TradeTest is TradeTestBase {
     function testTradeOutcomeA() public view {
+        //(,,,,,, IERC20 sA, IERC20 lA,) = conditionalMarketA.wrappedCTData();
         assertTrue(wrappedShortA.balanceOf(USER) < DECISION_SPLIT_AMOUNT);
         assertTrue(wrappedLongA.balanceOf(USER) > DECISION_SPLIT_AMOUNT);
         assertTrue(marketBalanceA(true) > CONTRACT_LIQUIDITY);
@@ -332,6 +449,8 @@ contract TradeTest is TradeTestBase {
     }
 
     function testTradeOutcomeB() public view {
+        //(,,,,,, IERC20 sA, IERC20 lA,) = conditionalMarketA.wrappedCTData();
+        //(,,,,,, IERC20 sB, IERC20 lB,) = conditionalMarketB.wrappedCTData();
         assertEq(
             DECISION_SPLIT_AMOUNT / 2 - wrappedShortB.balanceOf(USER),
             DECISION_SPLIT_AMOUNT - wrappedShortA.balanceOf(USER)
@@ -345,6 +464,8 @@ contract TradeTest is TradeTestBase {
     }
 
     function testTradeOutcomeC() public view {
+        //(,,,,,, IERC20 sB, IERC20 lB,) = conditionalMarketB.wrappedCTData();
+        //(,,,,,, IERC20 sC, IERC20 lC,) = conditionalMarketC.wrappedCTData();
         assertTrue(wrappedShortC.balanceOf(USER) < wrappedShortB.balanceOf(USER));
         assertTrue(wrappedLongC.balanceOf(USER) > wrappedLongB.balanceOf(USER));
         assertTrue(marketBalanceC(true) > marketBalanceB(true));
@@ -421,7 +542,7 @@ contract MergeTest is MergeTestBase {
     }
 
     function testMergePositionsC() public view {
-        // Merged all into collateral, so no wrapped short left.
+        // Merged everything back into collateral
         assertEq(wrappedShortC.balanceOf(USER), 0);
     }
 }

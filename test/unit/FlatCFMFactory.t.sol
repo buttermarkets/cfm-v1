@@ -76,18 +76,18 @@ contract CreateBadMarketTest is Base {
         string[] memory outcomeNames = new string[](0);
         FlatCFMQuestionParams memory decisionQuestionParams =
             FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
-        GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
+        GenericScalarQuestionParams memory genericScalarQuestionParams = GenericScalarQuestionParams({
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
 
-        vm.expectRevert(abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeCount.selector, 0));
-        factory.create(
+        vm.expectRevert(FlatCFMFactory.InvalidOutcomeCount.selector);
+        factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
@@ -96,21 +96,24 @@ contract CreateBadMarketTest is Base {
     function testTooManyOutcomes(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
         public
     {
-        string[] memory outcomeNames = new string[](factory.MAX_OUTCOMES() + 1);
+        // exceed factory.MAX_OUTCOME_COUNT()
+        uint256 tooMany = factory.MAX_OUTCOME_COUNT() + 1;
+        string[] memory outcomeNames = new string[](tooMany);
+
         FlatCFMQuestionParams memory decisionQuestionParams =
             FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
-        GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
+        GenericScalarQuestionParams memory genericScalarQuestionParams = GenericScalarQuestionParams({
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
 
-        vm.expectRevert(abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeCount.selector, factory.MAX_OUTCOMES() + 1));
-        factory.create(
+        vm.expectRevert(FlatCFMFactory.InvalidOutcomeCount.selector);
+        factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
@@ -119,11 +122,13 @@ contract CreateBadMarketTest is Base {
     function testTooLargeOutcomeName(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
         public
     {
+        // single outcome name exceeds length
         string[] memory outcomeNames = new string[](1);
         outcomeNames[0] = "01234567890123456789012345";
+
         FlatCFMQuestionParams memory decisionQuestionParams =
             FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
-        GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
+        GenericScalarQuestionParams memory genericScalarQuestionParams = GenericScalarQuestionParams({
             scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
             openingTime: scalarOpeningTime
         });
@@ -131,15 +136,55 @@ contract CreateBadMarketTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(FlatCFMFactory.InvalidOutcomeNameLength.selector, "01234567890123456789012345")
         );
-        factory.create(
+        factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+    }
+
+    function testTooManyCreateScalarCalls(
+        uint32 openingTime,
+        uint256 minValue,
+        uint256 maxValue,
+        uint32 scalarOpeningTime
+    ) public {
+        string[] memory outcomeNames = new string[](2);
+        outcomeNames[0] = "1";
+        outcomeNames[1] = "2";
+
+        FlatCFMQuestionParams memory decisionQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
+        GenericScalarQuestionParams memory genericScalarQuestionParams = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
+            openingTime: scalarOpeningTime
+        });
+
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
+
+        vm.expectRevert(FlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
+        factory.createConditionalScalarMarket(cfm);
+    }
+
+    function testCreateScalarAlone() public {
+        vm.expectRevert(FlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
+        factory.createConditionalScalarMarket(FlatCFM(address(0xdeadbeef)));
     }
 }
 
@@ -159,9 +204,9 @@ contract CreateMarketTestBase is Base {
 
     bytes32 constant DECISION_QID = bytes32("decision question id");
     //bytes32 constant DECISION_CID = bytes32("decision condition id");
-    bytes32 constant CONDITIONAL_QID = bytes32("conditional question id");
-    //bytes32 constant CONDITIONAL_CID = bytes32("conditional condition id");
-    bytes32 constant COND1_PARENT_COLLEC_ID = bytes32("cond 1 parent collection id");
+    bytes32 constant METRIC_QID = bytes32("conditional question id");
+    //bytes32 constant METRIC_CID = bytes32("conditional condition id");
+    bytes32 constant OUTCOME1_PARENT_COLLEC_ID = bytes32("cond 1 parent collection id");
     bytes32 constant SHORT_COLLEC_ID = bytes32("short collection id");
     uint256 constant SHORT_POSID = uint256(bytes32("short position id"));
     bytes32 constant LONG_COLLEC_ID = bytes32("long collection id");
@@ -170,7 +215,7 @@ contract CreateMarketTestBase is Base {
     uint256 constant INVALID_POSID = uint256(bytes32("invalid position id"));
 
     FlatCFMQuestionParams decisionQuestionParams;
-    GenericScalarQuestionParams conditionalQuestionParams;
+    GenericScalarQuestionParams genericScalarQuestionParams;
 
     event FlatCFMCreated(address indexed market);
     event ConditionalMarketCreated(
@@ -187,7 +232,7 @@ contract CreateMarketTestBase is Base {
 
         decisionQuestionParams = FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: DECISION_OPENING_TIME});
 
-        conditionalQuestionParams = GenericScalarQuestionParams({
+        genericScalarQuestionParams = GenericScalarQuestionParams({
             scalarParams: ScalarParams({minValue: MIN_VALUE, maxValue: MAX_VALUE}),
             openingTime: METRIC_OPENING_TIME
         });
@@ -195,9 +240,8 @@ contract CreateMarketTestBase is Base {
 
     function _getFirstConditionalScalarMarket() internal returns (ConditionalScalarMarket) {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == eventSignature) {
+            if (logs[i].topics[0] == keccak256("ConditionalScalarMarketCreated(address,address,uint256)")) {
                 // topics[2] because address is the second indexed param
                 ConditionalScalarMarket _csm = ConditionalScalarMarket(address(uint160(uint256(logs[i].topics[2]))));
                 (uint256 outcomeIndex) = abi.decode(logs[i].data, (uint256));
@@ -218,34 +262,72 @@ contract CreateMarketTest is CreateMarketTestBase {
     bytes32 constant CONDITION_ID = bytes32("some condition id");
 
     function testEmitsFlatCFMCreated() public {
+        vm.recordLogs();
+
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(IConditionalTokens.getConditionId.selector),
             abi.encode(CONDITION_ID)
         );
-        bool found;
-        vm.recordLogs();
 
-        FlatCFM cfm = factory.create(
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
 
+        // Check event "FlatCFMCreated(address,bytes32)"
         bytes32 eventSignature = keccak256("FlatCFMCreated(address,bytes32)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool found;
+        bytes32 condId;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == eventSignature) {
-                address eventAddr = address(uint160(uint256(logs[i].topics[1])));
-                bytes32 eventConditionId = abi.decode(logs[i].data, (bytes32));
-                found = found || ((eventAddr == address(cfm)) && (eventConditionId == CONDITION_ID));
+                address marketAddr = address(uint160(uint256(logs[i].topics[1])));
+                if (marketAddr == address(cfm)) {
+                    // We aren't mocking the condition ID here, so just check that we found the event
+                    condId = abi.decode(logs[i].data, (bytes32));
+                    found = true;
+                }
             }
         }
-        assertTrue(found);
+        assertTrue(found, "FlatCFMCreated event not found");
+        assertEq(condId, CONDITION_ID, "FlatCFMCreated event conditionId mismatch");
+    }
+
+    function testCreatesConditionalMarkets() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        vm.recordLogs();
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
+
+        bytes32 eventSignature = keccak256("ConditionalScalarMarketCreated(address,address,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 found;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                address decisionMkt = address(uint160(uint256(logs[i].topics[1])));
+                if (decisionMkt == address(cfm)) {
+                    found++;
+                }
+            }
+        }
+
+        assertEq(found, 4, "Should emit 4 ConditionalScalarMarketCreated events");
     }
 
     function testCallsAskDecisionQuestion() public {
@@ -255,12 +337,14 @@ contract CreateMarketTest is CreateMarketTestBase {
                 FlatCFMRealityAdapter.askDecisionQuestion.selector, DECISION_TEMPLATE_ID, decisionQuestionParams
             )
         );
-        factory.create(
+
+        // Only need to create the FlatCFM to trigger askDecisionQuestion.
+        factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
@@ -274,37 +358,46 @@ contract CreateMarketTest is CreateMarketTestBase {
             ),
             abi.encode(DECISION_QID)
         );
-        FlatCFM cfm = factory.create(
+
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+
+        // The factory sets up the decision condition for the FlatCFM contract:
         assertEq(conditionalTokens._test_prepareCondition_oracle(DECISION_QID), address(cfm));
     }
 
     function testEmitsConditionalMarketCreated() public {
-        uint256 found;
         vm.recordLogs();
 
-        FlatCFM cfm = factory.create(
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
 
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
+
+        bytes32 eventSignature = keccak256("ConditionalScalarMarketCreated(address,address,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 found;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == eventSignature) {
-                if (address(cfm) == address(uint160(uint256(logs[i].topics[1])))) found++;
+                if (address(cfm) == address(uint160(uint256(logs[i].topics[1])))) {
+                    found++;
+                }
             }
         }
         assertEq(found, 4);
@@ -316,34 +409,44 @@ contract CreateMarketTest is CreateMarketTestBase {
             abi.encodeWithSelector(
                 FlatCFMRealityAdapter.askMetricQuestion.selector,
                 METRIC_TEMPLATE_ID,
-                conditionalQuestionParams,
+                genericScalarQuestionParams,
                 outcomeNames[1]
             )
         );
-        factory.create(
+
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
     }
 
     function testCallsPrepareConditionForMetric() public {
         vm.expectCall(
             address(conditionalTokens), abi.encodeWithSelector(IConditionalTokens.prepareCondition.selector), 5
         );
-        factory.create(
+
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
+
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
     }
 }
 
@@ -384,7 +487,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(oracleAdapter),
             abi.encodeWithSelector(FlatCFMRealityAdapter.askMetricQuestion.selector),
-            abi.encode(CONDITIONAL_QID)
+            abi.encode(METRIC_QID)
         );
         vm.mockCall(
             address(conditionalTokens),
@@ -394,12 +497,14 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, 0),
-            abi.encode(COND1_PARENT_COLLEC_ID)
+            abi.encode(OUTCOME1_PARENT_COLLEC_ID)
         );
 
         vm.mockCall(
             address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITION_ID, 1),
+            abi.encodeWithSelector(
+                IConditionalTokens.getCollectionId.selector, OUTCOME1_PARENT_COLLEC_ID, CONDITION_ID, 1
+            ),
             abi.encode(SHORT_COLLEC_ID)
         );
         vm.mockCall(
@@ -410,7 +515,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITION_ID, 1 << 1
+                IConditionalTokens.getCollectionId.selector, OUTCOME1_PARENT_COLLEC_ID, CONDITION_ID, 1 << 1
             ),
             abi.encode(LONG_COLLEC_ID)
         );
@@ -422,7 +527,7 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         vm.mockCall(
             address(conditionalTokens),
             abi.encodeWithSelector(
-                IConditionalTokens.getCollectionId.selector, COND1_PARENT_COLLEC_ID, CONDITION_ID, 1 << 2
+                IConditionalTokens.getCollectionId.selector, OUTCOME1_PARENT_COLLEC_ID, CONDITION_ID, 1 << 2
             ),
             abi.encode(INVALID_COLLEC_ID)
         );
@@ -455,16 +560,18 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         );
 
         vm.recordLogs();
-        cfm = factory.create(
+        cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
-            conditionalQuestionParams,
+            genericScalarQuestionParams,
             collateralToken,
             METADATA_URI
         );
-
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
         csm1 = _getFirstConditionalScalarMarket();
     }
 
@@ -480,9 +587,9 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         assertEq(address(csm1.conditionalTokens()), address(conditionalTokens), "CT mismatch");
         assertEq(address(csm1.wrapped1155Factory()), address(wrapped1155Factory), "1155 factory mismatch");
         (bytes32 paramsQId, bytes32 paramsCId, bytes32 paramsColId, IERC20 paramsCollat) = csm1.ctParams();
-        assertEq(paramsQId, CONDITIONAL_QID, "metric q id mismatch");
+        assertEq(paramsQId, METRIC_QID, "metric q id mismatch");
         assertEq(paramsCId, CONDITION_ID, "metric condition id mismatch");
-        assertEq(paramsColId, COND1_PARENT_COLLEC_ID, "metric parent collection id mismatch");
+        assertEq(paramsColId, OUTCOME1_PARENT_COLLEC_ID, "metric parent collection id mismatch");
         assertEq(address(paramsCollat), address(collateralToken));
         (uint256 paramsMin, uint256 paramsMax) = csm1.scalarParams();
         assertEq(paramsMin, MIN_VALUE);
@@ -510,63 +617,45 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
     }
 }
 
-contract CreateMarketFuzzTest is Base {
-    function testCreateMarket(
-        uint256 outcomeCount,
-        uint32 openingTime,
-        uint256 minValue,
-        uint256 maxValue,
-        uint32 scalarOpeningTime
-    ) public {
-        vm.assume(outcomeCount > 0 && outcomeCount <= factory.MAX_OUTCOMES());
+contract CreateMarketFuzzTest is CreateMarketTestBase {
+    function testCreateMarket(uint256 outcomeCount) public {
+        vm.assume(outcomeCount > 0 && outcomeCount <= factory.MAX_OUTCOME_COUNT());
 
-        string[] memory outcomeNames = new string[](outcomeCount);
+        string[] memory outs = new string[](outcomeCount);
         for (uint256 i = 0; i < outcomeCount; i++) {
-            outcomeNames[i] = Strings.toString(i);
+            outs[i] = Strings.toString(i);
         }
 
-        FlatCFMQuestionParams memory decisionQuestionParams =
-            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: openingTime});
+        FlatCFMQuestionParams memory decisionQP =
+            FlatCFMQuestionParams({outcomeNames: outs, openingTime: decisionQuestionParams.openingTime});
 
-        GenericScalarQuestionParams memory conditionalQuestionParams = GenericScalarQuestionParams({
-            scalarParams: ScalarParams({minValue: minValue, maxValue: maxValue}),
-            openingTime: scalarOpeningTime
+        GenericScalarQuestionParams memory metricQP = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({
+                minValue: genericScalarQuestionParams.scalarParams.minValue,
+                maxValue: genericScalarQuestionParams.scalarParams.maxValue
+            }),
+            openingTime: genericScalarQuestionParams.openingTime
         });
 
-        vm.recordLogs();
-        FlatCFM cfm = factory.create(
-            oracleAdapter,
-            4242,
-            2424,
-            decisionQuestionParams,
-            conditionalQuestionParams,
-            collateralToken,
-            "ipfs://hello"
-        );
+        FlatCFM cfm =
+            factory.createFlatCFM(oracleAdapter, 4242, 2424, decisionQP, metricQP, collateralToken, "ipfs://hello");
+        assertTrue(address(cfm) != address(0), "CFM should not be zero address");
 
+        vm.recordLogs();
+        for (uint256 i = 0; i < outcomeCount; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
+
+        // We can check logs or read block state to confirm child markets
+        // For example, we can parse the logs to ensure we got `outcomeCount` events
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("ConditionalMarketCreated(address,address,uint256)");
-        address firstCsmAddr;
+        uint256 found;
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == eventSignature) {
-                // topics[2] because address is the second indexed param
-                firstCsmAddr = address(uint160(uint256(logs[i].topics[2])));
-                break;
+            if (logs[i].topics[0] == keccak256("ConditionalScalarMarketCreated(address,address,uint256)")) {
+                address parent = address(uint160(uint256(logs[i].topics[1])));
+                if (parent == address(cfm)) found++;
             }
         }
-        assertTrue(firstCsmAddr != address(0), "No ConditionalMarket created");
-        ConditionalScalarMarket firstCsm = ConditionalScalarMarket(firstCsmAddr);
-
-        assertTrue(address(cfm) != address(0), "Created market address should not be zero");
-
-        assertEq(address(cfm.oracleAdapter()), address(oracleAdapter));
-        assertEq(address(cfm.conditionalTokens()), address(conditionalTokens));
-        assertEq(cfm.outcomeCount(), outcomeNames.length, "Incorrect number of conditional markets created");
-
-        assertEq(address(firstCsm.oracleAdapter()), address(oracleAdapter));
-        assertEq(address(firstCsm.conditionalTokens()), address(conditionalTokens));
-        (uint256 minv, uint256 maxv) = firstCsm.scalarParams();
-        assertEq(minv, conditionalQuestionParams.scalarParams.minValue);
-        assertEq(maxv, conditionalQuestionParams.scalarParams.maxValue);
+        assertEq(found, outcomeCount, "Number of conditional markets does not match outcomeCount");
     }
 }

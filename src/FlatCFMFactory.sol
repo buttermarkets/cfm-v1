@@ -22,7 +22,16 @@ contract FlatCFMFactory {
     using Clones for address;
     using String31 for string;
 
-    uint256 public constant MAX_OUTCOMES = 50;
+    struct DeploymentParams {
+        IERC20 collateralToken;
+        uint256 metricTemplateId;
+        GenericScalarQuestionParams genericScalarQuestionParams;
+        bytes32 decisionConditionId;
+        string[] outcomeNames;
+    }
+
+    // In line with ConditionalTokens, +1 for Invalid.
+    uint256 public constant MAX_OUTCOME_COUNT = 255;
     // So that the outcome can fit in String31.
     uint256 public constant MAX_OUTCOME_NAME_LENGTH = 25;
 
@@ -32,12 +41,17 @@ contract FlatCFMFactory {
     address public immutable flatCfmImplementation;
     address public immutable conditionalScalarMarketImplementation;
 
-    error InvalidOutcomeCount(uint256 outcomeCount);
+    // How many outcomes there are left to deploy.
+    mapping(FlatCFM => uint256) public nextOutcomeToDeploy;
+    mapping(FlatCFM => DeploymentParams) public paramsToDeploy;
+
+    error InvalidOutcomeCount();
     error InvalidOutcomeNameLength(string outcomeName);
+    error NoConditionalScalarMarketToDeploy();
 
     event FlatCFMCreated(address indexed market, bytes32 conditionId);
 
-    event ConditionalMarketCreated(
+    event ConditionalScalarMarketCreated(
         address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
     );
 
@@ -50,92 +64,80 @@ contract FlatCFMFactory {
         conditionalScalarMarketImplementation = address(new ConditionalScalarMarket());
     }
 
-    /// @notice Creates a FlatCFM and corresponding nested conditional markets.
-    function create(
-        FlatCFMOracleAdapter oracleAdapter,
-        uint256 decisionTemplateId,
-        uint256 metricTemplateId,
-        FlatCFMQuestionParams calldata flatCFMQParams,
-        GenericScalarQuestionParams calldata genericScalarQParams,
-        IERC20 collateralToken,
-        string calldata metadataUri
-    ) external returns (FlatCFM) {
-        uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
-        if (outcomeCount == 0 || outcomeCount > MAX_OUTCOMES) {
-            revert InvalidOutcomeCount(outcomeCount);
-        }
-
-        (FlatCFM cfm, bytes32 cfmConditionId) =
-            createDecisionMarket(oracleAdapter, decisionTemplateId, flatCFMQParams, outcomeCount, metadataUri);
-
-        emit FlatCFMCreated(address(cfm), cfmConditionId);
-
-        for (uint256 i = 0; i < outcomeCount;) {
-            ConditionalScalarMarket csm = createConditionalMarket(
-                oracleAdapter,
-                metricTemplateId,
-                flatCFMQParams.outcomeNames[i],
-                i,
-                genericScalarQParams,
-                collateralToken,
-                cfmConditionId
-            );
-
-            emit ConditionalMarketCreated(address(cfm), address(csm), i);
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return cfm;
-    }
-
+    /// @notice Creates a FlatCFM. Corresponding conditional markets need to be
+    ///     created by separate calls to `createConditionalScalarMarket`.
     /// @dev 1) Asks a decision question on the oracle,
     ///      2) Prepares the condition in ConditionalTokens,
     ///      3) Deploys the FlatCFM contract.
-    function createDecisionMarket(
+    // All parameters for children conditional markets need to be stored on
+    // chain, in the FlatCFM instance, to make sure that only the original
+    // deployer's intention is respected.
+    function createFlatCFM(
         FlatCFMOracleAdapter oracleAdapter,
         uint256 decisionTemplateId,
+        uint256 metricTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
-        uint256 outcomeCount,
+        GenericScalarQuestionParams calldata genericScalarQuestionParams,
+        IERC20 collateralToken,
         string calldata metadataUri
-    ) private returns (FlatCFM, bytes32) {
-        bytes32 cfmQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
-        FlatCFM cfm = FlatCFM(flatCfmImplementation.clone());
-
-        // +1 counts for Invalid.
-        bytes32 cfmConditionId = conditionalTokens.getConditionId(address(cfm), cfmQuestionId, outcomeCount + 1);
-        if (conditionalTokens.getOutcomeSlotCount(cfmConditionId) == 0) {
-            conditionalTokens.prepareCondition(address(cfm), cfmQuestionId, outcomeCount + 1);
+    ) external returns (FlatCFM cfm) {
+        uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
+        if (outcomeCount == 0 || outcomeCount > MAX_OUTCOME_COUNT) {
+            revert InvalidOutcomeCount();
+        }
+        for (uint256 i = 0; i < outcomeCount; i++) {
+            string memory outcomeName = flatCFMQParams.outcomeNames[i];
+            if (bytes(outcomeName).length > MAX_OUTCOME_NAME_LENGTH) revert InvalidOutcomeNameLength(outcomeName);
         }
 
-        cfm.initialize(oracleAdapter, conditionalTokens, outcomeCount, cfmQuestionId, metadataUri);
+        cfm = FlatCFM(flatCfmImplementation.clone());
+        nextOutcomeToDeploy[cfm] = 0;
 
-        return (cfm, cfmConditionId);
+        bytes32 decisionQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
+
+        // +1 counts for Invalid.
+        bytes32 decisionConditionId =
+            conditionalTokens.getConditionId(address(cfm), decisionQuestionId, outcomeCount + 1);
+        if (conditionalTokens.getOutcomeSlotCount(decisionConditionId) == 0) {
+            conditionalTokens.prepareCondition(address(cfm), decisionQuestionId, outcomeCount + 1);
+        }
+
+        paramsToDeploy[cfm] = DeploymentParams({
+            collateralToken: collateralToken,
+            metricTemplateId: metricTemplateId,
+            genericScalarQuestionParams: genericScalarQuestionParams,
+            decisionConditionId: decisionConditionId,
+            outcomeNames: flatCFMQParams.outcomeNames
+        });
+
+        cfm.initialize(oracleAdapter, conditionalTokens, outcomeCount, decisionQuestionId, metadataUri);
+
+        emit FlatCFMCreated(address(cfm), decisionConditionId);
     }
 
-    ///@dev For each outcome,
-    ///     1) Ask a metric question,
-    ///     2) Prepare the child condition,
-    ///     3) Deploy short/long ERC20 tokens,
-    ///     4) Deploy the ConditionalScalarMarket contract.
-    function createConditionalMarket(
-        FlatCFMOracleAdapter oracleAdapter,
-        uint256 metricTemplateId,
-        string calldata outcomeName,
-        uint256 outcomeIndex,
-        GenericScalarQuestionParams calldata genericScalarQParams,
-        IERC20 collateralToken,
-        bytes32 cfmConditionId
-    ) private returns (ConditionalScalarMarket) {
+    function createConditionalScalarMarket(FlatCFM cfm) external returns (ConditionalScalarMarket csm) {
+        if (paramsToDeploy[cfm].outcomeNames.length == 0) revert NoConditionalScalarMarketToDeploy();
+
+        uint256 outcomeIndex = nextOutcomeToDeploy[cfm];
+        FlatCFMOracleAdapter oracleAdapter = cfm.oracleAdapter();
+        DeploymentParams memory params = paramsToDeploy[cfm];
+        csm = ConditionalScalarMarket(conditionalScalarMarketImplementation.clone());
+
         WrappedConditionalTokensData memory wrappedCTData;
         ConditionalScalarCTParams memory conditionalScalarCTParams;
-        ConditionalScalarMarket csm = ConditionalScalarMarket(conditionalScalarMarketImplementation.clone());
-        {
-            if (bytes(outcomeName).length > MAX_OUTCOME_NAME_LENGTH) revert InvalidOutcomeNameLength(outcomeName);
 
-            bytes32 csmQuestionId = oracleAdapter.askMetricQuestion(metricTemplateId, genericScalarQParams, outcomeName);
+        if (outcomeIndex == cfm.outcomeCount() - 1) {
+            delete nextOutcomeToDeploy[cfm];
+            delete paramsToDeploy[cfm];
+        } else {
+            nextOutcomeToDeploy[cfm]++;
+        }
+
+        {
+            string memory outcomeName = params.outcomeNames[outcomeIndex];
+            bytes32 csmQuestionId = oracleAdapter.askMetricQuestion(
+                params.metricTemplateId, params.genericScalarQuestionParams, outcomeName
+            );
 
             // 3: Short, Long, Invalid.
             bytes32 csmConditionId = conditionalTokens.getConditionId(address(csm), csmQuestionId, 3);
@@ -143,15 +145,17 @@ contract FlatCFMFactory {
                 conditionalTokens.prepareCondition(address(csm), csmQuestionId, 3);
             }
 
-            bytes32 decisionCollectionId = conditionalTokens.getCollectionId(0, cfmConditionId, 1 << outcomeIndex);
-            wrappedCTData =
-                deployWrappedConditiontalTokens(outcomeName, collateralToken, decisionCollectionId, csmConditionId);
+            bytes32 decisionCollectionId =
+                conditionalTokens.getCollectionId(0, params.decisionConditionId, 1 << outcomeIndex);
+            wrappedCTData = _deployWrappedConditiontalTokens(
+                outcomeName, params.collateralToken, decisionCollectionId, csmConditionId
+            );
 
             conditionalScalarCTParams = ConditionalScalarCTParams({
                 questionId: csmQuestionId,
                 conditionId: csmConditionId,
                 parentCollectionId: decisionCollectionId,
-                collateralToken: collateralToken
+                collateralToken: params.collateralToken
             });
         }
 
@@ -161,22 +165,22 @@ contract FlatCFMFactory {
             wrapped1155Factory,
             conditionalScalarCTParams,
             ScalarParams({
-                minValue: genericScalarQParams.scalarParams.minValue,
-                maxValue: genericScalarQParams.scalarParams.maxValue
+                minValue: params.genericScalarQuestionParams.scalarParams.minValue,
+                maxValue: params.genericScalarQuestionParams.scalarParams.maxValue
             }),
             wrappedCTData
         );
 
-        return csm;
+        emit ConditionalScalarMarketCreated(address(cfm), address(csm), outcomeIndex);
     }
 
     /// @dev Deploy short/long ERC20s for the nested condition.
-    function deployWrappedConditiontalTokens(
-        string calldata outcomeName,
+    function _deployWrappedConditiontalTokens(
+        string memory outcomeName,
         IERC20 collateralToken,
         bytes32 decisionCollectionId,
         bytes32 csmConditionId
-    ) private returns (WrappedConditionalTokensData memory) {
+    ) internal returns (WrappedConditionalTokensData memory) {
         bytes memory shortData = abi.encodePacked(
             string.concat(outcomeName, "-Short").toString31(), string.concat(outcomeName, "-ST").toString31(), uint8(18)
         );
