@@ -14,8 +14,6 @@ import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
 // could decouple other attributes, if we expect templates to change more often
 // than these.
 contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
-    string public constant SEPARATOR = "\u241f";
-
     IRealityETH public immutable oracle;
     address public immutable arbitrator;
     uint32 public immutable questionTimeout;
