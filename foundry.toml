@@ -12,8 +12,8 @@ optimizer_runs = 200
 libraries = []
 extra_output = ["metadata"]
 extra_output_files = ["metadata"]
-allowed_paths = ["./deployment-configs"]
-fs_permissions = [{ access = "read", path = "./deployment-configs"}]
+allowed_paths = ["./flatcfm-config.json"]
+fs_permissions = [{ access = "read", path = "./flatcfm-config.json"}]
 
 [profile.itest]
 test = "test/integration"
