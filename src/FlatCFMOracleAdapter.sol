@@ -7,6 +7,7 @@ import {FlatCFMQuestionParams, GenericScalarQuestionParams} from "./Types.sol";
 abstract contract FlatCFMOracleAdapter {
     function askDecisionQuestion(uint256 decisionTemplateId, FlatCFMQuestionParams calldata flatCFMQuestionParams)
         external
+        payable
         virtual
         returns (bytes32);
 
@@ -14,7 +15,7 @@ abstract contract FlatCFMOracleAdapter {
         uint256 metricTemplateId,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
-    ) external virtual returns (bytes32);
+    ) external payable virtual returns (bytes32);
 
     function getAnswer(bytes32 questionId) external view virtual returns (bytes32);
 

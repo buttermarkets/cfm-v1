@@ -450,7 +450,7 @@ contract CreateMarketTest is CreateMarketTestBase {
     }
 }
 
-contract CreateMarketDeploymentTest is CreateMarketTestBase {
+contract CreateMarketDeploymentTestBase is CreateMarketTestBase {
     using String31 for string;
 
     bytes32 constant CONDITION_ID = "test condition id";
@@ -458,8 +458,6 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
     bytes shortData;
     bytes longData;
     bytes invalidData;
-    FlatCFM cfm;
-    ConditionalScalarMarket csm1;
 
     function setUp() public override {
         super.setUp();
@@ -558,9 +556,30 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
             ),
             abi.encode(IERC20(address(0xfefefefe)))
         );
+    }
+}
 
+contract CreateMarketDeploymentTest is CreateMarketDeploymentTestBase {
+    function testDeploysAFlatCFM() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        assertEq(address(cfm.conditionalTokens()), address(conditionalTokens));
+        assertEq(address(cfm.oracleAdapter()), address(oracleAdapter));
+        assertEq(cfm.outcomeCount(), 4);
+        assertEq(cfm.questionId(), DECISION_QID);
+    }
+
+    function testDeploysAConditionalScalarMarket() public {
         vm.recordLogs();
-        cfm = factory.createFlatCFM(
+        FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
@@ -572,17 +591,8 @@ contract CreateMarketDeploymentTest is CreateMarketTestBase {
         for (uint256 i = 0; i < outcomeNames.length; i++) {
             factory.createConditionalScalarMarket(cfm);
         }
-        csm1 = _getFirstConditionalScalarMarket();
-    }
+        ConditionalScalarMarket csm1 = _getFirstConditionalScalarMarket();
 
-    function testDeploysAFlatCFM() public view {
-        assertEq(address(cfm.conditionalTokens()), address(conditionalTokens));
-        assertEq(address(cfm.oracleAdapter()), address(oracleAdapter));
-        assertEq(cfm.outcomeCount(), 4);
-        assertEq(cfm.questionId(), DECISION_QID);
-    }
-
-    function testDeploysAConditionalScalarMarket() public view {
         assertEq(address(csm1.oracleAdapter()), address(oracleAdapter));
         assertEq(address(csm1.conditionalTokens()), address(conditionalTokens), "CT mismatch");
         assertEq(address(csm1.wrapped1155Factory()), address(wrapped1155Factory), "1155 factory mismatch");
@@ -646,8 +656,6 @@ contract CreateMarketFuzzTest is CreateMarketTestBase {
             factory.createConditionalScalarMarket(cfm);
         }
 
-        // We can check logs or read block state to confirm child markets
-        // For example, we can parse the logs to ensure we got `outcomeCount` events
         Vm.Log[] memory logs = vm.getRecordedLogs();
         uint256 found;
         for (uint256 i = 0; i < logs.length; i++) {
@@ -657,5 +665,152 @@ contract CreateMarketFuzzTest is CreateMarketTestBase {
             }
         }
         assertEq(found, outcomeCount, "Number of conditional markets does not match outcomeCount");
+    }
+}
+
+contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
+    function testCreateFlatCFMForwardsPayment() public {
+        uint256 sendValue = 0.05 ether;
+
+        vm.expectCall(
+            address(oracleAdapter),
+            sendValue,
+            abi.encodeWithSelector(
+                FlatCFMRealityAdapter.askDecisionQuestion.selector, DECISION_TEMPLATE_ID, decisionQuestionParams
+            )
+        );
+
+        factory.createFlatCFM{value: sendValue}(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+    }
+
+    function testCreateFlatCFMNoPayment() public {
+        vm.expectCall(
+            address(oracleAdapter),
+            0,
+            abi.encodeWithSelector(
+                FlatCFMRealityAdapter.askDecisionQuestion.selector, DECISION_TEMPLATE_ID, decisionQuestionParams
+            )
+        );
+
+        factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+    }
+
+    function testCreateFlatCFMWithoutEnoughPaymentReverts() public {
+        vm.mockCallRevert(
+            address(oracleAdapter),
+            0,
+            abi.encodeWithSelector(FlatCFMRealityAdapter.askDecisionQuestion.selector),
+            "ETH must be provided"
+        );
+        vm.expectRevert("ETH must be provided");
+        factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+    }
+
+    function testCreateCSMForwardsPayment() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        uint256 sendValue = 0.05 ether;
+
+        vm.expectCall(
+            address(oracleAdapter),
+            sendValue,
+            abi.encodeWithSelector(
+                FlatCFMRealityAdapter.askMetricQuestion.selector,
+                METRIC_TEMPLATE_ID,
+                genericScalarQuestionParams,
+                decisionQuestionParams.outcomeNames[0]
+            )
+        );
+
+        factory.createConditionalScalarMarket{value: sendValue}(cfm);
+
+        vm.expectCall(
+            address(oracleAdapter),
+            sendValue,
+            abi.encodeWithSelector(
+                FlatCFMRealityAdapter.askMetricQuestion.selector,
+                METRIC_TEMPLATE_ID,
+                genericScalarQuestionParams,
+                decisionQuestionParams.outcomeNames[1]
+            )
+        );
+
+        factory.createConditionalScalarMarket{value: sendValue}(cfm);
+    }
+
+    function testCreateCSMNoPayment() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        vm.expectCall(
+            address(oracleAdapter),
+            0,
+            abi.encodeWithSelector(
+                FlatCFMRealityAdapter.askMetricQuestion.selector, METRIC_TEMPLATE_ID, genericScalarQuestionParams
+            )
+        );
+
+        factory.createConditionalScalarMarket(cfm);
+    }
+
+    function testCreateCSMWithoutEnoughPaymentReverts() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        vm.mockCallRevert(
+            address(oracleAdapter),
+            0,
+            abi.encodeWithSelector(FlatCFMRealityAdapter.askMetricQuestion.selector),
+            "ETH must be provided"
+        );
+
+        vm.expectRevert("ETH must be provided");
+        factory.createConditionalScalarMarket(cfm);
     }
 }

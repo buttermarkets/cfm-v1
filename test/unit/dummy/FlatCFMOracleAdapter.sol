@@ -6,6 +6,7 @@ import "src/FlatCFMOracleAdapter.sol";
 contract DummyFlatCFMOracleAdapter is FlatCFMOracleAdapter {
     function askDecisionQuestion(uint256 decisionTemplateId, FlatCFMQuestionParams calldata flatCFMQuestionParams)
         external
+        payable
         override
         returns (bytes32)
     {}
@@ -14,7 +15,7 @@ contract DummyFlatCFMOracleAdapter is FlatCFMOracleAdapter {
         uint256 metricTemplateId,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
-    ) external override returns (bytes32) {}
+    ) external payable override returns (bytes32) {}
 
     function getAnswer(bytes32 questionID) external view override returns (bytes32) {}
 

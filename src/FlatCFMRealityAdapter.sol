@@ -74,6 +74,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
 
     function askDecisionQuestion(uint256 decisionTemplateId, FlatCFMQuestionParams calldata flatCFMQuestionParams)
         public
+        payable
         override
         returns (bytes32)
     {
@@ -85,7 +86,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         uint256 metricTemplateId,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
-    ) public override returns (bytes32) {
+    ) public payable override returns (bytes32) {
         string memory formattedMetricQuestionParams = _formatMetricQuestionParams(outcomeName);
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, genericScalarQuestionParams.openingTime);
     }

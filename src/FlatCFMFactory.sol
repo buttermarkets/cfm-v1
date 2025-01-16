@@ -80,7 +80,7 @@ contract FlatCFMFactory {
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         IERC20 collateralToken,
         string calldata metadataUri
-    ) external returns (FlatCFM cfm) {
+    ) external payable returns (FlatCFM cfm) {
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
         if (outcomeCount == 0 || outcomeCount > MAX_OUTCOME_COUNT) {
             revert InvalidOutcomeCount();
@@ -93,7 +93,8 @@ contract FlatCFMFactory {
         cfm = FlatCFM(flatCfmImplementation.clone());
         nextOutcomeToDeploy[cfm] = 0;
 
-        bytes32 decisionQuestionId = oracleAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQParams);
+        bytes32 decisionQuestionId =
+            oracleAdapter.askDecisionQuestion{value: msg.value}(decisionTemplateId, flatCFMQParams);
 
         // +1 counts for Invalid.
         bytes32 decisionConditionId =
@@ -115,7 +116,7 @@ contract FlatCFMFactory {
         emit FlatCFMCreated(address(cfm), decisionConditionId);
     }
 
-    function createConditionalScalarMarket(FlatCFM cfm) external returns (ConditionalScalarMarket csm) {
+    function createConditionalScalarMarket(FlatCFM cfm) external payable returns (ConditionalScalarMarket csm) {
         if (paramsToDeploy[cfm].outcomeNames.length == 0) revert NoConditionalScalarMarketToDeploy();
 
         uint256 outcomeIndex = nextOutcomeToDeploy[cfm];
@@ -135,7 +136,7 @@ contract FlatCFMFactory {
 
         {
             string memory outcomeName = params.outcomeNames[outcomeIndex];
-            bytes32 csmQuestionId = oracleAdapter.askMetricQuestion(
+            bytes32 csmQuestionId = oracleAdapter.askMetricQuestion{value: msg.value}(
                 params.metricTemplateId, params.genericScalarQuestionParams, outcomeName
             );
 

@@ -78,6 +78,64 @@ contract AskQuestionTest is Base {
     }
 }
 
+// These tests mock the `askQuestionWithMinBond` to revert as if the
+// arbitration fee is non-null.
+// solhint-disable-next-line
+// See https://github.com/RealityETH/reality-eth-monorepo/blob/13f0556b72059e4a4d402fd75999d2ce320bd3c4/packages/contracts/flat/RealityETH-3.0.sol#L352
+contract AskQuestionRequiredPaymentTest is Base {
+    function setUp() public override {
+        super.setUp();
+
+        // Any 0-payment will revert in this test suite.
+        vm.mockCallRevert(
+            address(reality),
+            0,
+            abi.encodeWithSelector(DummyRealityETH.askQuestionWithMinBond.selector),
+            "ETH provided must cover question fee"
+        );
+    }
+
+    function testAskDecisionQuestionWithoutEnoughPaymentReverts() public {
+        FlatCFMQuestionParams memory flatCFMQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: new string[](2), openingTime: uint32(block.timestamp + 1000)});
+        flatCFMQuestionParams.outcomeNames[0] = "Yes";
+        flatCFMQuestionParams.outcomeNames[1] = "No";
+
+        vm.expectRevert("ETH provided must cover question fee");
+        realityAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQuestionParams);
+    }
+
+    function testAskMetricQuestionWithoutEnoughPaymentReverts() public {
+        GenericScalarQuestionParams memory params = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10000000}),
+            openingTime: uint32(block.timestamp + 1000)
+        });
+
+        vm.expectRevert("ETH provided must cover question fee");
+        realityAdapter.askMetricQuestion(metricTemplateId, params, "Above $2000");
+    }
+
+    function testAskDecisionQuestionWithEnoughPaymentGoesThrough() public {
+        FlatCFMQuestionParams memory flatCFMQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: new string[](2), openingTime: uint32(block.timestamp + 1000)});
+        flatCFMQuestionParams.outcomeNames[0] = "Yes";
+        flatCFMQuestionParams.outcomeNames[1] = "No";
+
+        vm.expectRevert("ETH provided must cover question fee");
+        realityAdapter.askDecisionQuestion{value: 0.01 ether}(decisionTemplateId, flatCFMQuestionParams);
+    }
+
+    function testAskMetricQuestionWithEnoughPaymentGoesThrough() public {
+        GenericScalarQuestionParams memory params = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10000000}),
+            openingTime: uint32(block.timestamp + 1000)
+        });
+
+        vm.expectRevert("ETH provided must cover question fee");
+        realityAdapter.askMetricQuestion{value: 0.01 ether}(metricTemplateId, params, "Above $2000");
+    }
+}
+
 // From Reality //
 // `resultForOnceSettled` reverts if TOO SOON.
 // solhint-disable-next-line
