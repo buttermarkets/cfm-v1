@@ -26,9 +26,9 @@ contract ConditionalScalarMarket is ERC1155Holder {
     bool public initialized;
 
     error AlreadyInitialized();
-    error WrappedShortTransferFailed(address wrappedShort, address from, address to, uint256 amount);
-    error WrappedLongTransferFailed(address wrappedShort, address from, address to, uint256 amount);
-    error WrappedInvalidTransferFailed(address wrappedShort, address from, address to, uint256 amount);
+    error WrappedShortTransferFailed();
+    error WrappedLongTransferFailed();
+    error WrappedInvalidTransferFailed();
 
     /// @notice Initialize function called by each clone.
     function initialize(
@@ -112,15 +112,13 @@ contract ConditionalScalarMarket is ERC1155Holder {
 
         // Contract transfers Long/Short ERC20 to user.
         if (!wrappedCTData.wrappedShort.transfer(msg.sender, amount)) {
-            revert WrappedShortTransferFailed(address(wrappedCTData.wrappedShort), address(this), msg.sender, amount);
+            revert WrappedShortTransferFailed();
         }
         if (!wrappedCTData.wrappedLong.transfer(msg.sender, amount)) {
-            revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), address(this), msg.sender, amount);
+            revert WrappedLongTransferFailed();
         }
         if (!wrappedCTData.wrappedInvalid.transfer(msg.sender, amount)) {
-            revert WrappedInvalidTransferFailed(
-                address(wrappedCTData.wrappedInvalid), address(this), msg.sender, amount
-            );
+            revert WrappedInvalidTransferFailed();
         }
     }
 
@@ -128,15 +126,13 @@ contract ConditionalScalarMarket is ERC1155Holder {
     function merge(uint256 amount) external {
         // User transfers Long/Short ERC20 to contract.
         if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), amount)) {
-            revert WrappedShortTransferFailed(address(wrappedCTData.wrappedShort), msg.sender, address(this), amount);
+            revert WrappedShortTransferFailed();
         }
         if (!wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), amount)) {
-            revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), msg.sender, address(this), amount);
+            revert WrappedLongTransferFailed();
         }
         if (!wrappedCTData.wrappedInvalid.transferFrom(msg.sender, address(this), amount)) {
-            revert WrappedInvalidTransferFailed(
-                address(wrappedCTData.wrappedInvalid), msg.sender, address(this), amount
-            );
+            revert WrappedInvalidTransferFailed();
         }
 
         // Contract transfers Long/Short ERC20 to wrapped1155Factory and gets
@@ -175,17 +171,13 @@ contract ConditionalScalarMarket is ERC1155Holder {
     function redeem(uint256 shortAmount, uint256 longAmount, uint256 invalidAmount) external {
         // User transfers Long/Short ERC20 to contract.
         if (!wrappedCTData.wrappedShort.transferFrom(msg.sender, address(this), shortAmount)) {
-            revert WrappedShortTransferFailed(
-                address(wrappedCTData.wrappedShort), msg.sender, address(this), shortAmount
-            );
+            revert WrappedShortTransferFailed();
         }
         if (!wrappedCTData.wrappedLong.transferFrom(msg.sender, address(this), longAmount)) {
-            revert WrappedLongTransferFailed(address(wrappedCTData.wrappedLong), msg.sender, address(this), longAmount);
+            revert WrappedLongTransferFailed();
         }
         if (!wrappedCTData.wrappedInvalid.transferFrom(msg.sender, address(this), invalidAmount)) {
-            revert WrappedInvalidTransferFailed(
-                address(wrappedCTData.wrappedInvalid), msg.sender, address(this), invalidAmount
-            );
+            revert WrappedInvalidTransferFailed();
         }
 
         // Contracts transfers Long/Short ERC20 to wrapped1155Factory and gets

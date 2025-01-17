@@ -29,8 +29,7 @@ remappings_regenerate = true
 remappings_version = false
 remappings_location = "txt"
 
-# FIXME upgrade
 [dependencies]
 "@openzeppelin-contracts" = "5.0.2"
 "@realityeth" = { version = "3.0.61", git = "https://github.com/RealityETH/reality-eth-monorepo.git", rev = "c5abe9c19fc6217e9636838e3cf0087e93bb6621" }
-forge-std = { version = "1.9.4", url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_4_25-10-2024_14:36:59_forge-std-1.9.zip" }
+forge-std = "1.9.5"
