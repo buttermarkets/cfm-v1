@@ -148,7 +148,7 @@ contract FlatCFMFactory {
 
             bytes32 decisionCollectionId =
                 conditionalTokens.getCollectionId(0, params.decisionConditionId, 1 << outcomeIndex);
-            wrappedCTData = _deployWrappedConditiontalTokens(
+            wrappedCTData = _deployWrappedConditionalTokens(
                 outcomeName, params.collateralToken, decisionCollectionId, csmConditionId
             );
 
@@ -176,7 +176,7 @@ contract FlatCFMFactory {
     }
 
     /// @dev Deploy short/long ERC20s for the nested condition.
-    function _deployWrappedConditiontalTokens(
+    function _deployWrappedConditionalTokens(
         string memory outcomeName,
         IERC20 collateralToken,
         bytes32 decisionCollectionId,
