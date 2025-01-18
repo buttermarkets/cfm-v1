@@ -1,5 +1,17 @@
 # how to
 
+## deploy an oracle adapter
+
+```sh
+QUESTION_TIMEOUT=3600 \
+MIN_BOND=100000000000000 \
+forge script script/DeployFlatCFMRealityAdapter.s.sol \
+    --rpc-url $RPC_URL \
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
+```
+
 ## deploy a factory
 
 ```sh
@@ -8,20 +20,22 @@ export CONDITIONAL_TOKENS=0xabcd...
 export WRAPPED1155_FACTORY=0x9999...
 forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory \
     --rpc-url $RPC_URL \
-    --private-key $PRIVATE_KEY \
-    --broadcast
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
 ```
 
 ## deploy a new Flat CFM
 
 ### using a block explorer
 
-1. Locate the FlatCFMFactory page on the block explorer.
-2. Connect your wallet.
-3. Enter fileds.
-4. Submit and send transaction.
+First deploy the Flat CFM instance:
 
-![factory-create.png](img/factory-create.png.png)
+![create-flatcfm](img/create-flatcfm.png)
+
+Then deploy each Conditional Scalar Market, one per outcome:
+
+![create-csm](img/create-csm.png)
 
 
 ### using a config file
@@ -31,28 +45,31 @@ First, define a config file (by default, use `./flatcfm.config.json`), like
 ```json
 {
   "factoryAddress": "0x1234567890abcdef1234567890abcdef12345678",
-  "roundName": "Demo Round",
-  "outcomeNames": ["Project A", "Project B"],
-  "openingTimeDecision": 1680000000,  
-  "metricName": "Rainfall (mm)",
-  "startDate": "2024-05-01",
-  "endDate": "2024-05-15",
+  "oracleAdapterAddress": "0x1234567890abcdef1234567890abcdef12345678",
+  "decisionTemplateId": 24,
+  "metricTemplateId": 42,
+  "collateralToken": "0x1234567890abcdef1234567890abcdef12345678",
+  "outcomeNames": [
+    "Project A",
+    "Project B",
+    "Project C",
+    "Project D"
+  ],
+  "openingTimeDecision": 1737111600,
   "minValue": 0,
-  "maxValue": 200,
-  "openingTimeMetric": 1681000000,
-  "collateralToken": "0x1234567890abcdef1234567890abcdef12345678"
-}
+  "maxValue": 100,
+  "openingTimeMetric": 1737457200,
+  "metadataUri": "ipfs://1234"
 ```
 
 then run
 
 ```sh
-export FACTORY_ADDRESS=0x1234…
-export MARKET_CONFIG_FILE=./somewhere/flatcfm.config.json
-forge script script/CreateFlatCFMFromConfig.s.sol:CreateFlatCFMFromConfig \
+forge script script/CreateFlatCFMFromConfig.s.sol \
     --rpc-url $RPC_URL \
-    --private-key $PRIVATE_KEY \
-    --broadcast
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
 ```
 
 # conditional funding markets (CFM)
@@ -65,7 +82,7 @@ The mechanism implemented here is a simplified version of
 
 ## design
 
-`FlatCFM` represents the condition of funding. It's a market but it won't
+`FlatCFM` represents the condition of funding. It is a market but it won't
 be traded. It creates a `ConditionalScalarMarket` for each outcome it has (apart
 from the special "Invalid" outcome, see below). It prepares an oracle question
 and condition (as in `ConditionalTokens`) during construction. 
