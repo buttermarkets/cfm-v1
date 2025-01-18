@@ -73,7 +73,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     }
 
     function askDecisionQuestion(uint256 decisionTemplateId, FlatCFMQuestionParams calldata flatCFMQuestionParams)
-        public
+        external
         payable
         override
         returns (bytes32)
@@ -86,7 +86,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         uint256 metricTemplateId,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
         string memory outcomeName
-    ) public payable override returns (bytes32) {
+    ) external payable override returns (bytes32) {
         string memory formattedMetricQuestionParams = _formatMetricQuestionParams(outcomeName);
         return _askQuestion(metricTemplateId, formattedMetricQuestionParams, genericScalarQuestionParams.openingTime);
     }
@@ -96,11 +96,11 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     ///     question's result is returned (or raises if not finalized either).
     // solhint-disable-next-line max-line-length
     ///     See https://github.com/RealityETH/reality-eth-monorepo/blob/13f0556b72059e4a4d402fd75999d2ce320bd3c4/packages/contracts/flat/RealityETH-3.0.sol#L618C14-L618C34
-    function getAnswer(bytes32 questionId) public view override returns (bytes32) {
+    function getAnswer(bytes32 questionId) external view override returns (bytes32) {
         return oracle.resultForOnceSettled(questionId);
     }
 
-    function isInvalid(bytes32 answer) public pure override returns (bool) {
+    function isInvalid(bytes32 answer) external pure override returns (bool) {
         return (uint256(answer) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     }
 }
