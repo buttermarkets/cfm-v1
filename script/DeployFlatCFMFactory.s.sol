@@ -29,7 +29,7 @@ contract DeployFlatCFMFactory is Script {
     }
 
     // Helper that reverts if env var isn't set or is zero.
-    function _requireEnvAddress(string memory key) internal view returns (address) {
+    function _requireEnvAddress(string memory key) private view returns (address) {
         address addr;
         try vm.envAddress(key) returns (address val) {
             addr = val;
