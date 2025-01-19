@@ -119,7 +119,6 @@ contract FlatCFMFactory {
         }
 
         cfm = FlatCFM(flatCfmImplementation.clone());
-        nextOutcomeToDeploy[cfm] = 0;
 
         bytes32 decisionQuestionId =
             oracleAdapter.askDecisionQuestion{value: msg.value}(decisionTemplateId, flatCFMQParams);
