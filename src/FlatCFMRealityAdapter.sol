@@ -124,7 +124,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         }
 
         // Otherwise ask a new question with the provided parameters.
-        return oracle.askQuestionWithMinBond(
+        return oracle.askQuestionWithMinBond{value: msg.value}(
             templateId, formattedQuestionParams, arbitrator, questionTimeout, openingTime, 0, minBond
         );
     }
