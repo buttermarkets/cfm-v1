@@ -13,7 +13,7 @@ import "src/interfaces/IWrapped1155Factory.sol";
 import "src/Types.sol";
 
 contract CreateFlatCFMFromConfigTest is Test {
-    string constant CONFIG_FILE_PATH = "test/fork/flatcfm-50-outcomes.json";
+    string constant CONFIG_FILE_PATH = "test/fork/flatcfm-255-outcomes.json";
     CreateFlatCFMFromConfig script;
 
     function setUp() public {
