@@ -3,8 +3,8 @@
 ## deploy an oracle adapter
 
 ```sh
-QUESTION_TIMEOUT=3600 \
-MIN_BOND=100000000000000 \
+export QUESTION_TIMEOUT=3600
+export MIN_BOND=100000000000000
 forge script script/DeployFlatCFMRealityAdapter.s.sol \
     --rpc-url $RPC_URL \
     --broadcast \
@@ -20,6 +20,31 @@ export CONDITIONAL_TOKENS=0xabcd...
 export WRAPPED1155_FACTORY=0x9999...
 forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory \
     --rpc-url $RPC_URL \
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
+```
+
+## deploy a Reality template
+
+Exemple decision template:
+
+```sh
+export TEMPLATE_CONTENT='{"title": "Which project got funded during CFM round #23?", "type": "multiple-select", "outcomes": [%s], "category": "cfm-decision", "lang": "en"}'
+forge script script/CreateRealityTemplate.s.sol \
+    --rpc-url "https://unichain-sepolia.infura.io/v3/$INFURA_PROJECT_ID" \
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
+```
+
+
+Example metric template:
+
+```sh
+export TEMPLATE_CONTENT='{"title": "Between the first block of 2025-01-01 and the last block of 2025-06-30, what is the average TVL in million USD, calculated at each block, for %s on BrandNewChain?", "type": "uint", "category": "cfm-metric", "lang": "en"}'
+forge script script/CreateRealityTemplate.s.sol \
+    --rpc-url "https://unichain-sepolia.infura.io/v3/$INFURA_PROJECT_ID" \
     --broadcast \
     --sender $ADDRESS \
     --private-key $PRIVATE_KEY
@@ -72,7 +97,7 @@ forge script script/CreateFlatCFMFromConfig.s.sol \
     --private-key $PRIVATE_KEY
 ```
 
-# conditional funding markets (CFM)
+# documentation
 
 ## mechansim: flat-cfm
 
@@ -80,7 +105,7 @@ The mechanism implemented here is a simplified version of
 [CFMs](https://community.ggresear.ch/t/conditional-funding-markets/27) called
 ["Flat CFM"](https://butterd.notion.site/cfm-v1-mech-v0-2-Flat-CFM-13657e477193802f8abce08cd13aa979?pvs=74).
 
-## design
+## architecture
 
 `FlatCFM` represents the condition of funding. It is a market but it won't
 be traded. It creates a `ConditionalScalarMarket` for each outcome it has (apart
@@ -91,20 +116,11 @@ and condition (as in `ConditionalTokens`) during construction.
 of parent `FlatCFM`. This will be traded. It prepares an oracle question
 and condition (as in `ConditionalTokens`) during construction. 
 
-`ConditionalTokens` is the core contract that manages the creation and
-redemption of conditional tokens. It's a port of Gnosis Conditional Tokens
-framework. We also rely on `Wrapped1155Factory` which enables wrapping 1155
-outcome tokens in ERC20s so we can trade them on any AMM.  
-Both these contracts were ported it to 8.20.0 with minor modifications for
-compatibility. We expect to deploy them on chain whenever the network we choose
-doesn't have a canonical deployment (for now, only mainnet and Gnosis Chain
-have some). We use these contracts for testing purposes as well.
-
 `FlatCFMRealityAdapter` implements an adapter pattern to access RealityETH from our
 contracts, with a normalized interface (we want to later enable oracle
 agnosticity).
 
-`QuestionTypes` defines basic data types for CFM decision questions, scalar
+`Types` defines basic data types for CFM decision questions, scalar
 questions and nested conditional tokens.
 
 The system follows these general steps:
@@ -128,8 +144,31 @@ The system follows these general steps:
    payouts.
 1. Users can redeem their positions for payouts.
 
+## dependency: ConditionalTokens
 
-## edge case: RealityETH's invalid case
+Gnosis' [Conditional Token framework](https://docs.gnosis.io/conditionaltokens/)
+provides the ability to create and manipulate tokens that are tied to a specific
+condition happening. `ConditionalTokens` is the core contract that manages among
+others the creation and redemption of conditional tokens.
+
+The codebase also rely on `Wrapped1155Factory` which enables wrapping 1155
+outcome tokens in ERC20s so participants can trade them on any AMM.
+
+Both these contracts are re-deployed in their original and audited versions. We
+updated the build pipeling with modern tooling: see
+[here](https://github.com/butterygg/conditional-tokens-contracts) and
+[here](https://github.com/butterygg/1155-to-20).
+
+## dependency: RealityETH
+
+[Reality.eth](https://reality.eth.limo) is the first oracle for which an adapter
+has been implemented. This is a general-purpose oracle which uses Kleros as an
+arbitrator.
+
+As with any external oracle, the CFM contracts economic security is limited by
+the economic security of the Reality + Kleros system.
+
+### edge case: RealityETH's invalid case
 
 Reality can return
 ['invalid'](https://realityeth.github.io/docs/html/contracts.html?highlight=invalid)
@@ -152,3 +191,17 @@ redemption.
 This is achieved by the same principle as above: `ConditionalScalarMarket`s
 create 3 outcomes: Short, Long, Invalid. No facility is provided for trading
 Invalid tokens.
+
+### bounty payments
+
+Reality bounties (and thus, `msg.value` forwarded by these contracts) are only
+useful to guarantee that the arbitrator fee requirement is fulfilled. FlatCFM &
+ConditionalScalarMarket deployers (Deployers) need to be aware of the amounts
+required by the arbitrator that they're using, and will need to input a
+`msg.value` at least matching the arbitrator fee.
+
+On a crypto-economics level, the cfm-v1 protocol doesn't require "pure" Reality
+bounties (aimed at incentivizing answers, what comes atop the arbitrator fee).
+Indeed, Deployers are expected to make decisions with significant budget at
+stake based on FlatCFMs markets resolving properly. This is providing a large
+enough existing incentive for Reality questions to be answered to.
