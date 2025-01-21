@@ -1,5 +1,22 @@
 # how to
 
+## install
+
+```sh
+forge soldeer install
+```
+
+## test
+
+```sh
+# unit tests:
+forge test
+# integration tests:
+FOUNDRY_PROFILE=itest forge test
+# fork tests:
+FOUNDRY_PROFILE=ftest forge test
+```
+
 ## deploy an oracle adapter
 
 ```sh
