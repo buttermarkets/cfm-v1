@@ -67,7 +67,7 @@ contract FlatCFMFactory {
     /// @notice Emitted when a new FlatCFM is created.
     /// @param market Address of the new FlatCFM contract.
     /// @param conditionId Conditional Tokens' condition ID.
-    event FlatCFMCreated(address indexed market, bytes32 conditionId);
+    event FlatCFMCreated(address indexed market, bytes32 conditionId, address deployer);
 
     /// @notice Emitted when a new ConditionalScalarMarket is created for a specific
     ///         outcome of a FlatCFM.
@@ -140,7 +140,7 @@ contract FlatCFMFactory {
 
         cfm.initialize(oracleAdapter, conditionalTokens, outcomeCount, decisionQuestionId, metadataUri);
 
-        emit FlatCFMCreated(address(cfm), decisionConditionId);
+        emit FlatCFMCreated(address(cfm), decisionConditionId, msg.sender);
     }
 
     /// @notice Creates a ConditionalScalarMarket for the next outcome in the given FlatCFM.
