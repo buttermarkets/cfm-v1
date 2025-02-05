@@ -15,7 +15,7 @@ contract BaseTest is Test {
 
     FlatCFM cfm;
 
-    uint256 constant OUTCOME_COUNT = 50;
+    uint256 constant OUTCOME_COUNT = 255;
     bytes32 constant QUESTION_ID = bytes32("some question id");
     string metadataUri;
 
@@ -34,30 +34,6 @@ contract TestResolve is BaseTest {
         uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT);
         plainAnswer[0] = 1;
         plainAnswer[OUTCOME_COUNT - 1] = 1;
-        bytes32 answer = _toBitArray(plainAnswer);
-
-        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
-        expectedPayout[0] = 1;
-        expectedPayout[OUTCOME_COUNT - 1] = 1;
-
-        vm.mockCall(
-            address(oracleAdapter),
-            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
-            abi.encode(answer)
-        );
-
-        vm.expectCall(
-            address(conditionalTokens),
-            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
-        );
-        cfm.resolve();
-    }
-
-    function testResolveWrongAnswerCallsReportPayoutsWithTruncatedContents() public {
-        uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT + 2);
-        plainAnswer[0] = 1;
-        plainAnswer[OUTCOME_COUNT - 1] = 1;
-        plainAnswer[OUTCOME_COUNT] = 1;
         bytes32 answer = _toBitArray(plainAnswer);
 
         uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
@@ -110,6 +86,52 @@ contract TestResolve is BaseTest {
         );
         vm.mockCall(
             address(oracleAdapter), abi.encodeWithSelector(FlatCFMOracleAdapter.isInvalid.selector), abi.encode(true)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        cfm.resolve();
+    }
+
+    function testResolveAnswerLargerThanOutcomeCountReportsPayoutToInvalid() public {
+        uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT + 2);
+        plainAnswer[0] = 0;
+        plainAnswer[OUTCOME_COUNT - 1] = 0;
+        plainAnswer[OUTCOME_COUNT] = 1;
+        bytes32 answer = _toBitArray(plainAnswer);
+
+        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
+        expectedPayout[OUTCOME_COUNT] = 1;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
+        );
+
+        vm.expectCall(
+            address(conditionalTokens),
+            abi.encodeWithSelector(IConditionalTokens.reportPayouts.selector, QUESTION_ID, expectedPayout)
+        );
+        cfm.resolve();
+    }
+
+    function testResolveAnswerLargerThanOutcomeCountReportsPayoutToInvalid2() public {
+        uint256[] memory plainAnswer = new uint256[](OUTCOME_COUNT + 2);
+        plainAnswer[0] = 1;
+        plainAnswer[OUTCOME_COUNT - 1] = 1;
+        plainAnswer[OUTCOME_COUNT] = 1;
+        bytes32 answer = _toBitArray(plainAnswer);
+
+        uint256[] memory expectedPayout = new uint256[](OUTCOME_COUNT + 1);
+        expectedPayout[OUTCOME_COUNT] = 1;
+
+        vm.mockCall(
+            address(oracleAdapter),
+            abi.encodeWithSelector(FlatCFMOracleAdapter.getAnswer.selector, QUESTION_ID),
+            abi.encode(answer)
         );
 
         vm.expectCall(

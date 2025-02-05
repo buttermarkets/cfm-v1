@@ -83,8 +83,19 @@ contract DummyConditionalTokens is IConditionalTokens {
 
     mapping(bytes32 => address) public _test_reportPayouts_caller;
 
-    function reportPayouts(bytes32 questionId, uint256[] calldata) external override {
+    function reportPayouts(bytes32 questionId, uint256[] calldata payouts) external override {
         _test_reportPayouts_caller[questionId] = msg.sender;
+
+        uint256 outcomeSlotCount = payouts.length;
+
+        require(outcomeSlotCount > 1, "there should be more than one outcome slot");
+
+        uint256 den = 0;
+        for (uint256 i = 0; i < outcomeSlotCount; i++) {
+            uint256 num = payouts[i];
+            den += num;
+        }
+        require(den > 0, "payout is all zeroes");
     }
 
     function splitPosition(IERC20, bytes32, bytes32, uint256[] calldata, uint256) external override {}
