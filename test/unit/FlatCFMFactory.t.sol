@@ -13,6 +13,7 @@ import "src/ConditionalScalarMarket.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import "src/FlatCFMOracleAdapter.sol";
 import "src/libs/String31.sol";
+import "src/interfaces/IConditionalTokens.sol";
 
 import {DummyConditionalTokens} from "./dummy/ConditionalTokens.sol";
 import {DummyWrapped1155Factory} from "./dummy/Wrapped1155Factory.sol";

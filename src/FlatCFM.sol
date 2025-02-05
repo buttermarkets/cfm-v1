@@ -60,7 +60,7 @@ contract FlatCFM {
         uint256[] memory payouts = new uint256[](outcomeCount + 1);
         uint256 numericAnswer = uint256(answer);
 
-        if (oracleAdapter.isInvalid(answer) || numericAnswer == 0) {
+        if (numericAnswer == 0 || numericAnswer >= (1 << outcomeCount) || oracleAdapter.isInvalid(answer)) {
             // 'Invalid' receives full payout
             payouts[outcomeCount] = 1;
         } else {
