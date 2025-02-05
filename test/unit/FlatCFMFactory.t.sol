@@ -814,3 +814,61 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
         factory.createConditionalScalarMarket(cfm);
     }
 }
+
+contract AskQuestionRevertsTest is Base {
+    uint256 constant DECISION_TEMPLATE_ID = 999;
+    uint256 constant METRIC_TEMPLATE_ID = 111;
+    string[] outcomeNames;
+    FlatCFMQuestionParams decisionQuestionParams;
+    GenericScalarQuestionParams genericScalarQuestionParams;
+
+    function setUp() public override {
+        super.setUp();
+
+        outcomeNames.push("project a");
+        outcomeNames.push("project b");
+        decisionQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: uint32(block.timestamp + 1000)});
+        genericScalarQuestionParams = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 1000}),
+            openingTime: uint32(block.timestamp + 2000)
+        });
+    }
+
+    function testCreateFlatCFMRevertsIfAskQuestionReverts() public {
+        deal(address(this), 1 ether);
+        vm.mockCallRevert(
+            address(oracleAdapter), 1 ether, FlatCFMRealityAdapter.askDecisionQuestion.selector, "TEST_ERR"
+        );
+
+        vm.expectRevert(bytes("TEST_ERR"));
+        factory.createFlatCFM{value: 1 ether}(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            "ipfs://metadata"
+        );
+    }
+
+    function testCreateConditionalScalarMarketRevertsIfAskQuestionReverts() public {
+        deal(address(this), 1 ether);
+
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            "ipfs://metadata"
+        );
+
+        vm.mockCallRevert(address(oracleAdapter), 1 ether, FlatCFMRealityAdapter.askMetricQuestion.selector, "TEST_ERR");
+
+        vm.expectRevert(bytes("TEST_ERR"));
+        factory.createConditionalScalarMarket{value: 1 ether}(cfm);
+    }
+}
