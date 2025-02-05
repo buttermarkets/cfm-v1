@@ -132,6 +132,20 @@ contract AskDecisionQuestionPaymentTest is Base {
         vm.expectRevert("ETH provided must cover question fee");
         realityAdapter.askDecisionQuestion{value: sendValue}(decisionTemplateId, flatCFMQuestionParams);
     }
+
+    function testAskDecisionQuestionAlreadyExistingReverts() public {
+        deal(address(this), 3 ether);
+
+        realityAdapter.askDecisionQuestion{value: 1 ether}(decisionTemplateId, flatCFMQuestionParams);
+        assertEq(address(this).balance, 2 ether);
+
+        vm.mockCall(
+            address(reality), abi.encodeWithSelector(IRealityETHCore.getTimeout.selector), abi.encode(uint256(1))
+        );
+
+        vm.expectRevert(FlatCFMRealityAdapter.QuestionAlreadyAsked.selector);
+        realityAdapter.askDecisionQuestion{value: 1 ether}(decisionTemplateId, flatCFMQuestionParams);
+    }
 }
 
 contract AskMetricQuestionPaymentTest is Base {
@@ -170,6 +184,119 @@ contract AskMetricQuestionPaymentTest is Base {
 
         vm.expectRevert("ETH provided must cover question fee");
         realityAdapter.askMetricQuestion{value: sendValue}(metricTemplateId, genericScalarQuestionParams, "A");
+    }
+
+    function testAskMetricQuestionAlreadyExistingReverts() public {
+        deal(address(this), 3 ether);
+
+        realityAdapter.askMetricQuestion{value: 1 ether}(metricTemplateId, genericScalarQuestionParams, "A");
+        assertEq(address(this).balance, 2 ether);
+
+        vm.mockCall(
+            address(reality), abi.encodeWithSelector(IRealityETHCore.getTimeout.selector), abi.encode(uint256(1))
+        );
+
+        vm.expectRevert(FlatCFMRealityAdapter.QuestionAlreadyAsked.selector);
+        realityAdapter.askMetricQuestion{value: 1 ether}(metricTemplateId, genericScalarQuestionParams, "A");
+    }
+}
+
+contract MockFormatFlatCFMRealityAdapter is FlatCFMRealityAdapter {
+    constructor(IRealityETH _oracle, address _arbitrator, uint32 _questionTimeout, uint256 _minBond)
+        FlatCFMRealityAdapter(_oracle, _arbitrator, _questionTimeout, _minBond)
+    {}
+
+    function getDecisionQuestionId(uint256 templateId, FlatCFMQuestionParams memory flatCFMQuestionParams)
+        public
+        view
+        returns (bytes32)
+    {
+        return _computeQuestionId(
+            templateId, flatCFMQuestionParams.openingTime, _formatDecisionQuestionParams(flatCFMQuestionParams)
+        );
+    }
+
+    function getMetricQuestionId(
+        uint256 templateId,
+        GenericScalarQuestionParams memory genericScalarQuestionParams,
+        string memory outcomeName
+    ) public view returns (bytes32) {
+        return _computeQuestionId(
+            templateId, genericScalarQuestionParams.openingTime, _formatMetricQuestionParams(outcomeName)
+        );
+    }
+}
+
+contract AskRepeatQuestionTest is Base {
+    MockFormatFlatCFMRealityAdapter mockRealityAdapter;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        mockRealityAdapter =
+            new MockFormatFlatCFMRealityAdapter(IRealityETH(address(reality)), arbitrator, questionTimeout, minBond);
+    }
+
+    function testAskDecisionQuestionAgainReturnsSameId() public {
+        uint32 openingTime = uint32(block.timestamp + 1000);
+        FlatCFMQuestionParams memory flatCFMQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: new string[](2), openingTime: openingTime});
+        flatCFMQuestionParams.outcomeNames[0] = "Yes";
+        flatCFMQuestionParams.outcomeNames[1] = "No";
+
+        bytes32 expectedQuestionId = mockRealityAdapter.getDecisionQuestionId(decisionTemplateId, flatCFMQuestionParams);
+
+        vm.mockCall(
+            address(reality),
+            abi.encodeWithSelector(IRealityETHCore.askQuestionWithMinBond.selector),
+            abi.encode(expectedQuestionId)
+        );
+        bytes32 questionId = mockRealityAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQuestionParams);
+
+        assertEq(questionId, expectedQuestionId);
+
+        vm.mockCall(
+            address(reality),
+            abi.encodeWithSelector(IRealityETHCore.askQuestionWithMinBond.selector),
+            abi.encode(bytes32("changedFakeDecisionQuestionId"))
+        );
+        vm.mockCall(
+            address(reality), abi.encodeWithSelector(IRealityETHCore.getTimeout.selector), abi.encode(uint256(1))
+        );
+        bytes32 questionIdAgain = mockRealityAdapter.askDecisionQuestion(decisionTemplateId, flatCFMQuestionParams);
+
+        assertEq(questionIdAgain, expectedQuestionId);
+    }
+
+    function testAskMetricQuestionAgainReturnsSameId() public {
+        uint32 openingTime = uint32(block.timestamp + 1000);
+        GenericScalarQuestionParams memory params = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10000000}),
+            openingTime: openingTime
+        });
+        string memory outcomeName = "some project";
+
+        bytes32 expectedQuestionId = mockRealityAdapter.getMetricQuestionId(metricTemplateId, params, outcomeName);
+
+        vm.mockCall(
+            address(reality),
+            abi.encodeWithSelector(IRealityETHCore.askQuestionWithMinBond.selector),
+            abi.encode(expectedQuestionId)
+        );
+        bytes32 questionId = mockRealityAdapter.askMetricQuestion(metricTemplateId, params, outcomeName);
+        assertEq(questionId, expectedQuestionId);
+
+        vm.mockCall(
+            address(reality),
+            abi.encodeWithSelector(IRealityETHCore.askQuestionWithMinBond.selector),
+            abi.encode(bytes32("changedFakeMetricQuestionId"))
+        );
+        vm.mockCall(
+            address(reality), abi.encodeWithSelector(IRealityETHCore.getTimeout.selector), abi.encode(uint256(1))
+        );
+        bytes32 questionIdAgain = mockRealityAdapter.askMetricQuestion(metricTemplateId, params, outcomeName);
+
+        assertEq(questionIdAgain, expectedQuestionId);
     }
 }
 

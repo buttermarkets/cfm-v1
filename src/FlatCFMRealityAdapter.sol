@@ -21,8 +21,7 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     /// @notice The minimum bond required to ask a question on RealityETH.
     uint256 public immutable minBond;
 
-    /// @notice Thrown if the question is stuck or otherwise unresolvable.
-    error QuestionStuck(address questionId);
+    error QuestionAlreadyAsked();
 
     /// @param _oracle The RealityETH oracle contract.
     /// @param _arbitrator The arbitrator address used for disputes.
@@ -77,12 +76,12 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     function isInvalid(bytes32 answer) public pure override returns (bool) {
         return (uint256(answer) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     }
-
     /// @dev Formats an array of outcome names into a JSON-like string for RealityETH.
     /// @param flatCFMQuestionParams The outcomes and other info.
     /// @return A formatted string for passing to RealityETH.
-    function _formatDecisionQuestionParams(FlatCFMQuestionParams calldata flatCFMQuestionParams)
-        private
+
+    function _formatDecisionQuestionParams(FlatCFMQuestionParams memory flatCFMQuestionParams)
+        internal
         pure
         returns (string memory)
     {
@@ -96,8 +95,26 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
     /// @dev Formats a single outcome name string for RealityETH.
     /// @param outcomeName The outcome name to be formatted.
     /// @return A formatted string for passing to RealityETH.
-    function _formatMetricQuestionParams(string memory outcomeName) private pure returns (string memory) {
+    function _formatMetricQuestionParams(string memory outcomeName) internal pure returns (string memory) {
         return string(abi.encodePacked(outcomeName));
+    }
+
+    /// @notice Computes the question ID in the same manner as RealityETH 3.0.
+    /// @param templateId The template ID.
+    /// @param openingTime The opening time of the question.
+    /// @param formattedQuestionParams The formatted question string.
+    /// @return The computed question ID.
+    function _computeQuestionId(uint256 templateId, uint32 openingTime, string memory formattedQuestionParams)
+        internal
+        view
+        returns (bytes32)
+    {
+        bytes32 contentHash = keccak256(abi.encodePacked(templateId, openingTime, formattedQuestionParams));
+        return keccak256(
+            abi.encodePacked(
+                contentHash, arbitrator, questionTimeout, minBond, address(oracle), address(this), uint256(0)
+            )
+        );
     }
 
     /// @notice Internal function that checks if a question was already asked,
@@ -110,16 +127,10 @@ contract FlatCFMRealityAdapter is FlatCFMOracleAdapter {
         private
         returns (bytes32)
     {
-        // See RealityETH reference for how question IDs are derived.
-        bytes32 contentHash = keccak256(abi.encodePacked(templateId, openingTime, formattedQuestionParams));
-        bytes32 questionId = keccak256(
-            abi.encodePacked(
-                contentHash, arbitrator, questionTimeout, minBond, address(oracle), address(this), uint256(0)
-            )
-        );
+        bytes32 questionId = _computeQuestionId(templateId, openingTime, formattedQuestionParams);
 
-        // If already asked, return existing questionId.
         if (oracle.getTimeout(questionId) != 0) {
+            if (msg.value > 0) revert QuestionAlreadyAsked();
             return questionId;
         }
 
