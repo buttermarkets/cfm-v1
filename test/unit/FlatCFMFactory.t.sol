@@ -281,8 +281,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             METADATA_URI
         );
 
-        // Check event "FlatCFMCreated(address,bytes32)"
-        bytes32 eventSignature = keccak256("FlatCFMCreated(address,bytes32)");
+        bytes32 eventSignature = keccak256("FlatCFMCreated(address,bytes32,address)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool found;
         bytes32 condId;
