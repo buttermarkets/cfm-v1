@@ -3,11 +3,11 @@ pragma solidity 0.8.20;
 
 import {Test, console, Vm} from "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
+import {RealityETH_v3_0} from "@realityeth/packages/contracts/flat/RealityETH-3.0.sol";
+import {Arbitrator} from "@realityeth/packages/contracts/flat/Arbitrator-development.sol";
 
 import "src/FlatCFMFactory.sol";
 import "src/FlatCFMRealityAdapter.sol";
-
-import "test/unit/dummy/RealityETH.sol";
 
 import "./vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
 import "./vendor/gnosis/1155-to-20/Wrapped1155Factory.sol";
@@ -22,10 +22,10 @@ contract CollateralToken is ERC20 {
 contract Base is Test {
     ConditionalTokens public conditionalTokens;
     Wrapped1155Factory public wrapped1155Factory;
-    DummyRealityETH public realityEth;
+    RealityETH_v3_0 public reality;
+    Arbitrator public arbitrator;
 
-    address USER = address(1);
-    address DUMMY_ARBITRATOR = address(0x42424242);
+    address USER = makeAddr("USER");
 
     uint256 public constant INITIAL_SUPPLY = 1000000 ether;
     uint256 public constant USER_SUPPLY = 5000 ether;
@@ -35,14 +35,16 @@ contract Base is Test {
 
     function setUp() public virtual {
         vm.label(USER, "User");
-        vm.label(DUMMY_ARBITRATOR, "Arbitrator");
 
         conditionalTokens = new ConditionalTokens();
         vm.label(address(conditionalTokens), "ConditionalTokens");
         wrapped1155Factory = new Wrapped1155Factory();
         vm.label(address(wrapped1155Factory), "Wrapped1155Factory");
-        realityEth = new DummyRealityETH();
-        vm.label(address(realityEth), "RealityETH");
+        reality = new RealityETH_v3_0();
+        vm.label(address(reality), "RealityETH");
+        arbitrator = new Arbitrator();
+        arbitrator.setRealitio(address(reality));
+        vm.label(address(arbitrator), "Arbitrator");
     }
 }
 
@@ -50,7 +52,7 @@ contract DependenciesTest is Base {
     function testDependenciesDeployments() public view {
         assertTrue(address(conditionalTokens) != address(0));
         assertTrue(address(wrapped1155Factory) != address(0));
-        assertTrue(address(realityEth) != address(0));
+        assertTrue(address(reality) != address(0));
     }
 }
 
@@ -61,7 +63,7 @@ contract DeployCoreContractsBase is Base {
     function setUp() public virtual override {
         super.setUp();
         oracleAdapter =
-            new FlatCFMRealityAdapter(IRealityETH(address(realityEth)), DUMMY_ARBITRATOR, QUESTION_TIMEOUT, MIN_BOND);
+            new FlatCFMRealityAdapter(IRealityETH(address(reality)), address(arbitrator), QUESTION_TIMEOUT, MIN_BOND);
         factory = new FlatCFMFactory(
             IConditionalTokens(address(conditionalTokens)), IWrapped1155Factory(address(wrapped1155Factory))
         );
@@ -82,11 +84,62 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
     CollateralToken public collateralToken;
+    uint256 decisionTemplateId;
+    uint256 metricTemplateId;
     FlatCFM cfm;
     ConditionalScalarMarket conditionalMarketA;
     ConditionalScalarMarket conditionalMarketB;
     ConditionalScalarMarket conditionalMarketC;
     bytes32 cfmConditionId;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        collateralToken = new CollateralToken(INITIAL_SUPPLY);
+        vm.label(address(collateralToken), "$COL");
+
+        collateralToken.transfer(USER, USER_SUPPLY);
+
+        string[] memory outcomes = new string[](3);
+        outcomes[0] = "Project A";
+        outcomes[1] = "Project B";
+        outcomes[2] = "Project C";
+
+        decisionQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomes, openingTime: uint32(block.timestamp + 2 days)});
+        genericScalarQuestionParams = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10000}),
+            openingTime: uint32(block.timestamp + 90 days)
+        });
+
+        decisionTemplateId = reality.createTemplate(
+            '{"title": "Which project will get funded?", "type": "uint", "category": "test", "lang": "en"}'
+        );
+        metricTemplateId = reality.createTemplate(
+            // solhint-disable-next-line
+            '{"title": "Between 2025-02-15 and 2025-06-15, what is the awesomeness in thousand USD, for %s on Coolchain?", "type": "uint", "category": "cfm-metric", "lang": "en"}'
+        );
+
+        vm.recordLogs();
+        cfm = factory.createFlatCFM(
+            oracleAdapter,
+            decisionTemplateId,
+            metricTemplateId,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            "ipfs://hello world"
+        );
+        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm);
+        }
+        _recordConditionIdAndScalarMarkets();
+
+        vm.label(address(cfm), "DecisionMarket");
+        vm.label(address(conditionalMarketA), "ConditionalMarketA");
+        vm.label(address(conditionalMarketB), "ConditionalMarketB");
+        vm.label(address(conditionalMarketC), "ConditionalMarketC");
+    }
 
     function _recordConditionIdAndScalarMarkets() internal {
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -94,7 +147,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         uint256 found = 0;
         for (uint256 i = 0; i < logs.length; i++) {
             if (
-                logs[i].topics[0] == keccak256("FlatCFMCreated(address,bytes32)")
+                logs[i].topics[0] == keccak256("FlatCFMCreated(address,bytes32,address)")
                     && address(uint160(uint256(logs[i].topics[1]))) == address(cfm)
             ) {
                 cfmConditionId = abi.decode(logs[i].data, (bytes32));
@@ -125,47 +178,6 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             partition[i] = 1 << i;
         }
         return partition;
-    }
-
-    function setUp() public virtual override {
-        super.setUp();
-
-        collateralToken = new CollateralToken(INITIAL_SUPPLY);
-        vm.label(address(collateralToken), "$COL");
-
-        collateralToken.transfer(USER, USER_SUPPLY);
-
-        string[] memory outcomes = new string[](3);
-        outcomes[0] = "Project A";
-        outcomes[1] = "Project B";
-        outcomes[2] = "Project C";
-
-        decisionQuestionParams =
-            FlatCFMQuestionParams({outcomeNames: outcomes, openingTime: uint32(block.timestamp + 2 days)});
-        genericScalarQuestionParams = GenericScalarQuestionParams({
-            scalarParams: ScalarParams({minValue: 0, maxValue: 10000}),
-            openingTime: uint32(block.timestamp + 90 days)
-        });
-
-        vm.recordLogs();
-        cfm = factory.createFlatCFM(
-            oracleAdapter,
-            1,
-            2,
-            decisionQuestionParams,
-            genericScalarQuestionParams,
-            collateralToken,
-            "ipfs://hello world"
-        );
-        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm);
-        }
-        _recordConditionIdAndScalarMarkets();
-
-        vm.label(address(cfm), "DecisionMarket");
-        vm.label(address(conditionalMarketA), "ConditionalMarketA");
-        vm.label(address(conditionalMarketB), "ConditionalMarketB");
-        vm.label(address(conditionalMarketC), "ConditionalMarketC");
     }
 }
 
@@ -322,6 +334,21 @@ contract SplitTestBase is SplitPositionTestBase {
         (,,,,,, wrappedShortB, wrappedLongB, wrappedInvalidB) = conditionalMarketB.wrappedCTData();
         (,,,,,, wrappedShortC, wrappedLongC, wrappedInvalidC) = conditionalMarketC.wrappedCTData();
     }
+
+    function _userBalanceOutcomeA() internal view returns (uint256) {
+        (,, bytes32 parentCollectionId,) = conditionalMarketA.ctParams();
+        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
+    }
+
+    function _userBalanceOutcomeB() internal view returns (uint256) {
+        (,, bytes32 parentCollectionId,) = conditionalMarketB.ctParams();
+        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
+    }
+
+    function _userBalanceOutcomeC() internal view returns (uint256) {
+        (,, bytes32 parentCollectionId,) = conditionalMarketC.ctParams();
+        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
+    }
 }
 
 contract SplitTest is SplitTestBase {
@@ -329,36 +356,21 @@ contract SplitTest is SplitTestBase {
         assertEq(wrappedShortA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(wrappedLongA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
         assertEq(wrappedInvalidA.balanceOf(USER), DECISION_SPLIT_AMOUNT);
-        assertEq(userBalanceOutcomeA(), DECISION_SPLIT_AMOUNT - METRIC_SPLIT_AMOUNT_A);
+        assertEq(_userBalanceOutcomeA(), DECISION_SPLIT_AMOUNT - METRIC_SPLIT_AMOUNT_A);
     }
 
     function testSplitPositionB() public view {
         assertEq(wrappedShortB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(wrappedLongB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
         assertEq(wrappedInvalidB.balanceOf(USER), DECISION_SPLIT_AMOUNT / 2);
-        assertEq(userBalanceOutcomeB(), DECISION_SPLIT_AMOUNT - METRIC_SPLIT_AMOUNT_B);
+        assertEq(_userBalanceOutcomeB(), DECISION_SPLIT_AMOUNT - METRIC_SPLIT_AMOUNT_B);
     }
 
     function testSplitPositionC() public view {
         assertEq(wrappedShortC.balanceOf(USER), 0);
         assertEq(wrappedLongC.balanceOf(USER), 0);
         assertEq(wrappedInvalidC.balanceOf(USER), 0);
-        assertEq(userBalanceOutcomeC(), DECISION_SPLIT_AMOUNT);
-    }
-
-    function userBalanceOutcomeA() private view returns (uint256) {
-        (,, bytes32 parentCollectionId,) = conditionalMarketA.ctParams();
-        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
-    }
-
-    function userBalanceOutcomeB() private view returns (uint256) {
-        (,, bytes32 parentCollectionId,) = conditionalMarketB.ctParams();
-        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
-    }
-
-    function userBalanceOutcomeC() private view returns (uint256) {
-        (,, bytes32 parentCollectionId,) = conditionalMarketC.ctParams();
-        return conditionalTokens.balanceOf(USER, conditionalTokens.getPositionId(collateralToken, parentCollectionId));
+        assertEq(_userBalanceOutcomeC(), DECISION_SPLIT_AMOUNT);
     }
 }
 
@@ -423,17 +435,17 @@ contract TradeTestBase is SplitTestBase, ERC1155Holder {
         vm.stopPrank();
     }
 
-    function marketBalanceA(bool short) internal view returns (uint256) {
+    function _marketBalanceA(bool short) internal view returns (uint256) {
         //(,,,,,, IERC20 _short, IERC20 _long,) = conditionalMarketA.wrappedCTData();
         return short ? wrappedShortA.balanceOf(address(ammA)) : wrappedLongA.balanceOf(address(ammA));
     }
 
-    function marketBalanceB(bool short) internal view returns (uint256) {
+    function _marketBalanceB(bool short) internal view returns (uint256) {
         //(,,,,,, IERC20 _short, IERC20 _long,) = conditionalMarketB.wrappedCTData();
         return short ? wrappedShortB.balanceOf(address(ammB)) : wrappedLongB.balanceOf(address(ammB));
     }
 
-    function marketBalanceC(bool short) internal view returns (uint256) {
+    function _marketBalanceC(bool short) internal view returns (uint256) {
         //(,,,,,, IERC20 _short, IERC20 _long,) = conditionalMarketC.wrappedCTData();
         return short ? wrappedShortC.balanceOf(address(ammC)) : wrappedLongC.balanceOf(address(ammC));
     }
@@ -444,8 +456,8 @@ contract TradeTest is TradeTestBase {
         //(,,,,,, IERC20 sA, IERC20 lA,) = conditionalMarketA.wrappedCTData();
         assertTrue(wrappedShortA.balanceOf(USER) < DECISION_SPLIT_AMOUNT);
         assertTrue(wrappedLongA.balanceOf(USER) > DECISION_SPLIT_AMOUNT);
-        assertTrue(marketBalanceA(true) > CONTRACT_LIQUIDITY);
-        assertTrue(marketBalanceA(false) < CONTRACT_LIQUIDITY);
+        assertTrue(_marketBalanceA(true) > CONTRACT_LIQUIDITY);
+        assertTrue(_marketBalanceA(false) < CONTRACT_LIQUIDITY);
     }
 
     function testTradeOutcomeB() public view {
@@ -459,8 +471,8 @@ contract TradeTest is TradeTestBase {
             wrappedLongB.balanceOf(USER) - (DECISION_SPLIT_AMOUNT / 2),
             wrappedLongA.balanceOf(USER) - DECISION_SPLIT_AMOUNT
         );
-        assertEq(marketBalanceA(true), marketBalanceB(true));
-        assertEq(marketBalanceA(false), marketBalanceB(false));
+        assertEq(_marketBalanceA(true), _marketBalanceB(true));
+        assertEq(_marketBalanceA(false), _marketBalanceB(false));
     }
 
     function testTradeOutcomeC() public view {
@@ -468,8 +480,8 @@ contract TradeTest is TradeTestBase {
         //(,,,,,, IERC20 sC, IERC20 lC,) = conditionalMarketC.wrappedCTData();
         assertTrue(wrappedShortC.balanceOf(USER) < wrappedShortB.balanceOf(USER));
         assertTrue(wrappedLongC.balanceOf(USER) > wrappedLongB.balanceOf(USER));
-        assertTrue(marketBalanceC(true) > marketBalanceB(true));
-        assertTrue(marketBalanceC(false) < marketBalanceB(false));
+        assertTrue(_marketBalanceC(true) > _marketBalanceB(true));
+        assertTrue(_marketBalanceC(false) < _marketBalanceB(false));
     }
 }
 
@@ -547,10 +559,438 @@ contract MergeTest is MergeTestBase {
     }
 }
 
-//contract ResolveDecisionTest is MergeTest {}
-//
-//contract TradeAfterDecisionTest is ResolveDecisionTest {}
-//
-//contract ResolveConditionalsTest is TradeAfterDecisionTest {}
-//
-//contract RedeemTest is ResolveConditionalsTest {}
+contract FormatAdapter is FlatCFMRealityAdapter {
+    constructor() FlatCFMRealityAdapter(IRealityETH(address(0)), address(0), 0, 0) {}
+
+    function formatDecisionQuestionParams(FlatCFMQuestionParams memory flatCFMQuestionParams)
+        external
+        pure
+        returns (string memory)
+    {
+        return _formatDecisionQuestionParams(flatCFMQuestionParams);
+    }
+
+    function formatMetricQuestionParams(string memory outcomeName) external pure returns (string memory) {
+        return _formatMetricQuestionParams(outcomeName);
+    }
+}
+
+contract BadAnswerSubmitDecisionAnswerTest is MergeTestBase {
+    address ANSWERER = makeAddr("answerer");
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.warp(decisionQuestionParams.openingTime + 1);
+        deal(ANSWERER, MIN_BOND);
+    }
+
+    function testCantResolveIfUnresolved() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(
+            cfm.questionId(), 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe, 0
+        );
+
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        vm.expectRevert("Question was settled too soon and has not been reopened");
+        cfm.resolve();
+    }
+
+    function testCantResolveIfUnresolvedReopened() public {
+        FormatAdapter formatAdapter = new FormatAdapter();
+
+        vm.startPrank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(
+            cfm.questionId(), 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe, 0
+        );
+
+        vm.warp(block.timestamp + QUESTION_TIMEOUT + 1);
+        bytes32 newQuestionId = reality.reopenQuestion(
+            decisionTemplateId,
+            formatAdapter.formatDecisionQuestionParams(decisionQuestionParams),
+            address(arbitrator),
+            QUESTION_TIMEOUT,
+            decisionQuestionParams.openingTime,
+            0,
+            MIN_BOND,
+            cfm.questionId()
+        );
+        deal(ANSWERER, MIN_BOND);
+        reality.submitAnswer{value: MIN_BOND}(
+            newQuestionId, 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe, 0
+        );
+
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + QUESTION_TIMEOUT + 1);
+        vm.expectRevert("Question replacement was settled too soon and has not been reopened");
+        cfm.resolve();
+    }
+
+    function testCanResolveIfInvalid() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(
+            cfm.questionId(), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, 0
+        );
+
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        cfm.resolve();
+
+        for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
+            assertEq(conditionalTokens.payoutNumerators(cfmConditionId, i), 0);
+        }
+        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, cfm.outcomeCount()), 1);
+    }
+
+    function testCanResolveIfLargerValue() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(cfm.questionId(), bytes32(uint256(1 << cfm.outcomeCount() + 1)), 0);
+
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        cfm.resolve();
+
+        for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
+            assertEq(conditionalTokens.payoutNumerators(cfmConditionId, i), 0);
+        }
+        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, cfm.outcomeCount()), 1);
+    }
+}
+
+contract GoodAnswerSubmitDecisionAnswerTestBase is MergeTestBase {
+    address ANSWERER = makeAddr("answerer");
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.warp(decisionQuestionParams.openingTime + 1);
+        deal(ANSWERER, MIN_BOND);
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(cfm.questionId(), /*0b101*/ bytes32(uint256(5)), 0);
+    }
+}
+
+contract GoodAnswerSubmitDecisionAnswerTest is GoodAnswerSubmitDecisionAnswerTestBase {
+    address CHALLENGER = makeAddr("challenger");
+
+    function testCantResolveBeforeTimeout() public {
+        vm.expectRevert("question must be finalized");
+        cfm.resolve();
+    }
+
+    function testCantResolveAfterTimeoutIfChallenged() public {
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT - 1);
+        deal(CHALLENGER, MIN_BOND);
+
+        vm.prank(CHALLENGER);
+        reality.submitAnswer{value: 2 * MIN_BOND}(cfm.questionId(), bytes32(uint256(1)), 0);
+
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        vm.expectRevert("question must be finalized");
+        cfm.resolve();
+    }
+
+    function testCanResolveAfterChallengeTimeout() public {
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT - 1);
+        deal(CHALLENGER, MIN_BOND);
+        vm.prank(CHALLENGER);
+        reality.submitAnswer{value: 2 * MIN_BOND}(cfm.questionId(), bytes32(uint256(3)), 0);
+
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT - 1 + QUESTION_TIMEOUT);
+        cfm.resolve();
+
+        for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
+            assertEq(conditionalTokens.payoutNumerators(cfmConditionId, i), (i == 0 || i == 1) ? 1 : 0);
+        }
+        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, cfm.outcomeCount()), 0);
+    }
+}
+
+contract GoodAnswerCfmResolveTestBase is GoodAnswerSubmitDecisionAnswerTestBase {
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.warp(decisionQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        cfm.resolve();
+    }
+}
+
+contract GoodAnswerCfmResolveTest is GoodAnswerCfmResolveTestBase {
+    function testReportedPayouts() public view {
+        for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
+            assertEq(conditionalTokens.payoutNumerators(cfmConditionId, i), (i == 0 || i == 2) ? 1 : 0);
+        }
+        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, cfm.outcomeCount()), 0);
+    }
+}
+
+contract DecisionOutcomeRedeemTestBase is GoodAnswerCfmResolveTestBase {
+    uint256 prevDeciRedeemBalanceA;
+    uint256 prevDeciRedeemBalanceB;
+    uint256 prevDeciRedeemBalanceC;
+    uint256 prevDeciRedeemBalanceCollat;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        prevDeciRedeemBalanceA = _userBalanceOutcomeA();
+        prevDeciRedeemBalanceB = _userBalanceOutcomeB();
+        prevDeciRedeemBalanceC = _userBalanceOutcomeC();
+        prevDeciRedeemBalanceCollat = collateralToken.balanceOf(USER);
+
+        vm.startPrank(USER);
+        conditionalTokens.redeemPositions(collateralToken, bytes32(0), cfmConditionId, _decisionDiscreetPartition());
+        vm.stopPrank();
+    }
+}
+
+contract DecisionOutcomeRedeemTest is DecisionOutcomeRedeemTestBase {
+    function testRedeemUpdatesCollateralBalanceWithWinners() public view {
+        uint256 expectedDeciRedeemCollatPayout = (prevDeciRedeemBalanceA + prevDeciRedeemBalanceC) / 2;
+        assertEq(collateralToken.balanceOf(USER), prevDeciRedeemBalanceCollat + expectedDeciRedeemCollatPayout);
+    }
+}
+
+contract BadAnswerSubmitMetricAsnwerTest is DecisionOutcomeRedeemTestBase {
+    bytes32 csmAQuestionId;
+    bytes32 csmAConditionId;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.warp(genericScalarQuestionParams.openingTime + 1);
+        deal(ANSWERER, MIN_BOND);
+
+        (csmAQuestionId, csmAConditionId,,) = conditionalMarketA.ctParams();
+    }
+
+    function testCantResolveIfUnresolved() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(
+            csmAQuestionId, 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe, 0
+        );
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        vm.expectRevert("Question was settled too soon and has not been reopened");
+        conditionalMarketA.resolve();
+    }
+
+    function testCanResolveIfInvalid() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(
+            csmAQuestionId, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, 0
+        );
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        conditionalMarketA.resolve();
+
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 1), 0);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 2), 1);
+    }
+
+    function testCanResolveIfTooHigh() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(
+            csmAQuestionId, bytes32(uint256(genericScalarQuestionParams.scalarParams.maxValue + 1)), 0
+        );
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        conditionalMarketA.resolve();
+
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 1), 1);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 2), 0);
+    }
+
+    function testCanResolveIfTooLow() public {
+        vm.prank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(csmAQuestionId, bytes32(uint256(0)), 0);
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        conditionalMarketA.resolve();
+
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 0), 1);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 1), 0);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 2), 0);
+    }
+}
+
+contract GoodAnswerSubmitMetricAnswerTestBase is DecisionOutcomeRedeemTestBase {
+    bytes32 csmAQuestionId;
+    bytes32 csmAConditionId;
+    bytes32 csmAParentCollectionid;
+    bytes32 csmBQuestionId;
+    bytes32 csmBConditionId;
+    bytes32 csmBParentCollectionid;
+    bytes32 csmCQuestionId;
+    bytes32 csmCConditionId;
+    bytes32 csmCParentCollectionid;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.warp(genericScalarQuestionParams.openingTime + 1);
+        deal(ANSWERER, MIN_BOND * 3);
+        (csmAQuestionId, csmAConditionId, csmAParentCollectionid,) = conditionalMarketA.ctParams();
+        (csmBQuestionId, csmBConditionId, csmBParentCollectionid,) = conditionalMarketB.ctParams();
+        (csmCQuestionId, csmCConditionId, csmCParentCollectionid,) = conditionalMarketC.ctParams();
+        vm.startPrank(ANSWERER);
+        reality.submitAnswer{value: MIN_BOND}(csmAQuestionId, bytes32(uint256(5000)), 0);
+        reality.submitAnswer{value: MIN_BOND}(csmBQuestionId, bytes32(uint256(2500)), 0);
+        reality.submitAnswer{value: MIN_BOND}(csmCQuestionId, bytes32(uint256(10000)), 0);
+        vm.stopPrank();
+    }
+}
+
+contract GoodAnswerSubmitMetricAnswerTest is GoodAnswerSubmitMetricAnswerTestBase {
+    address CHALLENGER = makeAddr("challenger");
+
+    function testCantResolveBeforeTimeout() public {
+        vm.expectRevert("question must be finalized");
+        conditionalMarketA.resolve();
+    }
+
+    function testCantResolveAfterTimeoutIfChallenged() public {
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT - 1);
+        deal(CHALLENGER, MIN_BOND * 2);
+
+        vm.prank(CHALLENGER);
+        reality.submitAnswer{value: 2 * MIN_BOND}(csmAQuestionId, bytes32(uint256(1)), 0);
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        vm.expectRevert("question must be finalized");
+        conditionalMarketA.resolve();
+    }
+
+    function testCanResolveAfterChallengeTimeout() public {
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT - 1);
+        deal(CHALLENGER, MIN_BOND * 2);
+        vm.prank(CHALLENGER);
+        reality.submitAnswer{value: 2 * MIN_BOND}(csmAQuestionId, bytes32(uint256(0)), 0);
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT - 1 + QUESTION_TIMEOUT);
+        conditionalMarketA.resolve();
+
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 0), 1);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 1), 0);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 2), 0);
+    }
+}
+
+contract GoodAnswerCsmResolveTestBase is GoodAnswerSubmitMetricAnswerTestBase {
+    function setUp() public virtual override {
+        super.setUp();
+
+        vm.warp(genericScalarQuestionParams.openingTime + QUESTION_TIMEOUT + 1);
+        conditionalMarketA.resolve();
+        conditionalMarketB.resolve();
+        conditionalMarketC.resolve();
+    }
+}
+
+contract GoodAnswerCsmResolveTest is GoodAnswerCsmResolveTestBase {
+    function testReportedPayoutsA() public view {
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 0), 5000);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 1), 5000);
+        assertEq(conditionalTokens.payoutNumerators(csmAConditionId, 2), 0);
+    }
+
+    function testReportedPayoutsB() public view {
+        assertEq(conditionalTokens.payoutNumerators(csmBConditionId, 0), 7500);
+        assertEq(conditionalTokens.payoutNumerators(csmBConditionId, 1), 2500);
+        assertEq(conditionalTokens.payoutNumerators(csmBConditionId, 2), 0);
+    }
+
+    function testReportedPayoutsC() public view {
+        assertEq(conditionalTokens.payoutNumerators(csmCConditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(csmCConditionId, 1), 1);
+        assertEq(conditionalTokens.payoutNumerators(csmCConditionId, 2), 0);
+    }
+}
+
+contract CsmRedeemTestBase is GoodAnswerCsmResolveTestBase {
+    uint256 prevCondRedeemBalanceA;
+    uint256 prevCondRedeemBalanceAShort;
+    uint256 prevCondRedeemBalanceALong;
+    uint256 prevCondRedeemBalanceAInvalid;
+    uint256 prevCondRedeemBalanceB;
+    uint256 prevCondRedeemBalanceBShort;
+    uint256 prevCondRedeemBalanceBLong;
+    uint256 prevCondRedeemBalanceBInvalid;
+    uint256 prevCondRedeemBalanceC;
+    uint256 prevCondRedeemBalanceCShort;
+    uint256 prevCondRedeemBalanceCLong;
+    uint256 prevCondRedeemBalanceCInvalid;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        prevCondRedeemBalanceA = _userBalanceOutcomeA();
+        prevCondRedeemBalanceAShort = wrappedShortA.balanceOf(USER);
+        prevCondRedeemBalanceALong = wrappedLongA.balanceOf(USER);
+        prevCondRedeemBalanceAInvalid = wrappedInvalidA.balanceOf(USER);
+        prevCondRedeemBalanceB = _userBalanceOutcomeB();
+        prevCondRedeemBalanceBShort = wrappedShortB.balanceOf(USER);
+        prevCondRedeemBalanceBLong = wrappedLongB.balanceOf(USER);
+        prevCondRedeemBalanceBInvalid = wrappedInvalidB.balanceOf(USER);
+        prevCondRedeemBalanceC = _userBalanceOutcomeC();
+        prevCondRedeemBalanceCShort = wrappedShortC.balanceOf(USER);
+        prevCondRedeemBalanceCLong = wrappedLongC.balanceOf(USER);
+        prevCondRedeemBalanceCInvalid = wrappedInvalidC.balanceOf(USER);
+
+        vm.startPrank(USER);
+        wrappedShortA.approve(address(conditionalMarketA), prevCondRedeemBalanceAShort);
+        wrappedLongA.approve(address(conditionalMarketA), prevCondRedeemBalanceALong);
+        wrappedInvalidA.approve(address(conditionalMarketA), prevCondRedeemBalanceAInvalid);
+        wrappedShortB.approve(address(conditionalMarketB), prevCondRedeemBalanceBShort);
+        wrappedLongB.approve(address(conditionalMarketB), prevCondRedeemBalanceBLong);
+        wrappedInvalidB.approve(address(conditionalMarketB), prevCondRedeemBalanceBInvalid);
+        wrappedShortC.approve(address(conditionalMarketC), prevCondRedeemBalanceCShort);
+        wrappedLongC.approve(address(conditionalMarketC), prevCondRedeemBalanceCLong);
+        wrappedInvalidC.approve(address(conditionalMarketC), prevCondRedeemBalanceCInvalid);
+        conditionalMarketA.redeem(
+            prevCondRedeemBalanceAShort, prevCondRedeemBalanceALong, prevCondRedeemBalanceAInvalid
+        );
+        conditionalMarketB.redeem(
+            prevCondRedeemBalanceBShort, prevCondRedeemBalanceBLong, prevCondRedeemBalanceBInvalid
+        );
+        conditionalMarketC.redeem(
+            prevCondRedeemBalanceCShort, prevCondRedeemBalanceCLong, prevCondRedeemBalanceCInvalid
+        );
+        vm.stopPrank();
+    }
+}
+
+contract CsmRedeemTest is CsmRedeemTestBase {
+    function testRedeemUpdatesOutcomeABalance() public view {
+        assertEq(_userBalanceOutcomeA(), prevCondRedeemBalanceAShort / 2 + prevCondRedeemBalanceALong / 2);
+    }
+
+    function testRedeemUpdatesOutcomeBBalance() public view {
+        assertEq(_userBalanceOutcomeB(), prevCondRedeemBalanceBShort * 3 / 4 + prevCondRedeemBalanceBLong / 4);
+    }
+
+    function testRedeemUpdatesOutcomeCBalance() public view {
+        assertEq(_userBalanceOutcomeC(), prevCondRedeemBalanceCLong);
+    }
+}
+
+contract RedeemBackToCollateralTest is CsmRedeemTestBase {
+    uint256 prevFinalRedeemCollateralBalance;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        prevFinalRedeemCollateralBalance = collateralToken.balanceOf(USER);
+
+        vm.startPrank(USER);
+        conditionalTokens.redeemPositions(collateralToken, bytes32(0), cfmConditionId, _decisionDiscreetPartition());
+        vm.stopPrank();
+    }
+
+    function testCollateral() public view {
+        uint256 expectedPayout =
+            (prevCondRedeemBalanceAShort / 2 + prevCondRedeemBalanceALong / 2) / 2 + prevCondRedeemBalanceCLong / 2;
+        assertEq(collateralToken.balanceOf(USER), prevFinalRedeemCollateralBalance + expectedPayout);
+    }
+}
