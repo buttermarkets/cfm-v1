@@ -42,6 +42,7 @@ contract String31Test is Test {
         assertEq(len, 31);
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
     function testTooLongReverts() public {
         // 32 characters
         string memory input = "12345678901234567890123456789012";
