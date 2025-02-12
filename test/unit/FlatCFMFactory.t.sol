@@ -255,8 +255,6 @@ contract CreateMarketTestBase is Base {
     }
 }
 
-// TODO test against a mocked version of FlatCFM and DecisionScalarMarket that
-// records the initialize call args.
 contract CreateMarketTest is CreateMarketTestBase {
     using String31 for string;
 

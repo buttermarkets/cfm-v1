@@ -954,8 +954,9 @@ contract CsmRedeemTestBase is GoodAnswerCsmResolveTestBase {
         conditionalMarketB.redeem(
             prevCondRedeemBalanceBShort, prevCondRedeemBalanceBLong, prevCondRedeemBalanceBInvalid
         );
+        // Redeem half.
         conditionalMarketC.redeem(
-            prevCondRedeemBalanceCShort, prevCondRedeemBalanceCLong, prevCondRedeemBalanceCInvalid
+            prevCondRedeemBalanceCShort / 2, prevCondRedeemBalanceCLong / 2, prevCondRedeemBalanceCInvalid / 2
         );
         vm.stopPrank();
     }
@@ -971,7 +972,8 @@ contract CsmRedeemTest is CsmRedeemTestBase {
     }
 
     function testRedeemUpdatesOutcomeCBalance() public view {
-        assertEq(_userBalanceOutcomeC(), prevCondRedeemBalanceCLong);
+        assertEq(_userBalanceOutcomeC(), prevCondRedeemBalanceCLong / 2);
+        assertEq(wrappedLongC.balanceOf(USER), prevCondRedeemBalanceCLong / 2);
     }
 }
 
@@ -990,7 +992,7 @@ contract RedeemBackToCollateralTest is CsmRedeemTestBase {
 
     function testCollateral() public view {
         uint256 expectedPayout =
-            (prevCondRedeemBalanceAShort / 2 + prevCondRedeemBalanceALong / 2) / 2 + prevCondRedeemBalanceCLong / 2;
+            (prevCondRedeemBalanceAShort / 2 + prevCondRedeemBalanceALong / 2) / 2 + prevCondRedeemBalanceCLong / 4;
         assertEq(collateralToken.balanceOf(USER), prevFinalRedeemCollateralBalance + expectedPayout);
     }
 }

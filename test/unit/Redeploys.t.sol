@@ -127,8 +127,7 @@ contract CreateDifferentMarketsTest is CreateMarketTestBase {
     }
 }
 
-// TODO add integrated test for the repeat case.
-// TODO this should rather be split in an interface test between FlatCFMFactory
+// This should rather be split in an interface test between FlatCFMFactory
 // and FlatCFMRealityAdapter then a unit test in FlatCFMRealityAdapter.
 contract CreateSameMarketsTest is CreateMarketTestBase {
     string decisionRealityQuestion;
@@ -302,7 +301,3 @@ contract CreateSameMarketsTest is CreateMarketTestBase {
         assertEq(qid1, qid2);
     }
 }
-
-// TODO test create another Factory and adapter then create with same params still works: same question
-// TODO test create another Factory and adapter then create with same params still works: different condition
-// TODO test create another Factory and same adapter then create with same params still works: same condition

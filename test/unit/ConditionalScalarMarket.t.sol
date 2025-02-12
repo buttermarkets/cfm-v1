@@ -365,7 +365,6 @@ contract MergeRevertingERC20TransfersTest is Base {
     }
 }
 
-// TODO integration tests with ConditionalTokens with different amounts
 contract RedeemBase is Base {
     function setUp() public override {
         super.setUp();
