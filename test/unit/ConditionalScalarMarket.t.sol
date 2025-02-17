@@ -13,11 +13,6 @@ import {DummyWrapped1155Factory} from "./dummy/Wrapped1155Factory.sol";
 import {DummyFlatCFMOracleAdapter} from "./dummy/FlatCFMOracleAdapter.sol";
 import {DummyERC20} from "./dummy/ERC20.sol";
 
-// TODO Integration tests for split/m/r in all different state cases: DecisionResolved? x
-// ConditionalResolved?
-// TODO Integration test: user 1 splits, resolve at Invalid case, user 2 redeems,
-// user 1 should still be able to redeem what was splitted.
-
 contract Base is Test {
     FlatCFMOracleAdapter oracleAdapter;
     IConditionalTokens conditionalTokens;
