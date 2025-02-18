@@ -124,33 +124,34 @@ The mechanism implemented here is a simplified version of
 
 ## architecture
 
-`FlatCFM` represents the condition of funding. It is a market but it won't
-be traded. It creates a `ConditionalScalarMarket` for each outcome it has (apart
-from the special "Invalid" outcome, see below). It prepares an oracle question
-and condition (as in `ConditionalTokens`) during construction. 
+The main contract, `FlatCFM` represents a CFM with a flat outcomes structure:
+each outcome represents the condition that a project gets funded. These outcomes
+are also called _decision outcomes_.
 
-`ConditionalScalarMarket` represents the scalar market which is on the condition
-of parent `FlatCFM`. This will be traded. It prepares an oracle question
-and condition (as in `ConditionalTokens`) during construction. 
+`ConditionalScalarMarket` represents the scalar prediction market which is
+conditional on the parent outcome being selected. It contains outcomes `Short`
+(also called DOWN), `Long` (also called UP) and `Invalid`.
+
+The `FlatCFMFactory` contract enables the creation of a `FlatCFM` and its
+related `ConditionalScalarMarket`. For a given CFM, it helps creating the
+unique `FlatCFM` instance, one `ConditionalScalarMarket` instance per decision
+outcome (not counting for the Invalid outcome), asks the associated oracle
+questions and prepares the associated conditional tokens.
 
 `FlatCFMRealityAdapter` implements an adapter pattern to access RealityETH from our
-contracts, with a normalized interface (we want to later enable oracle
-agnosticity).
-
-`Types` defines basic data types for CFM decision questions, scalar
-questions and nested conditional tokens.
+contracts, with a normalized interface.
 
 The system follows these general steps:
 
-1. `FlatCFMFactory` creates a new `FlatCFM` with specified
-   parameters. And this automatically creates `ConditionalScalarMarket`s for
-   each outcome.
-1. The `FlatCFM` prepares their condition through `ConditionalTokens` and
-   submits and oracle question via `FlatCFMRealityAdapter`.
-1. Each `ConditionalScalarMarket` prepares their condition through
-   `ConditionalTokens` and submits an oracle question via `FlatCFMRealityAdapter`.
-   Within a given `FlatCFM`, each of these will have similar questions
-   implemented by a common Reality template with a varying project name.
+1. The `FlatCFMFactory` creates a new `FlatCFM` with specified parameters. This
+   enables creation of `ConditionalScalarMarket`s for each outcome. This submits
+   the decision question to the oracle via `FlatCFMRealityAdapter` and prepares the
+   decision condition through `ConditionalTokens`.
+1. The `FlatCFMFactory` creates new `ConditionalScalarMarket`s for an existing
+   `FlatCFM`. This submits the scalar question to the oracle via
+   `FlatCFMRealityAdapter` and prepares the scalar conditions through
+   `ConditionalTokens`. This relies on a Reality template with a placeholder for
+   the decision outcome name.
 1. Users split their collateral into decision outcome tokens, then split again
    into scalar outcome tokens. These tokens are ERC20s and can be traded on
    AMMs.
