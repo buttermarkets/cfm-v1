@@ -20,26 +20,18 @@ FOUNDRY_PROFILE=ftest forge test
 ## deploy an oracle adapter
 
 ```sh
-export QUESTION_TIMEOUT=3600
-export MIN_BOND=100000000000000
-forge script script/DeployFlatCFMRealityAdapter.s.sol \
-    --rpc-url $RPC_URL \
-    --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+QUESTION_TIMEOUT=3600 \
+MIN_BOND=100000000000000 \
+forge script script/DeployFlatCFMRealityAdapter.s.sol …
 ```
 
 ## deploy a factory
 
 ```sh
-export ORACLE_ADAPTER=0x1234...
-export CONDITIONAL_TOKENS=0xabcd...
-export WRAPPED1155_FACTORY=0x9999...
-forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory \
-    --rpc-url $RPC_URL \
-    --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+ORACLE_ADAPTER=0x1234... \
+CONDITIONAL_TOKENS=0xabcd... \
+WRAPPED1155_FACTORY=0x9999... \
+forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory …
 ```
 
 ## deploy a Reality template
@@ -47,24 +39,16 @@ forge script script/DeployFlatCFMFactory.s.sol:DeployFlatCFMFactory \
 Exemple decision template:
 
 ```sh
-export TEMPLATE_CONTENT='{"title": "Which project got funded during CFM round #23?", "type": "multiple-select", "outcomes": [%s], "category": "cfm-decision", "lang": "en"}'
-forge script script/CreateRealityTemplate.s.sol \
-    --rpc-url "https://unichain-sepolia.infura.io/v3/$INFURA_PROJECT_ID" \
-    --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+TEMPLATE_CONTENT='{"title": "Which project got funded during CFM round #23?", "type": "multiple-select", "outcomes": [%s], "category": "cfm-decision", "lang": "en"}' \
+forge script script/CreateRealityTemplate.s.sol …
 ```
 
 
 Example metric template:
 
 ```sh
-export TEMPLATE_CONTENT='{"title": "Between the first block of 2025-01-01 and the last block of 2025-06-30, what is the average TVL in million USD, calculated at each block, for %s on BrandNewChain?", "type": "uint", "category": "cfm-metric", "lang": "en"}'
-forge script script/CreateRealityTemplate.s.sol \
-    --rpc-url "https://unichain-sepolia.infura.io/v3/$INFURA_PROJECT_ID" \
-    --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+TEMPLATE_CONTENT='{"title": "Between the first block of 2025-01-01 and the last block of 2025-06-30, what is the average TVL in million USD, calculated at each block, for %s on BrandNewChain?", "type": "uint", "category": "cfm-metric", "lang": "en"}' \
+forge script script/CreateRealityTemplate.s.sol …
 ```
 
 ## deploy a new Flat CFM
