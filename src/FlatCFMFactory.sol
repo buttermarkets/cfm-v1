@@ -10,11 +10,13 @@ import "./libs/String31.sol";
 import "./FlatCFMOracleAdapter.sol";
 import "./FlatCFM.sol";
 import "./ConditionalScalarMarket.sol";
+import "./InvalidlessConditionalScalarMarket.sol";
 import {
     FlatCFMQuestionParams,
     GenericScalarQuestionParams,
     ScalarParams,
     WrappedConditionalTokensData,
+    InvalidlessWrappedConditionalTokensData,
     ConditionalScalarCTParams
 } from "./Types.sol";
 
@@ -53,6 +55,9 @@ contract FlatCFMFactory {
     /// @notice Implementation for cloned ConditionalScalarMarket logic.
     address public immutable conditionalScalarMarketImplementation;
 
+    /// @notice Implementation for cloned InvalidlessConditionalScalarMarket logic.
+    address public immutable invalidlessConditionalScalarMarketImplementation;
+
     /// @dev Tracks which outcome index is to be deployed next for each FlatCFM.
     mapping(FlatCFM => uint256) public nextOutcomeToDeploy;
 
@@ -78,6 +83,15 @@ contract FlatCFMFactory {
         address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
     );
 
+    /// @notice Emitted when a new InvalidlessConditionalScalarMarket is created for a specific
+    ///         outcome of a FlatCFM.
+    /// @param decisionMarket The associated FlatCFM.
+    /// @param conditionalMarket The newly deployed InvalidlessConditionalScalarMarket.
+    /// @param outcomeIndex Which outcome index this market corresponds to.
+    event InvalidlessConditionalScalarMarketCreated(
+        address indexed decisionMarket, address indexed conditionalMarket, uint256 outcomeIndex
+    );
+
     /// @param _conditionalTokens Gnosis Conditional Tokens contract.
     /// @param _wrapped1155Factory Factory for ERC20-wrapped positions.
     constructor(IConditionalTokens _conditionalTokens, IWrapped1155Factory _wrapped1155Factory) {
@@ -85,6 +99,7 @@ contract FlatCFMFactory {
         wrapped1155Factory = _wrapped1155Factory;
         flatCfmImplementation = address(new FlatCFM());
         conditionalScalarMarketImplementation = address(new ConditionalScalarMarket());
+        invalidlessConditionalScalarMarketImplementation = address(new InvalidlessConditionalScalarMarket());
     }
 
     /// @notice Creates a new FlatCFM (decision market).
@@ -212,6 +227,78 @@ contract FlatCFMFactory {
         emit ConditionalScalarMarketCreated(address(cfm), address(csm), outcomeIndex);
     }
 
+    /// @notice Creates an InvalidlessConditionalScalarMarket for the next outcome in the given FlatCFM.
+    /// @dev Similar to createConditionalScalarMarket but creates a market without an invalid outcome.
+    /// @param cfm The FlatCFM for which to deploy the next scalar market.
+    /// @param defaultInvalidPayouts Default payouts to use if the answer is invalid [short, long].
+    /// @return icsm The newly deployed InvalidlessConditionalScalarMarket.
+    function createInvalidlessConditionalScalarMarket(FlatCFM cfm, uint256[2] calldata defaultInvalidPayouts)
+        external
+        payable
+        returns (InvalidlessConditionalScalarMarket icsm)
+    {
+        if (paramsToDeploy[cfm].outcomeNames.length == 0) revert NoConditionalScalarMarketToDeploy();
+
+        uint256 outcomeIndex = nextOutcomeToDeploy[cfm];
+        FlatCFMOracleAdapter oracleAdapter = cfm.oracleAdapter();
+        DeploymentParams memory params = paramsToDeploy[cfm];
+
+        icsm = InvalidlessConditionalScalarMarket(invalidlessConditionalScalarMarketImplementation.clone());
+
+        InvalidlessWrappedConditionalTokensData memory wrappedCTData;
+        ConditionalScalarCTParams memory conditionalScalarCTParams;
+
+        if (outcomeIndex == cfm.outcomeCount() - 1) {
+            // Once the final outcome is deployed, clean up storage for this FlatCFM.
+            delete nextOutcomeToDeploy[cfm];
+            delete paramsToDeploy[cfm];
+        } else {
+            nextOutcomeToDeploy[cfm]++;
+        }
+
+        {
+            string memory outcomeName = params.outcomeNames[outcomeIndex];
+            bytes32 csmQuestionId = oracleAdapter.askMetricQuestion{value: msg.value}(
+                params.metricTemplateId, params.genericScalarQuestionParams, outcomeName
+            );
+
+            // 2 outcomes: Short, Long (no Invalid)
+            bytes32 csmConditionId = conditionalTokens.getConditionId(address(icsm), csmQuestionId, 2);
+            if (conditionalTokens.getOutcomeSlotCount(csmConditionId) == 0) {
+                conditionalTokens.prepareCondition(address(icsm), csmQuestionId, 2);
+            }
+
+            bytes32 decisionCollectionId =
+                conditionalTokens.getCollectionId(0, params.decisionConditionId, 1 << outcomeIndex);
+
+            wrappedCTData = _deployInvalidlessWrappedConditionalTokens(
+                outcomeName, params.collateralToken, decisionCollectionId, csmConditionId
+            );
+
+            conditionalScalarCTParams = ConditionalScalarCTParams({
+                questionId: csmQuestionId,
+                conditionId: csmConditionId,
+                parentCollectionId: decisionCollectionId,
+                collateralToken: params.collateralToken
+            });
+        }
+
+        icsm.initialize(
+            oracleAdapter,
+            conditionalTokens,
+            wrapped1155Factory,
+            conditionalScalarCTParams,
+            ScalarParams({
+                minValue: params.genericScalarQuestionParams.scalarParams.minValue,
+                maxValue: params.genericScalarQuestionParams.scalarParams.maxValue
+            }),
+            wrappedCTData,
+            defaultInvalidPayouts
+        );
+
+        emit InvalidlessConditionalScalarMarketCreated(address(cfm), address(icsm), outcomeIndex);
+    }
+
     /// @dev Internal helper to deploy three wrapped ERC1155 tokens (Short, Long, Invalid)
     ///      for the nested condition, returning their data.
     function _deployWrappedConditionalTokens(
@@ -254,6 +341,41 @@ contract FlatCFMFactory {
             wrappedShort: wrappedShort,
             wrappedLong: wrappedLong,
             wrappedInvalid: wrappedInvalid
+        });
+    }
+
+    /// @dev Internal helper to deploy two wrapped ERC1155 tokens (Short, Long)
+    ///      for the nested condition, returning their data.
+    function _deployInvalidlessWrappedConditionalTokens(
+        string memory outcomeName,
+        IERC20 collateralToken,
+        bytes32 decisionCollectionId,
+        bytes32 csmConditionId
+    ) private returns (InvalidlessWrappedConditionalTokensData memory) {
+        bytes memory shortData = abi.encodePacked(
+            string.concat(outcomeName, "-Short").toString31(), string.concat(outcomeName, "-ST").toString31(), uint8(18)
+        );
+        bytes memory longData = abi.encodePacked(
+            string.concat(outcomeName, "-Long").toString31(), string.concat(outcomeName, "-LG").toString31(), uint8(18)
+        );
+
+        uint256 shortPosId = conditionalTokens.getPositionId(
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 1)
+        );
+        uint256 longPosId = conditionalTokens.getPositionId(
+            collateralToken, conditionalTokens.getCollectionId(decisionCollectionId, csmConditionId, 2)
+        );
+
+        IERC20 wrappedShort = wrapped1155Factory.requireWrapped1155(conditionalTokens, shortPosId, shortData);
+        IERC20 wrappedLong = wrapped1155Factory.requireWrapped1155(conditionalTokens, longPosId, longData);
+
+        return InvalidlessWrappedConditionalTokensData({
+            shortData: shortData,
+            longData: longData,
+            shortPositionId: shortPosId,
+            longPositionId: longPosId,
+            wrappedShort: wrappedShort,
+            wrappedLong: wrappedLong
         });
     }
 }
