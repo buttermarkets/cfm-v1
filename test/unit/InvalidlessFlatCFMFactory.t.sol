@@ -21,7 +21,7 @@ import {DummyRealityETH} from "./dummy/RealityETH.sol";
 
 contract TestERC20 is ERC20 {
     constructor() ERC20("Test Token", "TEST") {
-        _mint(msg.sender, 1000000e18);
+        _mint(msg.sender, 1_000_000e18);
     }
 }
 
@@ -35,7 +35,7 @@ contract Base is Test {
     IERC20 public collateralToken;
 
     uint32 constant QUESTION_TIMEOUT = 1000;
-    uint256 constant MIN_BOND = 1000000000000;
+    uint256 constant MIN_BOND = 1_000_000_000_000;
 
     function setUp() public virtual {
         conditionalTokens = new DummyConditionalTokens();
@@ -94,7 +94,12 @@ contract CreateBadMarketTest is Base {
         );
     }
 
-    function testTooManyOutcomes(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
+    function testTooManyOutcomes(
+        uint32 openingTime,
+        uint256 minValue,
+        uint256 maxValue,
+        uint32 scalarOpeningTime
+    )
         public
     {
         // exceed factory.MAX_OUTCOME_COUNT()
@@ -120,7 +125,12 @@ contract CreateBadMarketTest is Base {
         );
     }
 
-    function testTooLargeOutcomeName(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
+    function testTooLargeOutcomeName(
+        uint32 openingTime,
+        uint256 minValue,
+        uint256 maxValue,
+        uint32 scalarOpeningTime
+    )
         public
     {
         // single outcome name exceeds length
@@ -155,7 +165,9 @@ contract CreateBadMarketTest is Base {
         uint256 minValue,
         uint256 maxValue,
         uint32 scalarOpeningTime
-    ) public {
+    )
+        public
+    {
         string[] memory outcomeNames = new string[](2);
         outcomeNames[0] = "1";
         outcomeNames[1] = "2";
@@ -195,14 +207,14 @@ contract CreateMarketTestBase is Base {
     string[] outcomeNames;
     uint256 constant DECISION_TEMPLATE_ID = 42;
     uint256 constant METRIC_TEMPLATE_ID = 442;
-    uint32 constant DECISION_OPENING_TIME = 1739577600; // 2025-02-15
+    uint32 constant DECISION_OPENING_TIME = 1_739_577_600; // 2025-02-15
     string constant ROUND_NAME = "round";
     string constant METRIC_NAME = "metric";
     string constant START_DATE = "2025-02-16";
     string constant END_DATE = "2025-06-16";
     uint256 constant MIN_VALUE = 0;
-    uint256 constant MAX_VALUE = 1000000;
-    uint32 constant METRIC_OPENING_TIME = 1750118400; // 2025-06-17
+    uint256 constant MAX_VALUE = 1_000_000;
+    uint32 constant METRIC_OPENING_TIME = 1_750_118_400; // 2025-06-17
     string METADATA_URI = "ipfs://sfpi";
 
     bytes32 constant DECISION_QID = bytes32("decision question id");
@@ -837,5 +849,94 @@ contract AskQuestionRevertsTest is Base {
 
         vm.expectRevert(bytes("TEST_ERR"));
         factory.createConditionalScalarMarket{value: 1 ether}(cfm, [uint256(1), uint256(3)]);
+    }
+}
+
+contract InvalidlessParamsTest is CreateMarketTestBase {
+    function testDefaultInvalidPayoutsArePassedToCSM() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        uint256[2] memory defaultPayouts = [uint256(42), uint256(58)];
+
+        vm.recordLogs();
+        factory.createConditionalScalarMarket(cfm, defaultPayouts);
+
+        InvalidlessConditionalScalarMarket icsm = _getFirstConditionalScalarMarket();
+        assertEq(icsm.defaultInvalidPayouts(0), 42, "Short default payout mismatch");
+        assertEq(icsm.defaultInvalidPayouts(1), 58, "Long default payout mismatch");
+    }
+}
+
+contract DeploymentParamsTest is CreateMarketTestBase {
+    function testDeploymentParamsCleanupAfterLastMarket() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        // Deploy all markets
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+        }
+
+        // Verify params are cleaned up
+        (IERC20 collateralToken, uint256 metricTemplateId,, bytes32 decisionConditionId) = factory.paramsToDeploy(cfm);
+
+        assertEq(address(collateralToken), address(0), "Collateral not cleaned up");
+        assertEq(metricTemplateId, 0, "Template ID not cleaned up");
+        assertEq(decisionConditionId, bytes32(0), "Condition ID not cleaned up");
+
+        assertEq(factory.nextOutcomeToDeploy(cfm), 0, "Next outcome index not cleaned up");
+    }
+
+    function testRevertWhenDeployingMoreMarketsThanOutcomes() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        // Deploy all markets
+        for (uint256 i = 0; i < outcomeNames.length; i++) {
+            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+        }
+
+        // Try to deploy one more
+        vm.expectRevert(InvalidlessFlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
+        factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+    }
+
+    function testNextOutcomeToDeployIncrementsCorrectly() public {
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter,
+            DECISION_TEMPLATE_ID,
+            METRIC_TEMPLATE_ID,
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            collateralToken,
+            METADATA_URI
+        );
+
+        for (uint256 i = 0; i < outcomeNames.length - 1; i++) {
+            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            assertEq(factory.nextOutcomeToDeploy(cfm), i + 1, "Next outcome index incorrect");
+        }
     }
 }
