@@ -28,10 +28,10 @@ contract Base is Test {
 
     address USER = makeAddr("USER");
 
-    uint256 public constant INITIAL_SUPPLY = 1000000 ether;
+    uint256 public constant INITIAL_SUPPLY = 1_000_000 ether;
     uint256 public constant USER_SUPPLY = 5000 ether;
     uint256 public constant INITIAL_LIQUIDITY = 1000 ether;
-    uint32 public constant QUESTION_TIMEOUT = 86400;
+    uint32 public constant QUESTION_TIMEOUT = 86_400;
     uint256 public constant MIN_BOND = 100;
 
     function setUp() public virtual {
@@ -100,7 +100,6 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
     InvalidlessConditionalScalarMarket conditionalMarketC;
     bytes32 cfmConditionId;
 
-    // Default invalid payouts for testing
     uint256[2] defaultInvalidPayouts = [uint256(1), uint256(3)];
 
     function setUp() public virtual override {
@@ -119,7 +118,7 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
         decisionQuestionParams =
             FlatCFMQuestionParams({outcomeNames: outcomes, openingTime: uint32(block.timestamp + 2 days)});
         genericScalarQuestionParams = GenericScalarQuestionParams({
-            scalarParams: ScalarParams({minValue: 0, maxValue: 10000}),
+            scalarParams: ScalarParams({minValue: 0, maxValue: 10_000}),
             openingTime: uint32(block.timestamp + 90 days)
         });
 
@@ -877,8 +876,7 @@ contract GoodAnswerSubmitDecisionAnswerTest is GoodAnswerSubmitDecisionAnswerTes
         for (uint256 i = 0; i < cfm.outcomeCount(); i++) {
             assertEq(conditionalTokens.payoutNumerators(cfmConditionId, i), (i == 0 || i == 1) ? 1 : 0);
         }
-        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, 0), conditionalMarketA.defaultInvalidPayouts(0));
-        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, 1), conditionalMarketA.defaultInvalidPayouts(1));
+        assertEq(conditionalTokens.payoutNumerators(cfmConditionId, cfm.outcomeCount()), 0);
     }
 }
 
@@ -1017,7 +1015,7 @@ contract GoodAnswerSubmitMetricAnswerTestBase is DecisionOutcomeRedeemTestBase {
         vm.startPrank(ANSWERER);
         reality.submitAnswer{value: MIN_BOND}(csmAQuestionId, bytes32(uint256(5000)), 0);
         reality.submitAnswer{value: MIN_BOND}(csmBQuestionId, bytes32(uint256(2500)), 0);
-        reality.submitAnswer{value: MIN_BOND}(csmCQuestionId, bytes32(uint256(10000)), 0);
+        reality.submitAnswer{value: MIN_BOND}(csmCQuestionId, bytes32(uint256(10_000)), 0);
         vm.stopPrank();
     }
 }
