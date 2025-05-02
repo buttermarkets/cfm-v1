@@ -62,7 +62,6 @@ contract InvalidlessFlatCFMFactory {
     error InvalidOutcomeNameLength(string outcomeName);
     error NoConditionalScalarMarketToDeploy();
     error InvalidPayoutsCannotBeBothZero();
-    error InvalidPayoutsSumOverflow();
 
     /// @notice Emitted when a new FlatCFM is created.
     /// @param market Address of the new FlatCFM contract.

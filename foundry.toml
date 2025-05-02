@@ -4,7 +4,6 @@ out = "out"
 libs = ["dependencies"]
 test = "test/unit"
 auto_detect_remappings = false
-chain_id = 1
 auto_detect_solc = true
 via_ir = false
 optimizer = true
