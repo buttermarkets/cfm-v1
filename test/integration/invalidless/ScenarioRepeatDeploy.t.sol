@@ -81,11 +81,12 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             collateralToken,
             "ipfs://hello world"
         );
         for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, defaultInvalidPayouts);
+            factory.createConditionalScalarMarket(cfm);
         }
         _recordConditionIdAndScalarMarkets();
 
@@ -101,11 +102,12 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             collateralToken,
             "ipfs://hello world"
         );
         for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm2, defaultInvalidPayouts);
+            factory.createConditionalScalarMarket(cfm2);
         }
         _recordConditionIdAndScalarMarkets2();
 

@@ -119,7 +119,9 @@ contract InvalidlessFlatCFMFactory {
         // Check for overflow in defaultInvalidPayouts sum
         // Note: In Solidity 0.8+, this addition will revert on overflow by default
         // We perform it here explicitly to guarantee reportPayouts won't fail later
-        uint256 sumPayouts = defaultInvalidPayouts[0] + defaultInvalidPayouts[1];
+        // solhint-disable unused-local-variable
+        // This will compute the sum (and revert on overflow), but never actually fail the require.
+        require(defaultInvalidPayouts[0] + defaultInvalidPayouts[1] >= 0);
 
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
         if (outcomeCount == 0 || outcomeCount > MAX_OUTCOME_COUNT) {

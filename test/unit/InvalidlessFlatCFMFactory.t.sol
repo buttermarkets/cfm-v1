@@ -89,17 +89,13 @@ contract CreateBadMarketTest is Base {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)], // Add default invalid payouts
             collateralToken,
             METADATA_URI
         );
     }
 
-    function testTooManyOutcomes(
-        uint32 openingTime,
-        uint256 minValue,
-        uint256 maxValue,
-        uint32 scalarOpeningTime
-    )
+    function testTooManyOutcomes(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
         public
     {
         // exceed factory.MAX_OUTCOME_COUNT()
@@ -120,17 +116,13 @@ contract CreateBadMarketTest is Base {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)], // Add default invalid payouts
             collateralToken,
             METADATA_URI
         );
     }
 
-    function testTooLargeOutcomeName(
-        uint32 openingTime,
-        uint256 minValue,
-        uint256 maxValue,
-        uint32 scalarOpeningTime
-    )
+    function testTooLargeOutcomeName(uint32 openingTime, uint256 minValue, uint256 maxValue, uint32 scalarOpeningTime)
         public
     {
         // single outcome name exceeds length
@@ -166,9 +158,7 @@ contract CreateBadMarketTest is Base {
         uint256 minValue,
         uint256 maxValue,
         uint32 scalarOpeningTime
-    )
-        public
-    {
+    ) public {
         string[] memory outcomeNames = new string[](2);
         outcomeNames[0] = "1";
         outcomeNames[1] = "2";
@@ -243,7 +233,7 @@ contract CreateBadMarketTest is Base {
 
         uint256[2] memory overflowPayouts = [type(uint256).max, 1];
 
-        vm.expectRevert();  // Will revert with arithmetic overflow
+        vm.expectRevert(); // Will revert with arithmetic overflow
         factory.createFlatCFM(
             oracleAdapter,
             42, // decisionTemplateId
