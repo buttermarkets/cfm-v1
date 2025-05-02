@@ -38,8 +38,59 @@ contract ApproveAllPairTokens is CSMJsonParser {
         }
 
         console.log("Total unique pair tokens approved: %d", approvedCount);
+    }
+}
 
-        vm.stopBroadcast();
+contract ApproveAllPairTokensCheck is CSMJsonParser {
+    function run() external view {
+        string memory json = vm.readFile(vm.envString("CSM_JSON"));
+        Market[] memory markets = _parseAllMarkets(json);
+
+        address depositor = vm.envAddress("DEPOSITOR");
+        address router = vm.envAddress("UNISWAP_V2_ROUTER");
+
+        address[] memory checkedPairs = new address[](markets.length);
+        uint256 checkedCount = 0;
+
+        console.log("Checking pair allowances for %d markets...", markets.length);
+        console.log("Depositor: %s", depositor);
+        console.log("Router: %s", router);
+        console.log("-----------------------");
+
+        uint256 approvedCount = 0;
+        uint256 notApprovedCount = 0;
+
+        for (uint256 i = 0; i < markets.length; i++) {
+            address pair = markets[i].pair.id;
+
+            bool alreadyChecked = false;
+            for (uint256 j = 0; j < checkedCount; j++) {
+                if (checkedPairs[j] == pair) {
+                    alreadyChecked = true;
+                    break;
+                }
+            }
+
+            if (!alreadyChecked) {
+                uint256 allowance = IERC20(pair).allowance(depositor, router);
+                console.log("Pair: %s", pair);
+                console.log("Allowance: %s", allowance);
+
+                if (allowance > 0) {
+                    approvedCount++;
+                } else {
+                    notApprovedCount++;
+                }
+
+                checkedPairs[checkedCount++] = pair;
+                console.log("-----------------------");
+            }
+        }
+
+        console.log("Summary:");
+        console.log("Total unique pairs: %d", checkedCount);
+        console.log("Pairs with allowance: %d", approvedCount);
+        console.log("Pairs without allowance: %d", notApprovedCount);
     }
 }
 
@@ -164,58 +215,5 @@ contract ApproveAllPairTokensSafeBatch is CSMJsonParser {
         }
 
         return string(str);
-    }
-}
-
-contract CheckPairAllowances is CSMJsonParser {
-    function run() external view {
-        string memory json = vm.readFile(vm.envString("CSM_JSON"));
-        Market[] memory markets = _parseAllMarkets(json);
-
-        address depositor = vm.envAddress("DEPOSITOR");
-        address router = vm.envAddress("UNISWAP_V2_ROUTER");
-
-        address[] memory checkedPairs = new address[](markets.length);
-        uint256 checkedCount = 0;
-
-        console.log("Checking pair allowances for %d markets...", markets.length);
-        console.log("Depositor: %s", depositor);
-        console.log("Router: %s", router);
-        console.log("-----------------------");
-
-        uint256 approvedCount = 0;
-        uint256 notApprovedCount = 0;
-
-        for (uint256 i = 0; i < markets.length; i++) {
-            address pair = markets[i].pair.id;
-
-            bool alreadyChecked = false;
-            for (uint256 j = 0; j < checkedCount; j++) {
-                if (checkedPairs[j] == pair) {
-                    alreadyChecked = true;
-                    break;
-                }
-            }
-
-            if (!alreadyChecked) {
-                uint256 allowance = IERC20(pair).allowance(depositor, router);
-                console.log("Pair: %s", pair);
-                console.log("Allowance: %s", allowance);
-
-                if (allowance > 0) {
-                    approvedCount++;
-                } else {
-                    notApprovedCount++;
-                }
-
-                checkedPairs[checkedCount++] = pair;
-                console.log("-----------------------");
-            }
-        }
-
-        console.log("Summary:");
-        console.log("Total unique pairs: %d", checkedCount);
-        console.log("Pairs with allowance: %d", approvedCount);
-        console.log("Pairs without allowance: %d", notApprovedCount);
     }
 }
