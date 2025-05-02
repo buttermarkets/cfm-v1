@@ -83,6 +83,7 @@ contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             collateralToken,
             "ipfs://hello world"
         );
@@ -96,12 +97,13 @@ contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             collateralToken,
             "ipfs://hello world"
         );
 
         vm.expectRevert("ETH provided must cover question fee");
-        factory.createConditionalScalarMarket(cfm, defaultInvalidPayouts);
+        factory.createConditionalScalarMarket(cfm);
     }
 
     function testCFMExtraFeeIsBounty() public {
@@ -112,6 +114,7 @@ contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             collateralToken,
             "ipfs://hello world"
         );
@@ -172,11 +175,12 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             collateralToken,
             "ipfs://hello world"
         );
         for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket{value: QUESTION_FEE}(cfm, defaultInvalidPayouts);
+            factory.createConditionalScalarMarket{value: QUESTION_FEE}(cfm);
         }
         _recordConditionIdAndScalarMarkets();
 

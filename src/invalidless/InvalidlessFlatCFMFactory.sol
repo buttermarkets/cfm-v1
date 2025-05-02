@@ -28,6 +28,7 @@ contract InvalidlessFlatCFMFactory {
         IERC20 collateralToken;
         uint256 metricTemplateId;
         GenericScalarQuestionParams genericScalarQuestionParams;
+        uint256[2] defaultInvalidPayouts;
         bytes32 decisionConditionId;
         string[] outcomeNames;
     }
@@ -94,6 +95,7 @@ contract InvalidlessFlatCFMFactory {
     /// @param metricTemplateId Template ID used by the oracle for metric (scalar) questions.
     /// @param flatCFMQParams Struct with outcome names and question opening time.
     /// @param genericScalarQuestionParams Struct with scalar range info and opening time.
+    /// @param defaultInvalidPayouts Default payouts to use if the answer is invalid [short, long].
     /// @param collateralToken ERC20 token used as the collateral (e.g., DAI).
     /// @param metadataUri Metadata URI for front-ends.
     /// @return cfm Deployed FlatCFM clone address.
@@ -103,6 +105,7 @@ contract InvalidlessFlatCFMFactory {
         uint256 metricTemplateId,
         FlatCFMQuestionParams calldata flatCFMQParams,
         GenericScalarQuestionParams calldata genericScalarQuestionParams,
+        uint256[2] calldata defaultInvalidPayouts,
         IERC20 collateralToken,
         string calldata metadataUri
     ) external payable returns (FlatCFM cfm) {
@@ -131,6 +134,7 @@ contract InvalidlessFlatCFMFactory {
             collateralToken: collateralToken,
             metricTemplateId: metricTemplateId,
             genericScalarQuestionParams: genericScalarQuestionParams,
+            defaultInvalidPayouts: defaultInvalidPayouts,
             decisionConditionId: decisionConditionId,
             outcomeNames: flatCFMQParams.outcomeNames
         });
@@ -143,9 +147,8 @@ contract InvalidlessFlatCFMFactory {
     /// @notice Creates an InvalidlessConditionalScalarMarket for the next outcome in the given FlatCFM.
     /// @dev Similar to createConditionalScalarMarket but creates a market without an invalid outcome.
     /// @param cfm The FlatCFM for which to deploy the next scalar market.
-    /// @param defaultInvalidPayouts Default payouts to use if the answer is invalid [short, long].
     /// @return icsm The newly deployed InvalidlessConditionalScalarMarket.
-    function createConditionalScalarMarket(FlatCFM cfm, uint256[2] calldata defaultInvalidPayouts)
+    function createConditionalScalarMarket(FlatCFM cfm)
         external
         payable
         returns (InvalidlessConditionalScalarMarket icsm)
@@ -206,7 +209,7 @@ contract InvalidlessFlatCFMFactory {
                 maxValue: params.genericScalarQuestionParams.scalarParams.maxValue
             }),
             wrappedCTData,
-            defaultInvalidPayouts
+            params.defaultInvalidPayouts
         );
 
         emit InvalidlessConditionalScalarMarketCreated(address(cfm), address(icsm), outcomeIndex);

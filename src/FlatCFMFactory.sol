@@ -148,6 +148,8 @@ contract FlatCFMFactory {
     ///      2) Prepares condition if not already prepared.
     ///      3) Updates state for subsequent scalar market deployments.
     ///      4) Deploys a ConditionalScalarMarket clone.
+    ///      This function is untrusted, therefore it takes only a FlatCFM as
+    ///      argument and fetches related data from the factory storage.
     /// @param cfm The FlatCFM for which to deploy the next scalar market.
     /// @return csm The newly deployed ConditionalScalarMarket.
     function createConditionalScalarMarket(FlatCFM cfm) external payable returns (ConditionalScalarMarket csm) {

@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {ScalarParams} from "../Types.sol";
 
 /// @notice Data for wrapped short/long token positions (2 outcomes).
 struct InvalidlessWrappedConditionalTokensData {

@@ -155,6 +155,7 @@ contract CreateBadMarketTest is Base {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -185,21 +186,22 @@ contract CreateBadMarketTest is Base {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
 
         vm.expectRevert(InvalidlessFlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
-        factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket(cfm);
     }
 
     function testCreateScalarAlone() public {
         vm.expectRevert(InvalidlessFlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
-        factory.createConditionalScalarMarket(FlatCFM(address(0xdeadbeef)), [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket(FlatCFM(address(0xdeadbeef)));
     }
 }
 
@@ -288,6 +290,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -317,13 +320,14 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         vm.recordLogs();
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
 
         bytes32 eventSignature = keccak256("InvalidlessConditionalScalarMarketCreated(address,address,uint256)");
@@ -356,6 +360,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -376,6 +381,7 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -393,12 +399,13 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
 
         bytes32 eventSignature = keccak256("InvalidlessConditionalScalarMarketCreated(address,address,uint256)");
@@ -431,12 +438,13 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
     }
 
@@ -451,12 +459,13 @@ contract CreateMarketTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
     }
 }
@@ -558,6 +567,7 @@ contract CreateMarketDeploymentTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -576,11 +586,12 @@ contract CreateMarketDeploymentTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
         InvalidlessConditionalScalarMarket icsm1 = _getFirstConditionalScalarMarket();
 
@@ -626,13 +637,14 @@ contract CreateMarketFuzzTest is CreateMarketTestBase {
             openingTime: genericScalarQuestionParams.openingTime
         });
 
-        FlatCFM cfm =
-            factory.createFlatCFM(oracleAdapter, 4242, 2424, decisionQP, metricQP, collateralToken, "ipfs://hello");
+        FlatCFM cfm = factory.createFlatCFM(
+            oracleAdapter, 4242, 2424, decisionQP, metricQP, [uint256(1), uint256(3)], collateralToken, "ipfs://hello"
+        );
         assertTrue(address(cfm) != address(0), "CFM should not be zero address");
 
         vm.recordLogs();
         for (uint256 i = 0; i < outcomeCount; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -665,6 +677,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -685,6 +698,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -704,6 +718,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -716,6 +731,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -733,7 +749,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             )
         );
 
-        factory.createConditionalScalarMarket{value: sendValue}(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket{value: sendValue}(cfm);
 
         vm.expectCall(
             address(oracleAdapter),
@@ -746,7 +762,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             )
         );
 
-        factory.createConditionalScalarMarket{value: sendValue}(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket{value: sendValue}(cfm);
     }
 
     function testCreateCSMNoPayment() public {
@@ -756,6 +772,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -768,7 +785,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             )
         );
 
-        factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket(cfm);
     }
 
     function testCreateCSMWithoutEnoughPaymentReverts() public {
@@ -778,6 +795,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
@@ -790,7 +808,7 @@ contract PassValueToOracleAdapterTest is CreateMarketDeploymentTestBase {
         );
 
         vm.expectRevert("ETH must be provided");
-        factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket(cfm);
     }
 }
 
@@ -827,6 +845,7 @@ contract AskQuestionRevertsTest is Base {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             "ipfs://metadata"
         );
@@ -841,6 +860,7 @@ contract AskQuestionRevertsTest is Base {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             "ipfs://metadata"
         );
@@ -848,26 +868,27 @@ contract AskQuestionRevertsTest is Base {
         vm.mockCallRevert(address(oracleAdapter), 1 ether, FlatCFMRealityAdapter.askMetricQuestion.selector, "TEST_ERR");
 
         vm.expectRevert(bytes("TEST_ERR"));
-        factory.createConditionalScalarMarket{value: 1 ether}(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket{value: 1 ether}(cfm);
     }
 }
 
 contract InvalidlessParamsTest is CreateMarketTestBase {
     function testDefaultInvalidPayoutsArePassedToCSM() public {
+        uint256[2] memory defaultPayouts = [uint256(42), uint256(58)];
+
         FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
             DECISION_TEMPLATE_ID,
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultPayouts,
             collateralToken,
             METADATA_URI
         );
 
-        uint256[2] memory defaultPayouts = [uint256(42), uint256(58)];
-
         vm.recordLogs();
-        factory.createConditionalScalarMarket(cfm, defaultPayouts);
+        factory.createConditionalScalarMarket(cfm);
 
         InvalidlessConditionalScalarMarket icsm = _getFirstConditionalScalarMarket();
         assertEq(icsm.defaultInvalidPayouts(0), 42, "Short default payout mismatch");
@@ -883,13 +904,14 @@ contract DeploymentParamsTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         // Deploy all markets
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
 
         // Verify params are cleaned up
@@ -909,18 +931,19 @@ contract DeploymentParamsTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         // Deploy all markets
         for (uint256 i = 0; i < outcomeNames.length; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
         }
 
         // Try to deploy one more
         vm.expectRevert(InvalidlessFlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
-        factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+        factory.createConditionalScalarMarket(cfm);
     }
 
     function testNextOutcomeToDeployIncrementsCorrectly() public {
@@ -930,12 +953,13 @@ contract DeploymentParamsTest is CreateMarketTestBase {
             METRIC_TEMPLATE_ID,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            [uint256(1), uint256(3)],
             collateralToken,
             METADATA_URI
         );
 
         for (uint256 i = 0; i < outcomeNames.length - 1; i++) {
-            factory.createConditionalScalarMarket(cfm, [uint256(1), uint256(3)]);
+            factory.createConditionalScalarMarket(cfm);
             assertEq(factory.nextOutcomeToDeploy(cfm), i + 1, "Next outcome index incorrect");
         }
     }

@@ -96,12 +96,4 @@ contract InvalidlessConditionalScalarMarket is ERC1155Holder {
         }
         conditionalTokens.reportPayouts(ctParams.questionId, payouts);
     }
-
-    /// @dev Returns the discreet partition array [1,2] for the short/long outcomes.
-    function _discreetPartition() private pure returns (uint256[] memory) {
-        uint256[] memory partition = new uint256[](2);
-        partition[0] = 1;
-        partition[1] = 2;
-        return partition;
-    }
 }

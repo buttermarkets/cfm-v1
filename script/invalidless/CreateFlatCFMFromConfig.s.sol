@@ -8,6 +8,7 @@ import "src/invalidless/InvalidlessFlatCFMFactory.sol";
 import "src/FlatCFMOracleAdapter.sol";
 import "src/interfaces/IConditionalTokens.sol";
 import "src/interfaces/IWrapped1155Factory.sol";
+import {GenericScalarQuestionParams} from "src/Types.sol";
 
 contract CreateInvalidlessFlatCFMFromConfig is Script {
     // Fallback JSON file path
@@ -25,9 +26,9 @@ contract CreateInvalidlessFlatCFMFromConfig is Script {
         uint256 metricTemplateId = _parseMetricTemplateId(jsonContent);
         FlatCFMQuestionParams memory decisionQuestionParams = _parseFlatCFMQuestionParams(jsonContent);
         GenericScalarQuestionParams memory genericScalarQuestionParams = _parseGenericScalarQuestionParams(jsonContent);
+        uint256[2] memory defaultInvalidPayouts = _parseDefaultInvalidPayouts(jsonContent);
         address collateralAddr = _parseCollateralAddress(jsonContent);
         string memory metadataUri = _parseMetadataUri(jsonContent);
-        uint256[2] memory defaultInvalidPayouts = _parseDefaultPayouts(jsonContent);
 
         FlatCFM cfm = factory.createFlatCFM(
             oracleAdapter,
@@ -35,13 +36,14 @@ contract CreateInvalidlessFlatCFMFromConfig is Script {
             metricTemplateId,
             decisionQuestionParams,
             genericScalarQuestionParams,
+            defaultInvalidPayouts,
             IERC20(collateralAddr),
             metadataUri
         );
         console.log("Deployed FlatCFM at:", address(cfm));
 
         for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            InvalidlessConditionalScalarMarket icsm = factory.createConditionalScalarMarket(cfm, defaultInvalidPayouts);
+            InvalidlessConditionalScalarMarket icsm = factory.createConditionalScalarMarket(cfm);
             console.log("Deployed InvalidlessConditionalScalarMarket at:", address(icsm));
         }
 
@@ -109,6 +111,14 @@ contract CreateInvalidlessFlatCFMFromConfig is Script {
         });
     }
 
+    /// @dev Reads default invalid payouts from JSON
+    function _parseDefaultInvalidPayouts(string memory json) public pure returns (uint256[2] memory) {
+        bytes memory payoutsRaw = vm.parseJson(json, ".defaultPayouts");
+        uint256[] memory payouts = abi.decode(payoutsRaw, (uint256[]));
+        require(payouts.length == 2, "defaultPayouts must have exactly 2 values");
+        return [payouts[0], payouts[1]];
+    }
+
     /// @dev Reads the collateral token address from JSON
     function _parseCollateralAddress(string memory json) public pure returns (address) {
         return vm.parseJsonAddress(json, ".collateralToken");
@@ -116,14 +126,5 @@ contract CreateInvalidlessFlatCFMFromConfig is Script {
 
     function _parseMetadataUri(string memory json) public pure returns (string memory) {
         return vm.parseJsonString(json, ".metadataUri");
-    }
-
-    /// @dev Reads default invalid payouts from JSON
-    /// @return A fixed array of two uint256 values [shortPayout, longPayout]
-    function _parseDefaultPayouts(string memory json) public pure returns (uint256[2] memory) {
-        bytes memory payoutsRaw = vm.parseJson(json, ".defaultPayouts");
-        uint256[] memory payouts = abi.decode(payoutsRaw, (uint256[]));
-        require(payouts.length == 2, "defaultPayouts must have exactly 2 values");
-        return [payouts[0], payouts[1]];
     }
 }
