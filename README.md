@@ -194,6 +194,12 @@ This is achieved by the same principle as above: `ConditionalScalarMarket`s
 create 3 outcomes: Short, Long, Invalid. No facility is provided for trading
 Invalid tokens.
 
+A new version of conditional markets, called
+`InvalidlessConditionalScalarMarket` has been introduced that doesn't contain
+the invalid outcome and rather allocates payouts to default values in the
+invalid case. Correspondingly, a separate factory, `InvalidlessFlatCFMFactory`,
+expects the default payout values as input to the `createFlatCFM` function.
+
 ### bounty payments
 
 Reality bounties (and thus, `msg.value` forwarded by these contracts) are only
