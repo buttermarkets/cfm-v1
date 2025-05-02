@@ -16,15 +16,22 @@ contract CreateAllPairs is Script {
 
         IUniswapV2Factory factory = IUniswapV2Factory(factoryAddr);
 
-        vm.startBroadcast();
-
         for (uint256 i = 0; i < shortLongPairs.length; i++) {
             address shortToken = shortLongPairs[i][0];
             address longToken = shortLongPairs[i][1];
 
-            factory.createPair(shortToken, longToken);
+            vm.startBroadcast();
+            try factory.createPair(shortToken, longToken) returns (address pair) {
+                console.log("Created pair:", pair);
+            } catch Error(string memory reason) {
+                if (keccak256(bytes(reason)) == keccak256(bytes("UniswapV2: PAIR_EXISTS"))) {
+                    console.log(unicode"⏭️ Skipping existing pair for tokens:", shortToken, longToken);
+                } else {
+                    // If it's some other error, we want to revert
+                    revert(reason);
+                }
+            }
+            vm.stopBroadcast();
         }
-
-        vm.stopBroadcast();
     }
 }
