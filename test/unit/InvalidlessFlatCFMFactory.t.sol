@@ -203,6 +203,58 @@ contract CreateBadMarketTest is Base {
         vm.expectRevert(InvalidlessFlatCFMFactory.NoConditionalScalarMarketToDeploy.selector);
         factory.createConditionalScalarMarket(FlatCFM(address(0xdeadbeef)));
     }
+
+    function testRevertsIfBothDefaultPayoutsAreZero() public {
+        string[] memory outcomeNames = new string[](1);
+        outcomeNames[0] = "Test Outcome";
+
+        FlatCFMQuestionParams memory decisionQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: uint32(block.timestamp + 1000)});
+
+        GenericScalarQuestionParams memory genericScalarQuestionParams = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 1000}),
+            openingTime: uint32(block.timestamp + 2000)
+        });
+
+        vm.expectRevert(InvalidlessFlatCFMFactory.InvalidPayoutsCannotBeBothZero.selector);
+        factory.createFlatCFM(
+            oracleAdapter,
+            42, // decisionTemplateId
+            43, // metricTemplateId
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            [uint256(0), uint256(0)], // defaultInvalidPayouts
+            collateralToken,
+            "ipfs://metadata"
+        );
+    }
+
+    function testRevertsIfDefaultPayoutsSumOverflows() public {
+        string[] memory outcomeNames = new string[](1);
+        outcomeNames[0] = "Test Outcome";
+
+        FlatCFMQuestionParams memory decisionQuestionParams =
+            FlatCFMQuestionParams({outcomeNames: outcomeNames, openingTime: uint32(block.timestamp + 1000)});
+
+        GenericScalarQuestionParams memory genericScalarQuestionParams = GenericScalarQuestionParams({
+            scalarParams: ScalarParams({minValue: 0, maxValue: 1000}),
+            openingTime: uint32(block.timestamp + 2000)
+        });
+
+        uint256[2] memory overflowPayouts = [type(uint256).max, 1];
+
+        vm.expectRevert();  // Will revert with arithmetic overflow
+        factory.createFlatCFM(
+            oracleAdapter,
+            42, // decisionTemplateId
+            43, // metricTemplateId
+            decisionQuestionParams,
+            genericScalarQuestionParams,
+            overflowPayouts,
+            collateralToken,
+            "ipfs://metadata"
+        );
+    }
 }
 
 contract CreateMarketTestBase is Base {

@@ -61,6 +61,8 @@ contract InvalidlessFlatCFMFactory {
     error InvalidOutcomeCount();
     error InvalidOutcomeNameLength(string outcomeName);
     error NoConditionalScalarMarketToDeploy();
+    error InvalidPayoutsCannotBeBothZero();
+    error InvalidPayoutsSumOverflow();
 
     /// @notice Emitted when a new FlatCFM is created.
     /// @param market Address of the new FlatCFM contract.
@@ -109,6 +111,16 @@ contract InvalidlessFlatCFMFactory {
         IERC20 collateralToken,
         string calldata metadataUri
     ) external payable returns (FlatCFM cfm) {
+        // Add validation for defaultInvalidPayouts
+        if (defaultInvalidPayouts[0] == 0 && defaultInvalidPayouts[1] == 0) {
+            revert InvalidPayoutsCannotBeBothZero();
+        }
+
+        // Check for overflow in defaultInvalidPayouts sum
+        // Note: In Solidity 0.8+, this addition will revert on overflow by default
+        // We perform it here explicitly to guarantee reportPayouts won't fail later
+        uint256 sumPayouts = defaultInvalidPayouts[0] + defaultInvalidPayouts[1];
+
         uint256 outcomeCount = flatCFMQParams.outcomeNames.length;
         if (outcomeCount == 0 || outcomeCount > MAX_OUTCOME_COUNT) {
             revert InvalidOutcomeCount();
