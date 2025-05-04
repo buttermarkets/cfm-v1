@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import "@openzeppelin-contracts/proxy/Clones.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import "../interfaces/IWrapped1155Factory.sol";
 import "../interfaces/IConditionalTokens.sol";
@@ -236,11 +237,12 @@ contract InvalidlessFlatCFMFactory {
         bytes32 decisionCollectionId,
         bytes32 csmConditionId
     ) private returns (InvalidlessWrappedConditionalTokensData memory) {
+        uint8 decimals = IERC20Metadata(address(collateralToken)).decimals();
         bytes memory shortData = abi.encodePacked(
-            string.concat(outcomeName, "-Short").toString31(), string.concat(outcomeName, "-ST").toString31(), uint8(18)
+            string.concat(outcomeName, "-Short").toString31(), string.concat(outcomeName, "-ST").toString31(), decimals
         );
         bytes memory longData = abi.encodePacked(
-            string.concat(outcomeName, "-Long").toString31(), string.concat(outcomeName, "-LG").toString31(), uint8(18)
+            string.concat(outcomeName, "-Long").toString31(), string.concat(outcomeName, "-LG").toString31(), decimals
         );
 
         uint256 shortPosId = conditionalTokens.getPositionId(

@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {Test, console, Vm} from "forge-std/src/Test.sol";
 import "@openzeppelin-contracts/proxy/Clones.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin-contracts/utils/Strings.sol";
 
@@ -524,20 +525,21 @@ contract CreateMarketDeploymentTestBase is CreateMarketTestBase {
     function setUp() public override {
         super.setUp();
 
+        uint8 decimals = IERC20Metadata(address(collateralToken)).decimals();
         shortData = abi.encodePacked(
             string.concat(outcomeNames[0], "-Short").toString31(),
             string.concat(outcomeNames[0], "-ST").toString31(),
-            uint8(18)
+            decimals
         );
         longData = abi.encodePacked(
             string.concat(outcomeNames[0], "-Long").toString31(),
             string.concat(outcomeNames[0], "-LG").toString31(),
-            uint8(18)
+            decimals
         );
         invalidData = abi.encodePacked(
             string.concat(outcomeNames[0], "-Inv").toString31(),
             string.concat(outcomeNames[0], "-XX").toString31(),
-            uint8(18)
+            decimals
         );
         vm.mockCall(
             address(oracleAdapter),
