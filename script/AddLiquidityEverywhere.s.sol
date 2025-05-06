@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/src/Script.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "./CSMJsonParser.s.sol";
+import "./FlatCFMJsonParser.s.sol";
 
 interface IUniswapV2Router {
     function addLiquidity(
@@ -18,13 +19,16 @@ interface IUniswapV2Router {
     ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
 }
 
-contract AddLiquidityEverywhere is Script {
+contract AddLiquidityEverywhere is Script, FlatCFMJsonParser {
     function run() external {
-        uint256 amount = vm.envUint("AMOUNT");
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
         address myAddress = vm.envAddress("MY_ADDRESS");
-        IUniswapV2Router router = IUniswapV2Router(vm.envAddress("UNISWAP_V2_ROUTER"));
+        IUniswapV2Router router = IUniswapV2Router(_parseUniswapV2Router(jsonContent));
         address[][] memory shortLongPairs = abi.decode(vm.parseJson(vm.envString("SHORT_LONG_PAIRS")), (address[][]));
-        uint256 minAmount = (amount * (100 - vm.envUint("SLIPPAGE_PCT"))) / 100;
+        uint256 minAmount = (depositAmount * (100 - _parseSlippagePct(jsonContent))) / 100;
 
         vm.startBroadcast();
 
@@ -32,14 +36,14 @@ contract AddLiquidityEverywhere is Script {
             address shortTokenAddr = shortLongPairs[i][0];
             address longTokenAddr = shortLongPairs[i][1];
 
-            IERC20(shortTokenAddr).approve(address(router), amount);
-            IERC20(longTokenAddr).approve(address(router), amount);
+            IERC20(shortTokenAddr).approve(address(router), depositAmount);
+            IERC20(longTokenAddr).approve(address(router), depositAmount);
 
             router.addLiquidity(
                 shortTokenAddr,
                 longTokenAddr,
-                amount,
-                amount,
+                depositAmount,
+                depositAmount,
                 minAmount,
                 minAmount,
                 myAddress,
@@ -53,12 +57,15 @@ contract AddLiquidityEverywhere is Script {
     }
 }
 
-contract AddLiquidityEverywhereCheck is CSMJsonParser {
+contract AddLiquidityEverywhereCheck is CSMJsonParser, FlatCFMJsonParser {
     function run() external {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         address depositor = vm.envAddress("DEPOSITOR");
-        uint256 amount = vm.envUint("AMOUNT");
-        IUniswapV2Router router = IUniswapV2Router(vm.envAddress("UNISWAP_V2_ROUTER"));
-        uint256 minAmount = (amount * (100 - vm.envUint("SLIPPAGE_PCT"))) / 100;
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
+        IUniswapV2Router router = IUniswapV2Router(_parseUniswapV2Router(jsonContent));
+        uint256 minAmount = (depositAmount * (100 - _parseSlippagePct(jsonContent))) / 100;
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
 
         Market[] memory csms = _parseAllMarkets(json);
@@ -80,7 +87,7 @@ contract AddLiquidityEverywhereCheck is CSMJsonParser {
             console.log("-----------------------");
 
             console.log(
-                (routerAllowanceShort >= amount) && (routerAllowanceLong >= amount)
+                (routerAllowanceShort >= depositAmount) && (routerAllowanceLong >= depositAmount)
                     ? unicode"✅ allowance ok"
                     : unicode"❌ allowance not set",
                 "Short // Long"

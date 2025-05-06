@@ -6,13 +6,17 @@ import {IERC20} from "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IConditionalTokens} from "src/interfaces/IConditionalTokens.sol";
 import "src/ConditionalScalarMarket.sol";
 import "./CSMJsonParser.s.sol";
+import "./FlatCFMJsonParser.s.sol";
 
-contract SplitEverything is Script {
+contract SplitEverything is Script, FlatCFMJsonParser {
     function run() external {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
-        address collateralAddr = vm.envAddress("COLLATERAL_TOKEN");
+        address collateralAddr = _parseCollateralAddress(jsonContent);
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
-        uint256 amount = vm.envUint("AMOUNT");
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
         address[] memory csmList = abi.decode(vm.parseJson(vm.envString("CSM_LIST")), (address[]));
         bool skipApprovals = vm.envOr("SKIP_APPROVALS", false);
 
@@ -29,26 +33,29 @@ contract SplitEverything is Script {
 
         vm.startBroadcast();
 
-        collateral.approve(conditionalTokensAddr, amount);
-        conditionalTokens.splitPosition(collateral, bytes32(0), cfmConditionId, partition, amount);
+        collateral.approve(conditionalTokensAddr, depositAmount);
+        conditionalTokens.splitPosition(collateral, bytes32(0), cfmConditionId, partition, depositAmount);
 
         for (uint256 i = 0; i < csmList.length; i++) {
             ConditionalScalarMarket csm = ConditionalScalarMarket(csmList[i]);
             if (!skipApprovals) {
                 conditionalTokens.setApprovalForAll(address(csm), true);
             }
-            csm.split(amount);
+            csm.split(depositAmount);
         }
 
         vm.stopBroadcast();
     }
 }
 
-contract SplitEverythingCheck is CSMJsonParser {
+contract SplitEverythingCheck is CSMJsonParser, FlatCFMJsonParser {
     function run() external {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
-        address collateralAddr = vm.envAddress("COLLATERAL_TOKEN");
-        uint256 amount = vm.envUint("AMOUNT");
+        address collateralAddr = _parseCollateralAddress(jsonContent);
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
         address depositor = vm.envAddress("DEPOSITOR");
 
         IConditionalTokens conditionalTokens = IConditionalTokens(conditionalTokensAddr);
@@ -65,7 +72,7 @@ contract SplitEverythingCheck is CSMJsonParser {
 
             console.log("=============================");
             console.log(
-                (ctAllowance >= amount) ? unicode"✅ CT allowance ok" : unicode"❌ CT allowance not set",
+                (ctAllowance >= depositAmount) ? unicode"✅ CT allowance ok" : unicode"❌ CT allowance not set",
                 "ConditionalTokens allowance:"
             );
             console.log(ctAllowance);
@@ -94,7 +101,7 @@ contract SplitEverythingCheck is CSMJsonParser {
                 )
             );
             console.log(
-                (erc1155Balance >= amount) ? unicode"✅ splitPosition done" : unicode"❌ splitPosition not done",
+                (erc1155Balance >= depositAmount) ? unicode"✅ splitPosition done" : unicode"❌ splitPosition not done",
                 "Position balance:"
             );
             console.log(erc1155Balance);
@@ -112,7 +119,7 @@ contract SplitEverythingCheck is CSMJsonParser {
             uint256 sbal = short.balanceOf(depositor);
             uint256 lbal = long.balanceOf(depositor);
             uint256 ibal = invalid.balanceOf(depositor);
-            console.log((sbal >= amount) && (lbal >= amount) ? unicode"✅" : unicode"❌", "Short // Long // Invalid:");
+            console.log((sbal >= depositAmount) && (lbal >= depositAmount) ? unicode"✅" : unicode"❌", "Short // Long // Invalid:");
             console.logUint(sbal);
             console.logUint(lbal);
             console.logUint(ibal);

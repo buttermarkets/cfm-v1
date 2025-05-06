@@ -4,10 +4,14 @@ pragma solidity ^0.8.20;
 import "forge-std/src/Script.sol";
 import "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "./CSMJsonParser.s.sol";
+import "./FlatCFMJsonParser.s.sol";
 
-contract ApproveAllPairTokens is CSMJsonParser {
+contract ApproveAllPairTokens is CSMJsonParser, FlatCFMJsonParser {
     function run() external {
-        address router = vm.envAddress("UNISWAP_V2_ROUTER");
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
+        address router = _parseUniswapV2Router(jsonContent);
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
 
         Market[] memory markets = _parseAllMarkets(json);
@@ -41,13 +45,16 @@ contract ApproveAllPairTokens is CSMJsonParser {
     }
 }
 
-contract ApproveAllPairTokensCheck is CSMJsonParser {
+contract ApproveAllPairTokensCheck is CSMJsonParser, FlatCFMJsonParser {
     function run() external view {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
         Market[] memory markets = _parseAllMarkets(json);
 
         address depositor = vm.envAddress("DEPOSITOR");
-        address router = vm.envAddress("UNISWAP_V2_ROUTER");
+        address router = _parseUniswapV2Router(jsonContent);
 
         address[] memory checkedPairs = new address[](markets.length);
         uint256 checkedCount = 0;

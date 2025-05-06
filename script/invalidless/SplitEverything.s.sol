@@ -7,22 +7,26 @@ import {IERC20} from "@openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IConditionalTokens} from "src/interfaces/IConditionalTokens.sol";
 import "src/invalidless/InvalidlessConditionalScalarMarket.sol";
 import "../CSMJsonParser.s.sol";
+import "../FlatCFMJsonParser.s.sol";
 
-contract SplitEverythingInvalidless is Script {
+contract SplitEverythingInvalidless is Script, FlatCFMJsonParser {
     function run() external {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         // ── immutable context ────────────────────────────────────────
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
         uint256 amount = vm.envUint("AMOUNT");
         bool skipApprovals = vm.envOr("SKIP_APPROVALS", false);
 
-        IERC20 collateral = IERC20(vm.envAddress("COLLATERAL_TOKEN"));
+        IERC20 collateral = IERC20(_parseCollateralAddress(jsonContent));
         IConditionalTokens conditionalTok = IConditionalTokens(vm.envAddress("CONDITIONAL_TOKENS"));
         address[] memory icsmList = abi.decode(vm.parseJson(vm.envString("CSM_LIST")), (address[]));
 
         // ── parent split (keeps locals low) ───────────────────────────
         _splitParent(collateral, conditionalTok, cfmConditionId, amount, icsmList.length);
 
-        // ── per-market work moved to helper to free the caller’s stack ─
+        // ── per-market work moved to helper to free the caller's stack ─
         for (uint256 i; i < icsmList.length; ++i) {
             _splitICSM(conditionalTok, InvalidlessConditionalScalarMarket(icsmList[i]), amount, skipApprovals);
         }
@@ -58,10 +62,13 @@ contract SplitEverythingInvalidless is Script {
     }
 }
 
-contract SplitEverythingInvalidlessCheck is CSMJsonParser {
+contract SplitEverythingInvalidlessCheck is CSMJsonParser, FlatCFMJsonParser {
     function run() external {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
-        address collateralAddr = vm.envAddress("COLLATERAL_TOKEN");
+        address collateralAddr = _parseCollateralAddress(jsonContent);
         uint256 amount = vm.envUint("AMOUNT");
         address depositor = vm.envAddress("DEPOSITOR");
 
@@ -134,13 +141,16 @@ contract SplitEverythingInvalidlessCheck is CSMJsonParser {
     }
 }
 
-contract SplitEverythingInvalidlessSafeBatchTransfers is CSMJsonParser {
+contract SplitEverythingInvalidlessSafeBatchTransfers is CSMJsonParser, FlatCFMJsonParser {
     string private batchBase;
     string private currentTransactions;
 
     function run() external {
+        string memory configPath = _getJsonFilePath();
+        string memory jsonContent = vm.readFile(configPath);
+
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
-        address collateralAddr = vm.envAddress("COLLATERAL_TOKEN");
+        address collateralAddr = _parseCollateralAddress(jsonContent);
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
         uint256 amount = vm.envUint("AMOUNT");
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
