@@ -6,6 +6,7 @@ import "./FlatCFMJsonParser.s.sol";
 
 interface IUniswapV2Factory {
     function createPair(address tokenA, address tokenB) external returns (address pair);
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
 }
 
 contract CreateAllPairs is Script, FlatCFMJsonParser {
@@ -24,17 +25,17 @@ contract CreateAllPairs is Script, FlatCFMJsonParser {
             address shortToken = shortLongPairs[i][0];
             address longToken = shortLongPairs[i][1];
 
-            vm.startBroadcast();
-            try factory.createPair(shortToken, longToken) returns (address pair) {
-                console.log("Created pair:", pair);
-            } catch Error(string memory reason) {
-                if (keccak256(bytes(reason)) == keccak256(bytes("UniswapV2: PAIR_EXISTS"))) {
-                    console.log(unicode"⏭️ Skipping existing pair for tokens:", shortToken, longToken);
-                } else {
-                    // If it's some other error, we want to revert
-                    revert(reason);
-                }
+            // ⏩ Skip if the pair already exists to avoid revert
+            if (factory.getPair(shortToken, longToken) != address(0)) {
+                console.log(
+                    unicode"⏭️ Skipping existing pair for tokens:", shortToken, longToken
+                );
+                continue;
             }
+
+            vm.startBroadcast();
+            address pair = factory.createPair(shortToken, longToken);
+            console.log("Created pair:", pair);
             vm.stopBroadcast();
         }
     }

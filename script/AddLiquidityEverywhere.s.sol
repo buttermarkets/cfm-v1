@@ -19,16 +19,23 @@ interface IUniswapV2Router {
     ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
 }
 
+interface IUniswapV2Factory {
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
+}
+
 contract AddLiquidityEverywhere is Script, FlatCFMJsonParser {
     function run() external {
         string memory configPath = _getJsonFilePath();
         string memory jsonContent = vm.readFile(configPath);
 
-        uint256 depositAmount = _parseDepositAmount(jsonContent);
-        address myAddress = vm.envAddress("MY_ADDRESS");
-        IUniswapV2Router router = IUniswapV2Router(_parseUniswapV2Router(jsonContent));
         address[][] memory shortLongPairs = abi.decode(vm.parseJson(vm.envString("SHORT_LONG_PAIRS")), (address[][]));
-        uint256 minAmount = (depositAmount * (100 - _parseSlippagePct(jsonContent))) / 100;
+        uint256 minAmount = (_parseDepositAmount(jsonContent) * (100 - _parseSlippagePct(jsonContent))) / 100;
+
+        // ── Check env flag ──────────────────────────────────────────
+        bool forceAdd = false;
+        try vm.envString("FORCE_ADD_LIQUIDITY") returns (string memory flag) {
+            if (keccak256(bytes(flag)) == keccak256("true")) forceAdd = true;
+        } catch { /* leave as false */ }
 
         vm.startBroadcast();
 
@@ -36,17 +43,31 @@ contract AddLiquidityEverywhere is Script, FlatCFMJsonParser {
             address shortTokenAddr = shortLongPairs[i][0];
             address longTokenAddr = shortLongPairs[i][1];
 
-            IERC20(shortTokenAddr).approve(address(router), depositAmount);
-            IERC20(longTokenAddr).approve(address(router), depositAmount);
+            // ── Skip if liquidity already exists (unless forced) ─────
+            if (!forceAdd) {
+                address pairAddr =
+                    IUniswapV2Factory(_parseUniswapV2Factory(jsonContent)).getPair(shortTokenAddr, longTokenAddr);
+                if (pairAddr != address(0) && IERC20(pairAddr).totalSupply() > 0) {
+                    console.log(unicode"⏭️ Skipping liquidity (already >0) for pair:", shortTokenAddr, longTokenAddr);
+                    continue;
+                }
+            }
 
-            router.addLiquidity(
+            IERC20(shortTokenAddr).approve(
+                address(IUniswapV2Router(_parseUniswapV2Router(jsonContent))), _parseDepositAmount(jsonContent)
+            );
+            IERC20(longTokenAddr).approve(
+                address(IUniswapV2Router(_parseUniswapV2Router(jsonContent))), _parseDepositAmount(jsonContent)
+            );
+
+            IUniswapV2Router(_parseUniswapV2Router(jsonContent)).addLiquidity(
                 shortTokenAddr,
                 longTokenAddr,
-                depositAmount,
-                depositAmount,
+                _parseDepositAmount(jsonContent),
+                _parseDepositAmount(jsonContent),
                 minAmount,
                 minAmount,
-                myAddress,
+                vm.envAddress("MY_ADDRESS"),
                 block.timestamp + 600 // 10 min deadline
             );
 
@@ -63,9 +84,7 @@ contract AddLiquidityEverywhereCheck is CSMJsonParser, FlatCFMJsonParser {
         string memory jsonContent = vm.readFile(configPath);
 
         address depositor = vm.envAddress("DEPOSITOR");
-        uint256 depositAmount = _parseDepositAmount(jsonContent);
-        IUniswapV2Router router = IUniswapV2Router(_parseUniswapV2Router(jsonContent));
-        uint256 minAmount = (depositAmount * (100 - _parseSlippagePct(jsonContent))) / 100;
+        uint256 minAmount = (_parseDepositAmount(jsonContent) * (100 - _parseSlippagePct(jsonContent))) / 100;
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
 
         Market[] memory csms = _parseAllMarkets(json);
@@ -79,15 +98,18 @@ contract AddLiquidityEverywhereCheck is CSMJsonParser, FlatCFMJsonParser {
         for (uint256 i = 0; i < csms.length; i++) {
             IERC20 short = IERC20(csms[i].shortToken.id);
             IERC20 long = IERC20(csms[i].longToken.id);
-            uint256 routerAllowanceShort = short.allowance(depositor, address(router));
-            uint256 routerAllowanceLong = long.allowance(depositor, address(router));
+            uint256 routerAllowanceShort =
+                short.allowance(depositor, address(IUniswapV2Router(_parseUniswapV2Router(jsonContent))));
+            uint256 routerAllowanceLong =
+                long.allowance(depositor, address(IUniswapV2Router(_parseUniswapV2Router(jsonContent))));
             IERC20 pair = IERC20(csms[i].pair.id);
             uint256 pairBalance = pair.balanceOf(depositor);
 
             console.log("-----------------------");
 
             console.log(
-                (routerAllowanceShort >= depositAmount) && (routerAllowanceLong >= depositAmount)
+                (routerAllowanceShort >= _parseDepositAmount(jsonContent))
+                    && (routerAllowanceLong >= _parseDepositAmount(jsonContent))
                     ? unicode"✅ allowance ok"
                     : unicode"❌ allowance not set",
                 "Short // Long"

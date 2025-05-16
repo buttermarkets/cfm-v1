@@ -16,27 +16,47 @@ contract SplitEverythingInvalidless is Script, FlatCFMJsonParser {
 
         // ── immutable context ────────────────────────────────────────
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
-        uint256 amount = vm.envUint("AMOUNT");
-        bool skipApprovals = vm.envOr("SKIP_APPROVALS", false);
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
 
-        IERC20 collateral = IERC20(_parseCollateralAddress(jsonContent));
-        IConditionalTokens conditionalTok = IConditionalTokens(vm.envAddress("CONDITIONAL_TOKENS"));
         address[] memory icsmList = abi.decode(vm.parseJson(vm.envString("CSM_LIST")), (address[]));
+        uint256 outcomeCount = icsmList.length + 1;
+
+        vm.startBroadcast();
 
         // ── parent split (keeps locals low) ───────────────────────────
-        _splitParent(collateral, conditionalTok, cfmConditionId, amount, icsmList.length);
+        _splitParent(
+            IERC20(_parseCollateralAddress(jsonContent)),
+            IConditionalTokens(vm.envAddress("CONDITIONAL_TOKENS")),
+            cfmConditionId,
+            depositAmount,
+            outcomeCount
+        );
 
         // ── per-market work moved to helper to free the caller's stack ─
         for (uint256 i; i < icsmList.length; ++i) {
-            _splitICSM(conditionalTok, InvalidlessConditionalScalarMarket(icsmList[i]), amount, skipApprovals);
+            _splitICSM(
+                IConditionalTokens(vm.envAddress("CONDITIONAL_TOKENS")),
+                InvalidlessConditionalScalarMarket(icsmList[i]),
+                depositAmount,
+                vm.envOr("SKIP_APPROVALS", false)
+            );
         }
+
+        vm.stopBroadcast();
     }
 
     function _splitParent(IERC20 collateral, IConditionalTokens ct, bytes32 condId, uint256 amt, uint256 outcomeCount)
         internal
     {
-        uint256[] memory partition = new uint256[](outcomeCount + 1);
-        for (uint256 i; i < outcomeCount + 1; ++i) {
+        // ── Skip if already split ────────────────────────────────
+        uint256 firstPosId = ct.getPositionId(collateral, ct.getCollectionId(bytes32(0), condId, /* indexSet = */ 1));
+        if (ct.balanceOf(msg.sender, firstPosId) >= amt) {
+            console.log(unicode"⏭️ Parent positions already split, skipping");
+            return;
+        }
+
+        uint256[] memory partition = new uint256[](outcomeCount);
+        for (uint256 i = 0; i < outcomeCount; i++) {
             partition[i] = 1 << i;
         }
 
@@ -47,18 +67,31 @@ contract SplitEverythingInvalidless is Script, FlatCFMJsonParser {
     function _splitICSM(IConditionalTokens ct, InvalidlessConditionalScalarMarket icsm, uint256 amt, bool skipApprovals)
         internal
     {
+        {
+            (,,,, IERC20 wrappedShort, IERC20 wrappedLong) = icsm.wrappedCTData();
+
+            // ── Skip if account already holds wrapped tokens ──────────
+            if (wrappedShort.balanceOf(msg.sender) >= amt && wrappedLong.balanceOf(msg.sender) >= amt) {
+                console.log(unicode"⏭️ Wrapped tokens already held, skipping split for ICSM:", address(icsm));
+                return;
+            }
+        }
+
         if (!skipApprovals) ct.setApprovalForAll(address(icsm.wrapped1155Factory()), true);
 
-        (, bytes32 condId, bytes32 parentCollId, IERC20 collToken) = icsm.ctParams();
-        (,, uint256 shortId, uint256 longId,,) = icsm.wrappedCTData();
+        {
+            (bytes memory shortData, bytes memory longData, uint256 shortId, uint256 longId,,) = icsm.wrappedCTData();
 
-        uint256[] memory payouts = new uint256[](2);
-        payouts[0] = uint256(1);
-        payouts[1] = uint256(2);
-        ct.splitPosition(collToken, parentCollId, condId, payouts, amt);
+            (, bytes32 condId, bytes32 parentCollId, IERC20 collToken) = icsm.ctParams();
 
-        ct.safeTransferFrom(address(this), address(icsm.wrapped1155Factory()), shortId, amt, "");
-        ct.safeTransferFrom(address(this), address(icsm.wrapped1155Factory()), longId, amt, "");
+            uint256[] memory payouts = new uint256[](2);
+            payouts[0] = uint256(1);
+            payouts[1] = uint256(2);
+            ct.splitPosition(collToken, parentCollId, condId, payouts, amt);
+
+            ct.safeTransferFrom(msg.sender, address(icsm.wrapped1155Factory()), shortId, amt, shortData);
+            ct.safeTransferFrom(msg.sender, address(icsm.wrapped1155Factory()), longId, amt, longData);
+        }
     }
 }
 
@@ -69,7 +102,7 @@ contract SplitEverythingInvalidlessCheck is CSMJsonParser, FlatCFMJsonParser {
 
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
         address collateralAddr = _parseCollateralAddress(jsonContent);
-        uint256 amount = vm.envUint("AMOUNT");
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
         address depositor = vm.envAddress("DEPOSITOR");
 
         IConditionalTokens conditionalTokens = IConditionalTokens(conditionalTokensAddr);
@@ -86,7 +119,7 @@ contract SplitEverythingInvalidlessCheck is CSMJsonParser, FlatCFMJsonParser {
 
             console.log("=============================");
             console.log(
-                (ctAllowance >= amount) ? unicode"✅ CT allowance ok" : unicode"❌ CT allowance not set",
+                (ctAllowance >= depositAmount) ? unicode"✅ CT allowance ok" : unicode"❌ CT allowance not set",
                 "ConditionalTokens allowance:"
             );
             console.log(ctAllowance);
@@ -115,7 +148,7 @@ contract SplitEverythingInvalidlessCheck is CSMJsonParser, FlatCFMJsonParser {
                 )
             );
             console.log(
-                (erc1155Balance >= amount) ? unicode"✅ splitPosition done" : unicode"❌ splitPosition not done",
+                (erc1155Balance >= depositAmount) ? unicode"✅ splitPosition done" : unicode"❌ splitPosition not done",
                 "Position balance:"
             );
             console.log(erc1155Balance);
@@ -132,7 +165,7 @@ contract SplitEverythingInvalidlessCheck is CSMJsonParser, FlatCFMJsonParser {
             );
             uint256 sbal = short.balanceOf(depositor);
             uint256 lbal = long.balanceOf(depositor);
-            console.log((sbal >= amount) && (lbal >= amount) ? unicode"✅" : unicode"❌", "Short // Long:");
+            console.log((sbal >= depositAmount) && (lbal >= depositAmount) ? unicode"✅" : unicode"❌", "Short // Long:");
             console.logUint(sbal);
             console.logUint(lbal);
         }
@@ -152,7 +185,7 @@ contract SplitEverythingInvalidlessSafeBatchTransfers is CSMJsonParser, FlatCFMJ
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
         address collateralAddr = _parseCollateralAddress(jsonContent);
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
-        uint256 amount = vm.envUint("AMOUNT");
+        uint256 depositAmount = _parseDepositAmount(jsonContent);
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
 
         console.log("Skip approvals: %s", vm.envOr("SKIP_APPROVALS", false));
@@ -164,19 +197,19 @@ contract SplitEverythingInvalidlessSafeBatchTransfers is CSMJsonParser, FlatCFMJ
         currentTransactions = "[";
 
         // Generate collateral approval
-        _appendTransaction(generateApproveTransaction(collateralAddr, conditionalTokensAddr, amount));
+        _appendTransaction(generateApproveTransaction(collateralAddr, conditionalTokensAddr, depositAmount));
 
         // Generate initial split position
         uint256 outcomeCount = icsms.length + 1;
         string memory partition = _generatePartitionArrayString(outcomeCount);
         _appendTransaction(
             generateSplitPositionTransaction(
-                conditionalTokensAddr, collateralAddr, bytes32(0), cfmConditionId, partition, amount
+                conditionalTokensAddr, collateralAddr, bytes32(0), cfmConditionId, partition, depositAmount
             )
         );
 
         // Generate transactions for each market
-        _generateMarketTransactions(icsms, conditionalTokensAddr, amount);
+        _generateMarketTransactions(icsms, conditionalTokensAddr, depositAmount);
 
         // Complete the transactions array and safe batch json
         currentTransactions = string.concat(currentTransactions, "]");
@@ -196,7 +229,7 @@ contract SplitEverythingInvalidlessSafeBatchTransfers is CSMJsonParser, FlatCFMJ
         currentTransactions = string.concat(currentTransactions, transaction);
     }
 
-    function _generateMarketTransactions(Market[] memory icsms, address conditionalTokensAddr, uint256 amount)
+    function _generateMarketTransactions(Market[] memory icsms, address conditionalTokensAddr, uint256 depositAmount)
         private
     {
         for (uint256 i = 0; i < icsms.length; i++) {
@@ -221,19 +254,24 @@ contract SplitEverythingInvalidlessSafeBatchTransfers is CSMJsonParser, FlatCFMJ
             // Generate split transaction
             _appendTransaction(
                 generateSplitPositionTransaction(
-                    conditionalTokensAddr, address(collateralToken), parentCollectionId, conditionId, "[1,2]", amount
+                    conditionalTokensAddr,
+                    address(collateralToken),
+                    parentCollectionId,
+                    conditionId,
+                    "[1,2]",
+                    depositAmount
                 )
             );
 
             // Generate transfer transactions
             _appendTransaction(
                 generateTransferTransaction(
-                    conditionalTokensAddr, address(icsm.wrapped1155Factory()), shortPositionId, amount
+                    conditionalTokensAddr, address(icsm.wrapped1155Factory()), shortPositionId, depositAmount
                 )
             );
             _appendTransaction(
                 generateTransferTransaction(
-                    conditionalTokensAddr, address(icsm.wrapped1155Factory()), longPositionId, amount
+                    conditionalTokensAddr, address(icsm.wrapped1155Factory()), longPositionId, depositAmount
                 )
             );
         }
