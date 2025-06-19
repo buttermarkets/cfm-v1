@@ -6,8 +6,6 @@ import "@openzeppelin-contracts/token/ERC20/ERC20.sol";
 import {RealityETH_v3_0} from "@realityeth/packages/contracts/flat/RealityETH-3.0.sol";
 import {Arbitrator} from "@realityeth/packages/contracts/flat/Arbitrator-development.sol";
 
-import "../vendor/gnosis/conditional-tokens-contracts/ConditionalTokens.sol";
-
 import "src/invalidless/InvalidlessFlatCFMFactory.sol";
 import "src/FlatCFMRealityAdapter.sol";
 import {CollateralToken, Base} from "./Scenario.t.sol";
@@ -37,7 +35,6 @@ contract DeployCoreContractsBase is Base {
 contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
-    CollateralToken public collateralToken;
     uint256 decisionTemplateId;
     uint256 metricTemplateId;
     FlatCFM cfm;
@@ -129,7 +126,6 @@ contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
-    CollateralToken public collateralToken;
     uint256 decisionTemplateId;
     uint256 metricTemplateId;
     FlatCFM cfm;

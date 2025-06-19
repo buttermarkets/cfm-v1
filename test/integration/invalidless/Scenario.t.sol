@@ -25,6 +25,7 @@ contract Base is Test {
     Wrapped1155Factory public wrapped1155Factory;
     RealityETH_v3_0 public reality;
     Arbitrator public arbitrator;
+    CollateralToken public collateralToken;
 
     address USER = makeAddr("USER");
 
@@ -46,6 +47,9 @@ contract Base is Test {
         arbitrator = new Arbitrator();
         arbitrator.setRealitio(address(reality));
         vm.label(address(arbitrator), "Arbitrator");
+        collateralToken = new CollateralToken(INITIAL_SUPPLY);
+        vm.label(address(collateralToken), "$COL");
+        collateralToken.transfer(USER, USER_SUPPLY);
     }
 
     function _getDiscreetPartition() internal pure returns (uint256[] memory) {
@@ -91,7 +95,6 @@ contract DeployCoreContractsTest is DeployCoreContractsBase {
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
-    CollateralToken public collateralToken;
     uint256 decisionTemplateId;
     uint256 metricTemplateId;
     FlatCFM cfm;
@@ -104,11 +107,6 @@ contract CreateDecisionMarketBase is DeployCoreContractsBase {
 
     function setUp() public virtual override {
         super.setUp();
-
-        collateralToken = new CollateralToken(INITIAL_SUPPLY);
-        vm.label(address(collateralToken), "$COL");
-
-        collateralToken.transfer(USER, USER_SUPPLY);
 
         string[] memory outcomes = new string[](3);
         outcomes[0] = "Project A";
@@ -320,8 +318,6 @@ contract SplitPositionTest is SplitPositionTestBase {
 }
 
 contract SplitTestBase is SplitPositionTestBase {
-    // Note: In the invalidless variant, we don't have invalid tokens
-    // so we're only tracking short and long tokens
     uint256 constant METRIC_SPLIT_AMOUNT_A = DECISION_SPLIT_AMOUNT;
     uint256 constant METRIC_SPLIT_AMOUNT_B = DECISION_SPLIT_AMOUNT / 2;
 
@@ -652,7 +648,7 @@ contract MergeTestBase is TradeTestBase {
 
         // 2. Merge positions (using the received ERC1155 tokens)
         conditionalTokens.mergePositions(
-            collateralToken, parentCollectionIdA, conditionIdA, _discreetPartition(), MERGE_AMOUNT
+            collateralToken, parentCollectionIdA, conditionIdA, _getDiscreetPartition(), MERGE_AMOUNT
         );
 
         // For market B
@@ -676,7 +672,7 @@ contract MergeTestBase is TradeTestBase {
 
         // 2. Merge positions
         conditionalTokens.mergePositions(
-            collateralToken, parentCollectionIdB, conditionIdB, _discreetPartition(), MERGE_AMOUNT
+            collateralToken, parentCollectionIdB, conditionIdB, _getDiscreetPartition(), MERGE_AMOUNT
         );
 
         // For market C
@@ -700,18 +696,10 @@ contract MergeTestBase is TradeTestBase {
 
         // 2. Merge positions
         conditionalTokens.mergePositions(
-            collateralToken, parentCollectionIdC, conditionIdC, _discreetPartition(), mergeMax
+            collateralToken, parentCollectionIdC, conditionIdC, _getDiscreetPartition(), mergeMax
         );
 
         vm.stopPrank();
-    }
-
-    // This function returns [1, 2] for the partition (for InvalidConditionalScalarMarket with invalid)
-    function _discreetPartition() private pure returns (uint256[] memory) {
-        uint256[] memory partition = new uint256[](2);
-        partition[0] = 1;
-        partition[1] = 2;
-        return partition;
     }
 }
 
@@ -1184,8 +1172,9 @@ contract CsmRedeemTest is CsmRedeemTestBase {
         (,, bytes32 parentCollectionId,) = conditionalMarketB.ctParams();
         uint256 positionId = conditionalTokens.getPositionId(collateralToken, parentCollectionId);
 
-        uint256 expectedBalance =
-            prevCondRedeemBalanceB + prevCondRedeemBalanceBShort * 3 / 4 + prevCondRedeemBalanceBLong / 4;
+        uint256 expectedPayout =
+            (prevCondRedeemBalanceBShort * 7500 + prevCondRedeemBalanceBLong * 2500) / 10_000;
+        uint256 expectedBalance = prevCondRedeemBalanceB + expectedPayout;
         assertEq(conditionalTokens.balanceOf(USER, positionId), expectedBalance);
     }
 
@@ -1194,11 +1183,12 @@ contract CsmRedeemTest is CsmRedeemTestBase {
         (,, bytes32 parentCollectionId,) = conditionalMarketC.ctParams();
         uint256 positionId = conditionalTokens.getPositionId(collateralToken, parentCollectionId);
 
-        uint256 expectedBalance = prevCondRedeemBalanceC + prevCondRedeemBalanceCLong / 2;
+        uint256 actualRedeemedAmount = prevCondRedeemBalanceCLong / 2;
+        uint256 expectedBalance = prevCondRedeemBalanceC + actualRedeemedAmount;
         assertEq(conditionalTokens.balanceOf(USER, positionId), expectedBalance);
 
         // Check that remaining tokens are still there
-        assertEq(wrappedLongC.balanceOf(USER), prevCondRedeemBalanceCLong / 2);
+        assertEq(wrappedLongC.balanceOf(USER), prevCondRedeemBalanceCLong - actualRedeemedAmount);
     }
 }
 
@@ -1220,8 +1210,14 @@ contract RedeemBackToCollateralTest is CsmRedeemTestBase {
 
     function testCollateral() public view {
         console.log("Testing final collateral redemption");
-        uint256 expectedPayout =
-            (prevCondRedeemBalanceAShort / 2 + prevCondRedeemBalanceALong / 2) / 2 + prevCondRedeemBalanceCLong / 4;
+        uint256 payoutA = (prevCondRedeemBalanceAShort * 5000 + prevCondRedeemBalanceALong * 5000) / 10_000;
+        uint256 payoutC = prevCondRedeemBalanceCLong / 2;
+
+        // Decision market resolution: A and C are winners, payout is 0.5 each
+        uint256 collateralA = payoutA / 2;
+        uint256 collateralC = payoutC / 2;
+
+        uint256 expectedPayout = collateralA + collateralC;
         assertEq(collateralToken.balanceOf(USER), prevFinalRedeemCollateralBalance + expectedPayout);
     }
 }

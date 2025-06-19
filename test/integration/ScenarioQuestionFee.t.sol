@@ -35,7 +35,6 @@ contract DeployCoreContractsBase is Base {
 contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
-    CollateralToken public collateralToken;
     uint256 decisionTemplateId;
     uint256 metricTemplateId;
     FlatCFM cfm;
@@ -124,7 +123,6 @@ contract CreateDecisionMarketOtherTest is DeployCoreContractsBase {
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
-    CollateralToken public collateralToken;
     uint256 decisionTemplateId;
     uint256 metricTemplateId;
     FlatCFM cfm;

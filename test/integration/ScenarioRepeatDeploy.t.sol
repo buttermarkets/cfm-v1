@@ -30,7 +30,6 @@ contract DeployCoreContractsBase is Base {
 contract CreateDecisionMarketBase is DeployCoreContractsBase {
     FlatCFMQuestionParams decisionQuestionParams;
     GenericScalarQuestionParams genericScalarQuestionParams;
-    CollateralToken public collateralToken;
     uint256 decisionTemplateId;
     uint256 metricTemplateId;
     FlatCFM cfm;

@@ -16,6 +16,7 @@ contract SplitEverything is Script, FlatCFMJsonParser {
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
         address collateralAddr = _parseCollateralAddress(jsonContent);
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
+        address wrapped1155FactoryAddr = vm.envAddress("WRAPPED_1155_FACTORY");
         uint256 depositAmount = _parseDepositAmount(jsonContent);
         address[] memory csmList = abi.decode(vm.parseJson(vm.envString("CSM_LIST")), (address[]));
         bool skipApprovals = vm.envOr("SKIP_APPROVALS", false);
@@ -38,10 +39,40 @@ contract SplitEverything is Script, FlatCFMJsonParser {
 
         for (uint256 i = 0; i < csmList.length; i++) {
             ConditionalScalarMarket csm = ConditionalScalarMarket(csmList[i]);
-            if (!skipApprovals) {
-                conditionalTokens.setApprovalForAll(address(csm), true);
-            }
-            csm.split(depositAmount);
+            
+            // Get the market parameters
+            (, bytes32 conditionId, bytes32 parentCollectionId,) = csm.ctParams();
+            (
+                bytes memory shortData,
+                bytes memory longData,
+                bytes memory invalidData,
+                uint256 shortPositionId,
+                uint256 longPositionId,
+                uint256 invalidPositionId,
+                ,
+                ,
+            ) = csm.wrappedCTData();
+
+            // Split the position for this market
+            uint256[] memory scalarPartition = new uint256[](3);
+            scalarPartition[0] = 1; // short
+            scalarPartition[1] = 2; // long
+            scalarPartition[2] = 4; // invalid
+            
+            conditionalTokens.splitPosition(
+                collateral, parentCollectionId, conditionId, scalarPartition, depositAmount
+            );
+
+            // Transfer to wrapped1155Factory to get ERC20s
+            conditionalTokens.safeTransferFrom(
+                msg.sender, wrapped1155FactoryAddr, shortPositionId, depositAmount, shortData
+            );
+            conditionalTokens.safeTransferFrom(
+                msg.sender, wrapped1155FactoryAddr, longPositionId, depositAmount, longData
+            );
+            conditionalTokens.safeTransferFrom(
+                msg.sender, wrapped1155FactoryAddr, invalidPositionId, depositAmount, invalidData
+            );
         }
 
         vm.stopBroadcast();
@@ -111,11 +142,6 @@ contract SplitEverythingCheck is CSMJsonParser, FlatCFMJsonParser {
             IERC20 invalid = IERC20(csms[i].invalidToken.id);
 
             console.log(csms[i].id);
-            console.log(
-                conditionalTokens.isApprovedForAll(depositor, csms[i].id)
-                    ? unicode"✅ is approved for all"
-                    : unicode"❌ NOT APPROVED FOR ALL"
-            );
             uint256 sbal = short.balanceOf(depositor);
             uint256 lbal = long.balanceOf(depositor);
             uint256 ibal = invalid.balanceOf(depositor);
@@ -134,6 +160,7 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
         bytes32 cfmConditionId = vm.envBytes32("CFM_CONDITION_ID");
         address collateralAddr = vm.envAddress("COLLATERAL_TOKEN");
         address conditionalTokensAddr = vm.envAddress("CONDITIONAL_TOKENS");
+        address wrapped1155FactoryAddr = vm.envAddress("WRAPPED_1155_FACTORY");
         uint256 amount = vm.envUint("AMOUNT");
         string memory json = vm.readFile(vm.envString("CSM_JSON"));
 
@@ -163,21 +190,41 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
 
         transactions = string.concat(transactions, ",", splitPosition);
 
-        // For each CSM, approve (if not skipped) and split
+        // For each CSM, split and transfer to wrapped1155Factory
         for (uint256 i = 0; i < csms.length; i++) {
-            // Generate split transaction for the CSM
-            string memory split = generateCSMSplitTransaction(csms[i].id, amount);
+            ConditionalScalarMarket csm = ConditionalScalarMarket(csms[i].id);
+            
+            // Get the market parameters
+            (, bytes32 conditionId, bytes32 parentCollectionId,) = csm.ctParams();
+            (
+                bytes memory shortData,
+                bytes memory longData,
+                bytes memory invalidData,
+                uint256 shortPositionId,
+                uint256 longPositionId,
+                uint256 invalidPositionId,
+                ,
+                ,
+            ) = csm.wrappedCTData();
 
-            if (!vm.envOr("SKIP_APPROVALS", false)) {
-                // Generate setApprovalForAll transaction
-                string memory approveForAll =
-                    generateSetApprovalForAllTransaction(conditionalTokensAddr, csms[i].id, true);
-                // Add transactions with approval
-                transactions = string.concat(transactions, ",", approveForAll, ",", split);
-            } else {
-                // Add only split transaction
-                transactions = string.concat(transactions, ",", split);
-            }
+            // Generate split transaction for the CSM
+            string memory split = generateSplitPositionTransaction(
+                conditionalTokensAddr, collateralAddr, parentCollectionId, conditionId, "[1,2,4]", amount
+            );
+
+            // Generate transfer transactions
+            string memory transferShort = generateTransferTransaction(
+                conditionalTokensAddr, wrapped1155FactoryAddr, shortPositionId, amount, shortData
+            );
+            string memory transferLong = generateTransferTransaction(
+                conditionalTokensAddr, wrapped1155FactoryAddr, longPositionId, amount, longData
+            );
+            string memory transferInvalid = generateTransferTransaction(
+                conditionalTokensAddr, wrapped1155FactoryAddr, invalidPositionId, amount, invalidData
+            );
+
+            // Add transactions
+            transactions = string.concat(transactions, ",", split, ",", transferShort, ",", transferLong, ",", transferInvalid);
         }
 
         transactions = string.concat(transactions, "]");
@@ -189,9 +236,7 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
         vm.writeFile("./spliteverything-batch.json", safeBatch);
 
         console.log("Generated Safe batch transfers file: spliteverything-batch.json");
-        uint256 totalTransactions = vm.envOr("SKIP_APPROVALS", false)
-            ? csms.length + 2 // 1 per market + collateral approval + initial split
-            : csms.length * 2 + 2; // 2 per market (approval + split) + collateral approval + initial split
+        uint256 totalTransactions = csms.length * 4 + 2; // 4 per market (split + 3 transfers) + collateral approval + initial split
 
         console.log("Includes %d markets with %d total transactions", csms.length, totalTransactions);
     }
@@ -392,6 +437,62 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
         );
     }
 
+    function generateTransferTransaction(address conditionalTokensAddr, address to, uint256 tokenId, uint256 amount, bytes memory data)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            "{\n",
+            '      "to": "',
+            addressToString(conditionalTokensAddr),
+            '",\n',
+            '      "value": "0",\n',
+            '      "data": null,\n',
+            '      "contractMethod": {\n',
+            '        "inputs": [\n',
+            "          {\n",
+            '            "internalType": "address",\n',
+            '            "name": "to",\n',
+            '            "type": "address"\n',
+            "          },\n",
+            "          {\n",
+            '            "internalType": "uint256",\n',
+            '            "name": "tokenId",\n',
+            '            "type": "uint256"\n',
+            "          },\n",
+            "          {\n",
+            '            "internalType": "uint256",\n',
+            '            "name": "amount",\n',
+            '            "type": "uint256"\n',
+            "          },\n",
+            "          {\n",
+            '            "internalType": "bytes",\n',
+            '            "name": "data",\n',
+            '            "type": "bytes"\n',
+            "          }\n",
+            "        ],\n",
+            '        "name": "safeTransferFrom",\n',
+            '        "payable": false\n',
+            "      },\n",
+            '      "contractInputsValues": {\n',
+            '        "to": "',
+            addressToString(to),
+            '",\n',
+            '        "tokenId": "',
+            vm.toString(tokenId),
+            '",\n',
+            '        "amount": "',
+            vm.toString(amount),
+            '",\n',
+            '        "data": "',
+            bytesToHex(data),
+            '"\n',
+            "      }\n",
+            "    }"
+        );
+    }
+
     // Helper function to convert address to checksum string
     function addressToString(address addr) internal pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(addr)));
@@ -423,5 +524,16 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
         }
 
         return string(str);
+    }
+
+    // Helper function to convert bytes to hex string
+    function bytesToHex(bytes memory data) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory hexData = new bytes(data.length * 2);
+        for (uint256 i = 0; i < data.length; i++) {
+            hexData[i * 2] = alphabet[uint8(data[i]) >> 4];
+            hexData[i * 2 + 1] = alphabet[uint8(data[i]) & 0xf];
+        }
+        return string(hexData);
     }
 }
