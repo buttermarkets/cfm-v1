@@ -39,7 +39,7 @@ contract SplitEverything is Script, FlatCFMJsonParser {
 
         for (uint256 i = 0; i < csmList.length; i++) {
             ConditionalScalarMarket csm = ConditionalScalarMarket(csmList[i]);
-            
+
             // Get the market parameters
             (, bytes32 conditionId, bytes32 parentCollectionId,) = csm.ctParams();
             (
@@ -58,10 +58,8 @@ contract SplitEverything is Script, FlatCFMJsonParser {
             scalarPartition[0] = 1; // short
             scalarPartition[1] = 2; // long
             scalarPartition[2] = 4; // invalid
-            
-            conditionalTokens.splitPosition(
-                collateral, parentCollectionId, conditionId, scalarPartition, depositAmount
-            );
+
+            conditionalTokens.splitPosition(collateral, parentCollectionId, conditionId, scalarPartition, depositAmount);
 
             // Transfer to wrapped1155Factory to get ERC20s
             conditionalTokens.safeTransferFrom(
@@ -145,7 +143,10 @@ contract SplitEverythingCheck is CSMJsonParser, FlatCFMJsonParser {
             uint256 sbal = short.balanceOf(depositor);
             uint256 lbal = long.balanceOf(depositor);
             uint256 ibal = invalid.balanceOf(depositor);
-            console.log((sbal >= depositAmount) && (lbal >= depositAmount) ? unicode"✅" : unicode"❌", "Short // Long // Invalid:");
+            console.log(
+                (sbal >= depositAmount) && (lbal >= depositAmount) ? unicode"✅" : unicode"❌",
+                "Short // Long // Invalid:"
+            );
             console.logUint(sbal);
             console.logUint(lbal);
             console.logUint(ibal);
@@ -193,7 +194,7 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
         // For each CSM, split and transfer to wrapped1155Factory
         for (uint256 i = 0; i < csms.length; i++) {
             ConditionalScalarMarket csm = ConditionalScalarMarket(csms[i].id);
-            
+
             // Get the market parameters
             (, bytes32 conditionId, bytes32 parentCollectionId,) = csm.ctParams();
             (
@@ -224,7 +225,8 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
             );
 
             // Add transactions
-            transactions = string.concat(transactions, ",", split, ",", transferShort, ",", transferLong, ",", transferInvalid);
+            transactions =
+                string.concat(transactions, ",", split, ",", transferShort, ",", transferLong, ",", transferInvalid);
         }
 
         transactions = string.concat(transactions, "]");
@@ -437,11 +439,13 @@ contract SplitEverythingSafeBatchTransfers is CSMJsonParser {
         );
     }
 
-    function generateTransferTransaction(address conditionalTokensAddr, address to, uint256 tokenId, uint256 amount, bytes memory data)
-        internal
-        pure
-        returns (string memory)
-    {
+    function generateTransferTransaction(
+        address conditionalTokensAddr,
+        address to,
+        uint256 tokenId,
+        uint256 amount,
+        bytes memory data
+    ) internal pure returns (string memory) {
         return string.concat(
             "{\n",
             '      "to": "',
