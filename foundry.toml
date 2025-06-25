@@ -12,7 +12,7 @@ libraries = []
 extra_output = ["metadata"]
 extra_output_files = ["metadata"]
 allowed_paths = ["./flatcfm-config.json"]
-fs_permissions = [{ access = "read-write", path = "./"}]
+fs_permissions = [{ access = "read", path = "/"}, { access = "read-write", path = "./"}]
 allow_internal_expect_revert = true
 
 [profile.itest]
