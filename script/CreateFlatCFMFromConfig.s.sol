@@ -26,20 +26,31 @@ contract CreateFlatCFMFromConfig is Script, FlatCFMJsonParser {
         address collateralAddr = _parseCollateralAddress(jsonContent);
         string memory metadataUri = _parseMetadataUri(jsonContent);
 
-        FlatCFM cfm = factory.createFlatCFM(
-            oracleAdapter,
-            decisionTemplateId,
-            metricTemplateId,
-            decisionQuestionParams,
-            genericScalarQuestionParams,
-            IERC20(collateralAddr),
-            metadataUri
-        );
-        console.log("Deployed FlatCFM at:", address(cfm));
+        address cfmAddr;
+        try vm.envAddress("CFM_ID") returns (address addr) {
+            cfmAddr = addr;
+        } catch {
+            cfmAddr = address(0);
+        }
 
-        for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
-            ConditionalScalarMarket csm = factory.createConditionalScalarMarket(cfm);
-            console.log("Deployed ConditionalScalarMarket at:", address(csm));
+        if (cfmAddr == address(0)) {
+            FlatCFM cfm = factory.createFlatCFM(
+                oracleAdapter,
+                decisionTemplateId,
+                metricTemplateId,
+                decisionQuestionParams,
+                genericScalarQuestionParams,
+                IERC20(collateralAddr),
+                metadataUri
+            );
+            console.log("Deployed FlatCFM at:", address(cfm));
+        } else {
+            FlatCFM cfm = FlatCFM(cfmAddr);
+
+            for (uint256 i = 0; i < decisionQuestionParams.outcomeNames.length; i++) {
+                ConditionalScalarMarket csm = factory.createConditionalScalarMarket(cfm);
+                console.log("Deployed ConditionalScalarMarket at:", address(csm));
+            }
         }
 
         vm.stopBroadcast();
