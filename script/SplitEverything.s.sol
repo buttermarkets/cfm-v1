@@ -119,7 +119,10 @@ contract SplitEverythingCheck is CSMJsonParser, FlatCFMJsonParser {
             uint256 sbal = short.balanceOf(depositor);
             uint256 lbal = long.balanceOf(depositor);
             uint256 ibal = invalid.balanceOf(depositor);
-            console.log((sbal >= depositAmount) && (lbal >= depositAmount) ? unicode"✅" : unicode"❌", "Short // Long // Invalid:");
+            console.log(
+                (sbal >= depositAmount) && (lbal >= depositAmount) ? unicode"✅" : unicode"❌",
+                "Short // Long // Invalid:"
+            );
             console.logUint(sbal);
             console.logUint(lbal);
             console.logUint(ibal);

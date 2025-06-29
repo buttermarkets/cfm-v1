@@ -27,9 +27,7 @@ contract CreateAllPairs is Script, FlatCFMJsonParser {
 
             // ⏩ Skip if the pair already exists to avoid revert
             if (factory.getPair(shortToken, longToken) != address(0)) {
-                console.log(
-                    unicode"⏭️ Skipping existing pair for tokens:", shortToken, longToken
-                );
+                console.log(unicode"⏭️ Skipping existing pair for tokens:", shortToken, longToken);
                 continue;
             }
 

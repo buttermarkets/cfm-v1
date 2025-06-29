@@ -56,7 +56,6 @@ contract CreateInvalidlessFlatCFMFromConfig is Script, FlatCFMJsonParser {
             }
         }
 
-
         vm.stopBroadcast();
     }
 }
