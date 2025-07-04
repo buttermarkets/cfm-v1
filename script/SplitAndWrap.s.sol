@@ -130,15 +130,17 @@ contract SplitAndWrap is Script {
         IERC20 wrappedToken = wrapped1155Factory.requireWrapped1155(conditionalTokens, positionId, data);
 
         // Transfer the ERC1155 tokens to the factory to get wrapped tokens
-        conditionalTokens.safeTransferFrom(msg.sender, config.wrapped1155Factory, positionId, config.amount, data);
+        conditionalTokens.safeTransferFrom(
+            vm.envOr("USER", tx.origin), config.wrapped1155Factory, positionId, config.amount, data
+        );
 
         console.log("    Wrapped token address:", address(wrappedToken));
-        console.log("    Wrapped token balance:", wrappedToken.balanceOf(msg.sender));
+        console.log("    Wrapped token balance:", wrappedToken.balanceOf(tx.origin));
     }
 
     function parseConfig(string memory json) internal pure virtual returns (Config memory) {
         Config memory config;
-        
+
         // Parse each field individually
         config.collateralToken = abi.decode(vm.parseJson(json, ".collateralToken"), (address));
         config.amount = abi.decode(vm.parseJson(json, ".amount"), (uint256));
@@ -146,7 +148,7 @@ contract SplitAndWrap is Script {
         config.conditionalTokens = abi.decode(vm.parseJson(json, ".conditionalTokens"), (address));
         config.wrapped1155Factory = abi.decode(vm.parseJson(json, ".wrapped1155Factory"), (address));
         config.outcomeNames = abi.decode(vm.parseJson(json, ".outcomeNames"), (string[]));
-        
+
         return config;
     }
 }
@@ -165,12 +167,12 @@ contract SplitAndWrapCheck is SplitAndWrap {
         IWrapped1155Factory wrapped1155Factory = IWrapped1155Factory(config.wrapped1155Factory);
         IERC20 collateral = IERC20(config.collateralToken);
 
-        console.log("Checking split and wrap status for user:", vm.envOr("USER", msg.sender));
+        console.log("Checking split and wrap status for user:", vm.envOr("USER", tx.origin));
         console.log("========================================");
 
         // Check collateral balance and allowance
-        uint256 collateralBalance = collateral.balanceOf(vm.envOr("USER", msg.sender));
-        uint256 collateralAllowance = collateral.allowance(vm.envOr("USER", msg.sender), config.conditionalTokens);
+        uint256 collateralBalance = collateral.balanceOf(vm.envOr("USER", tx.origin));
+        uint256 collateralAllowance = collateral.allowance(vm.envOr("USER", tx.origin), config.conditionalTokens);
         console.log("Collateral balance:", collateralBalance);
         console.log("Collateral allowance:", collateralAllowance);
         console.log(
@@ -190,7 +192,7 @@ contract SplitAndWrapCheck is SplitAndWrap {
             bytes32 collectionId = conditionalTokens.getCollectionId(bytes32(0), config.conditionId, partition[i]);
             uint256 positionId = conditionalTokens.getPositionId(collateral, collectionId);
 
-            uint256 erc1155Balance = conditionalTokens.balanceOf(vm.envOr("USER", msg.sender), positionId);
+            uint256 erc1155Balance = conditionalTokens.balanceOf(vm.envOr("USER", tx.origin), positionId);
             console.log("    ERC1155 balance:", erc1155Balance);
 
             // Reconstruct the data to check for wrapped token
@@ -202,7 +204,7 @@ contract SplitAndWrapCheck is SplitAndWrap {
             // Check if wrapped token exists
             try wrapped1155Factory.requireWrapped1155(conditionalTokens, positionId, data) returns (IERC20 wrappedToken)
             {
-                uint256 wrappedBalance = wrappedToken.balanceOf(vm.envOr("USER", msg.sender));
+                uint256 wrappedBalance = wrappedToken.balanceOf(vm.envOr("USER", tx.origin));
                 console.log("    Wrapped token:", address(wrappedToken));
                 console.log("    Wrapped balance:", wrappedBalance);
                 console.log(wrappedBalance > 0 ? unicode"    ✅ Has wrapped tokens" : unicode"    ⚠️  No wrapped tokens");
@@ -212,7 +214,7 @@ contract SplitAndWrapCheck is SplitAndWrap {
         }
 
         // Check approval status
-        bool isApproved = conditionalTokens.isApprovedForAll(vm.envOr("USER", msg.sender), config.wrapped1155Factory);
+        bool isApproved = conditionalTokens.isApprovedForAll(vm.envOr("USER", tx.origin), config.wrapped1155Factory);
         console.log("\nWrapped1155Factory approval:", isApproved ? unicode"✅ Approved" : unicode"❌ Not approved");
     }
 }
