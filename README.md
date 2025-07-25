@@ -98,6 +98,48 @@ forge script script/CreateFlatCFMFromConfig.s.sol \
     --private-key $PRIVATE_KEY
 ```
 
+## deploy an InvalidlessConditionalScalarMarket independently
+
+You can deploy InvalidlessConditionalScalarMarkets independently (without a FlatCFM) using a dedicated script.
+
+First, define a config file (by default, use `./icsm.config.json`):
+
+```json
+{
+  "oracleAdapterAddress": "0x1234567890abcdef1234567890abcdef12345678",
+  "conditionalTokens": "0x1234567890abcdef1234567890abcdef12345678",
+  "wrapped1155Factory": "0x1234567890abcdef1234567890abcdef12345678",
+  "collateralToken": "0x1234567890abcdef1234567890abcdef12345678",
+  "templateId": 2,
+  "outcomeName": "ETH Price Prediction",
+  "minValue": 1000,
+  "maxValue": 10000,
+  "openingTime": 1735689600,
+  "defaultInvalidPayouts": [1, 1]
+}
+```
+
+Then run:
+
+```sh
+forge script script/DeployInvalidlessConditionalScalarMarket.s.sol \
+    --rpc-url $RPC_URL \
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
+```
+
+Optionally, specify a custom config file:
+
+```sh
+MARKET_CONFIG_FILE=./my-icsm-config.json \
+forge script script/DeployInvalidlessConditionalScalarMarket.s.sol \
+    --rpc-url $RPC_URL \
+    --broadcast \
+    --sender $ADDRESS \
+    --private-key $PRIVATE_KEY
+```
+
 # documentation
 
 ## mechansim: flat-cfm
