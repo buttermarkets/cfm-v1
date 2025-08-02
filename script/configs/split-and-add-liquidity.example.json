@@ -1,0 +1,12 @@
+{
+  "icsmAddress": "0x...",
+  "depositAmount": "1000000000000000000000",
+  "collateralToken": "0x...",
+  "conditionalTokens": "0x...",
+  "wrapped1155Factory": "0x...",
+  "uniswapV2Router": "0x...",
+  "uniswapV2Factory": "0x...",
+  "deadline": 0,
+  "amountAMin": 0,
+  "amountBMin": 0
+}
