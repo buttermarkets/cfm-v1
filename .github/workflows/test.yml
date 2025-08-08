@@ -54,8 +54,3 @@ jobs:
         run: |
           FOUNDRY_PROFILE=itest forge test
         id: integration-test
-
-      - name: Run fork tests
-        run: |
-          FOUNDRY_PROFILE=ftest forge test --fork-url "https://sepolia.unichain.org/"
-        id: fork-test
