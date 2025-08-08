@@ -32,10 +32,10 @@ contract SplitAndWrapICSM is Script {
 
         // Get ICSM contract
         InvalidlessConditionalScalarMarket icsm = InvalidlessConditionalScalarMarket(config.icsmAddress);
-        
+
         // Get condition ID and wrapped token data from ICSM
-        (, bytes32 conditionId, , ) = icsm.ctParams();
-        (bytes memory shortData, bytes memory longData, , , IERC20 shortToken, IERC20 longToken) = icsm.wrappedCTData();
+        (, bytes32 conditionId,,) = icsm.ctParams();
+        (bytes memory shortData, bytes memory longData,,, IERC20 shortToken, IERC20 longToken) = icsm.wrappedCTData();
 
         console.log("Splitting and wrapping for ICSM:");
         console.log("  ICSM Address:", config.icsmAddress);
@@ -86,13 +86,7 @@ contract SplitAndWrapICSM is Script {
         // Wrap short tokens if needed
         if (shortWrappedBalance < config.amount) {
             uint256 toWrap = config.amount - shortWrappedBalance;
-            ct.safeTransferFrom(
-                msg.sender,
-                config.wrapped1155Factory,
-                shortPositionId,
-                toWrap,
-                shortData
-            );
+            ct.safeTransferFrom(msg.sender, config.wrapped1155Factory, shortPositionId, toWrap, shortData);
             console.log("Wrapped short tokens:", toWrap);
             console.log("  Short token address:", address(shortToken));
         }
@@ -100,13 +94,7 @@ contract SplitAndWrapICSM is Script {
         // Wrap long tokens if needed
         if (longWrappedBalance < config.amount) {
             uint256 toWrap = config.amount - longWrappedBalance;
-            ct.safeTransferFrom(
-                msg.sender,
-                config.wrapped1155Factory,
-                longPositionId,
-                toWrap,
-                longData
-            );
+            ct.safeTransferFrom(msg.sender, config.wrapped1155Factory, longPositionId, toWrap, longData);
             console.log("Wrapped long tokens:", toWrap);
             console.log("  Long token address:", address(longToken));
         }
@@ -116,7 +104,7 @@ contract SplitAndWrapICSM is Script {
         // Show final balances
         uint256 finalShortBalance = shortToken.balanceOf(msg.sender);
         uint256 finalLongBalance = longToken.balanceOf(msg.sender);
-        
+
         console.log("\nSplit and wrap completed successfully!");
         console.log("Final wrapped token balances:");
         console.log("  Short tokens:", finalShortBalance);
@@ -144,7 +132,7 @@ contract SplitAndWrapICSMCheck is Script {
         require(bytes(configPath).length > 0, "CONFIG_PATH environment variable must be set");
 
         string memory json = vm.readFile(configPath);
-        
+
         address icsmAddress = abi.decode(vm.parseJson(json, ".icsmAddress"), (address));
         uint256 amount = abi.decode(vm.parseJson(json, ".amount"), (uint256));
         address collateralToken = abi.decode(vm.parseJson(json, ".collateralToken"), (address));
@@ -152,11 +140,11 @@ contract SplitAndWrapICSMCheck is Script {
 
         // Get ICSM data
         InvalidlessConditionalScalarMarket icsm = InvalidlessConditionalScalarMarket(icsmAddress);
-        (, bytes32 conditionId, , ) = icsm.ctParams();
-        (, , , , IERC20 shortToken, IERC20 longToken) = icsm.wrappedCTData();
+        (, bytes32 conditionId,,) = icsm.ctParams();
+        (,,,, IERC20 shortToken, IERC20 longToken) = icsm.wrappedCTData();
 
         address user = vm.envOr("USER", msg.sender);
-        
+
         console.log("Checking split and wrap status for ICSM:");
         console.log("  User:", user);
         console.log("  ICSM:", icsmAddress);
@@ -166,21 +154,19 @@ contract SplitAndWrapICSMCheck is Script {
         IERC20 collateral = IERC20(collateralToken);
         uint256 collateralBalance = collateral.balanceOf(user);
         uint256 collateralAllowance = collateral.allowance(user, conditionalTokens);
-        
+
         console.log("Collateral:");
         console.log("  Balance:", collateralBalance);
         console.log("  Allowance:", collateralAllowance);
-        console.log(
-            collateralAllowance >= amount ? "  ✅ Sufficient allowance" : "  ❌ Insufficient allowance"
-        );
+        console.log(collateralAllowance >= amount ? "  ✅ Sufficient allowance" : "  ❌ Insufficient allowance");
 
         // Check ERC1155 balances
         IConditionalTokens ct = IConditionalTokens(conditionalTokens);
-        
+
         uint256[] memory partition = new uint256[](2);
         partition[0] = 1;
         partition[1] = 2;
-        
+
         bytes32 shortCollectionId = ct.getCollectionId(bytes32(0), conditionId, partition[0]);
         bytes32 longCollectionId = ct.getCollectionId(bytes32(0), conditionId, partition[1]);
         uint256 shortPositionId = ct.getPositionId(collateral, shortCollectionId);

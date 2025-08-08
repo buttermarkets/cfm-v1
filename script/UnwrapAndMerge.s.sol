@@ -72,18 +72,12 @@ contract UnwrapAndMerge is Script {
         }
 
         // Ensure user has the invalid outcome tokens as well
-        bytes32 invalidCollectionId = conditionalTokens.getCollectionId(
-            bytes32(0),
-            config.conditionId,
-            partition[config.outcomeNames.length]
-        );
+        bytes32 invalidCollectionId =
+            conditionalTokens.getCollectionId(bytes32(0), config.conditionId, partition[config.outcomeNames.length]);
         uint256 invalidPositionId = conditionalTokens.getPositionId(collateral, invalidCollectionId);
         uint256 invalidBalance = conditionalTokens.balanceOf(msg.sender, invalidPositionId);
         console.log("Invalid outcome ERC1155 balance:", invalidBalance);
-        require(
-            invalidBalance >= config.amount,
-            "Insufficient invalid outcome token balance for merge"
-        );
+        require(invalidBalance >= config.amount, "Insufficient invalid outcome token balance for merge");
 
         // Merge all conditional tokens back to collateral
         conditionalTokens.mergePositions(
@@ -128,25 +122,22 @@ contract UnwrapAndMerge is Script {
         // Get the wrapped token address
         bytes memory data = abi.encodePacked(tokenName.toString31(), tokenName.toString31(), decimals);
         IERC20 wrappedToken = wrapped1155Factory.requireWrapped1155(conditionalTokens, positionId, data);
-        
+
         // Check wrapped token balance
         uint256 wrappedBalance = wrappedToken.balanceOf(msg.sender);
         console.log("    Wrapped token balance:", wrappedBalance);
-        
-        require(wrappedBalance >= config.amount, string.concat("Insufficient wrapped token balance for ", config.outcomeNames[i]));
+
+        require(
+            wrappedBalance >= config.amount,
+            string.concat("Insufficient wrapped token balance for ", config.outcomeNames[i])
+        );
 
         // Approve wrapped1155Factory to spend wrapped tokens
         wrappedToken.approve(address(wrapped1155Factory), config.amount);
         console.log("    Approved factory to spend wrapped tokens");
 
         // Unwrap the ERC20 tokens back to ERC1155 conditional tokens
-        wrapped1155Factory.unwrap(
-            conditionalTokens,
-            positionId,
-            config.amount,
-            msg.sender,
-            data
-        );
+        wrapped1155Factory.unwrap(conditionalTokens, positionId, config.amount, msg.sender, data);
         console.log("    Unwrapped tokens back to ERC1155");
 
         // Verify we received the ERC1155 tokens
@@ -156,7 +147,7 @@ contract UnwrapAndMerge is Script {
 
     function parseConfig(string memory json) internal pure virtual returns (Config memory) {
         Config memory config;
-        
+
         // Parse each field individually
         config.collateralToken = abi.decode(vm.parseJson(json, ".collateralToken"), (address));
         config.amount = abi.decode(vm.parseJson(json, ".amount"), (uint256));
@@ -164,7 +155,7 @@ contract UnwrapAndMerge is Script {
         config.conditionalTokens = abi.decode(vm.parseJson(json, ".conditionalTokens"), (address));
         config.wrapped1155Factory = abi.decode(vm.parseJson(json, ".wrapped1155Factory"), (address));
         config.outcomeNames = abi.decode(vm.parseJson(json, ".outcomeNames"), (string[]));
-        
+
         return config;
     }
 }
@@ -214,7 +205,11 @@ contract UnwrapAndMergeCheck is UnwrapAndMerge {
                 uint256 wrappedBalance = wrappedToken.balanceOf(vm.envOr("USER", msg.sender));
                 console.log("    Wrapped token:", address(wrappedToken));
                 console.log("    Wrapped balance:", wrappedBalance);
-                console.log(wrappedBalance >= config.amount ? unicode"    ✅ Sufficient for merge" : unicode"    ❌ Insufficient for merge");
+                console.log(
+                    wrappedBalance >= config.amount
+                        ? unicode"    ✅ Sufficient for merge"
+                        : unicode"    ❌ Insufficient for merge"
+                );
             } catch {
                 console.log(unicode"    ⚠️  Wrapped token not found");
             }
@@ -225,11 +220,12 @@ contract UnwrapAndMergeCheck is UnwrapAndMerge {
         }
 
         // Check invalid outcome ERC1155 balance
-        bytes32 invalidCollectionId = conditionalTokens.getCollectionId(bytes32(0), config.conditionId, partition[config.outcomeNames.length]);
+        bytes32 invalidCollectionId =
+            conditionalTokens.getCollectionId(bytes32(0), config.conditionId, partition[config.outcomeNames.length]);
         uint256 invalidPositionId = conditionalTokens.getPositionId(collateral, invalidCollectionId);
         uint256 invalidBalance = conditionalTokens.balanceOf(vm.envOr("USER", msg.sender), invalidPositionId);
         console.log("\nInvalid outcome ERC1155 balance:", invalidBalance);
-        
+
         // Check if user has complete set for merging
         bool canMerge = true;
         for (uint256 i = 0; i < config.outcomeNames.length; i++) {
@@ -244,7 +240,11 @@ contract UnwrapAndMergeCheck is UnwrapAndMerge {
         if (invalidBalance < config.amount) {
             canMerge = false;
         }
-        
-        console.log(canMerge ? unicode"\n✅ Can merge complete set back to collateral" : unicode"\n❌ Cannot merge - incomplete set");
+
+        console.log(
+            canMerge
+                ? unicode"\n✅ Can merge complete set back to collateral"
+                : unicode"\n❌ Cannot merge - incomplete set"
+        );
     }
 }

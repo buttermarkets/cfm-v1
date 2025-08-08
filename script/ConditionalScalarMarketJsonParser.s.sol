@@ -59,8 +59,6 @@ abstract contract ConditionalScalarMarketJsonParser is Script {
         return uint32(openingTime);
     }
 
-
-
     /// @dev Reads default invalid payouts from JSON. Only used by InvalidlessConditionalScalarMarket.
     function _parseDefaultInvalidPayouts(string memory json) public pure returns (uint256[2] memory) {
         bytes memory payoutsRaw = vm.parseJson(json, ".defaultInvalidPayouts");

@@ -39,10 +39,11 @@ contract SplitAndAddLiquidity is Script {
         // Get market parameters from ICSM
         InvalidlessConditionalScalarMarket icsm = InvalidlessConditionalScalarMarket(config.icsmAddress);
         // ctParams returns a tuple when accessed as a public variable
-        (bytes32 questionId, bytes32 conditionId, , ) = icsm.ctParams();
-        
+        (bytes32 questionId, bytes32 conditionId,,) = icsm.ctParams();
+
         // Get wrapped token metadata and addresses from ICSM
-        (bytes memory shortData, bytes memory longData, , , IERC20 existingShort, IERC20 existingLong) = icsm.wrappedCTData();
+        (bytes memory shortData, bytes memory longData,,, IERC20 existingShort, IERC20 existingLong) =
+            icsm.wrappedCTData();
 
         console.log("=== Split and Add Liquidity ===");
         console.log("ICSM Address:", config.icsmAddress);
@@ -57,19 +58,19 @@ contract SplitAndAddLiquidity is Script {
             console.log("\n=== Market Information ===");
             console.log("Short Token:", address(existingShort));
             console.log("Long Token:", address(existingLong));
-            
+
             // Check if pair exists
             IUniswapV2Factory factory = IUniswapV2Factory(config.uniswapV2Factory);
             address pairAddress = factory.getPair(address(existingShort), address(existingLong));
-            
+
             if (pairAddress != address(0)) {
                 console.log("Pair Address:", pairAddress);
-                
+
                 // Get pair reserves
                 IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
-                (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
+                (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
                 address token0 = pair.token0();
-                
+
                 if (token0 == address(existingShort)) {
                     console.log("  Short Reserve:", uint256(reserve0));
                     console.log("  Long Reserve:", uint256(reserve1));
@@ -77,13 +78,13 @@ contract SplitAndAddLiquidity is Script {
                     console.log("  Short Reserve:", uint256(reserve1));
                     console.log("  Long Reserve:", uint256(reserve0));
                 }
-                
+
                 uint256 totalSupply = pair.totalSupply();
                 console.log("  LP Total Supply:", totalSupply);
             } else {
                 console.log("⚠️  No liquidity pair exists yet");
             }
-            
+
             return;
         }
 
@@ -138,7 +139,7 @@ contract SplitAndAddLiquidity is Script {
         uint256 deadline = config.deadline > 0 ? config.deadline : block.timestamp + 30 minutes;
 
         // Call addLiquidity without storing all return values to avoid stack too deep
-        (, , uint256 liquidity) = IUniswapV2Router02(config.uniswapV2Router).addLiquidity(
+        (,, uint256 liquidity) = IUniswapV2Router02(config.uniswapV2Router).addLiquidity(
             shortToken,
             longToken,
             config.depositAmount,
@@ -191,7 +192,6 @@ contract SplitAndAddLiquidity is Script {
         console.log("  Long:", longPositionId);
     }
 
-
     function _wrapTokens(
         Config memory config,
         uint256 shortPositionId,
@@ -210,11 +210,7 @@ contract SplitAndAddLiquidity is Script {
         if (shortWrappedBalance < config.depositAmount) {
             uint256 toWrap = config.depositAmount - shortWrappedBalance;
             IConditionalTokens(config.conditionalTokens).safeTransferFrom(
-                msg.sender,
-                config.wrapped1155Factory,
-                shortPositionId,
-                toWrap,
-                shortData
+                msg.sender, config.wrapped1155Factory, shortPositionId, toWrap, shortData
             );
             console.log(unicode"✓ Wrapped short tokens:", toWrap);
         }
@@ -222,11 +218,7 @@ contract SplitAndAddLiquidity is Script {
         if (longWrappedBalance < config.depositAmount) {
             uint256 toWrap = config.depositAmount - longWrappedBalance;
             IConditionalTokens(config.conditionalTokens).safeTransferFrom(
-                msg.sender,
-                config.wrapped1155Factory,
-                longPositionId,
-                toWrap,
-                longData
+                msg.sender, config.wrapped1155Factory, longPositionId, toWrap, longData
             );
             console.log(unicode"✓ Wrapped long tokens:", toWrap);
         }
@@ -253,14 +245,14 @@ contract SplitAndAddLiquidity is Script {
 
         // Required fields
         config.icsmAddress = vm.parseJsonAddress(json, ".icsmAddress");
-        
+
         // depositAmount is optional - defaults to 0 if not provided
         try vm.parseJsonUint(json, ".depositAmount") returns (uint256 depositAmount) {
             config.depositAmount = depositAmount;
         } catch {
             config.depositAmount = 0;
         }
-        
+
         config.collateralToken = vm.parseJsonAddress(json, ".collateralToken");
         config.conditionalTokens = vm.parseJsonAddress(json, ".conditionalTokens");
         config.wrapped1155Factory = vm.parseJsonAddress(json, ".wrapped1155Factory");

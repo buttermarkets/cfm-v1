@@ -20,10 +20,8 @@ contract DeployInvalidlessConditionalScalarMarketFactory is Script {
         IWrapped1155Factory wrapped1155Factory = IWrapped1155Factory(wrapped1155FactoryAddr);
 
         // Deploy.
-        InvalidlessConditionalScalarMarketFactory factory = new InvalidlessConditionalScalarMarketFactory(
-            conditionalTokens,
-            wrapped1155Factory
-        );
+        InvalidlessConditionalScalarMarketFactory factory =
+            new InvalidlessConditionalScalarMarketFactory(conditionalTokens, wrapped1155Factory);
         console.log("InvalidlessConditionalScalarMarketFactory deployed at:", address(factory));
 
         vm.stopBroadcast();

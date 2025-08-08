@@ -29,17 +29,15 @@ contract CreateInvalidlessConditionalScalarMarketFromFactory is Script, Conditio
         Config memory config = parseConfig();
 
         // Use the factory to deploy the market
-        InvalidlessConditionalScalarMarketFactory factory = InvalidlessConditionalScalarMarketFactory(config.factoryAddress);
+        InvalidlessConditionalScalarMarketFactory factory =
+            InvalidlessConditionalScalarMarketFactory(config.factoryAddress);
 
         InvalidlessConditionalScalarMarket icsm = factory.createInvalidlessConditionalScalarMarket(
             FlatCFMOracleAdapter(config.oracleAdapterAddress),
             config.templateId,
             config.outcomeName,
             GenericScalarQuestionParams({
-                scalarParams: ScalarParams({
-                    minValue: config.minValue,
-                    maxValue: config.maxValue
-                }),
+                scalarParams: ScalarParams({minValue: config.minValue, maxValue: config.maxValue}),
                 openingTime: config.openingTime
             }),
             config.defaultInvalidPayouts,
@@ -47,7 +45,7 @@ contract CreateInvalidlessConditionalScalarMarketFromFactory is Script, Conditio
         );
 
         console.log("Deployed InvalidlessConditionalScalarMarket via factory at:", address(icsm));
-        
+
         // Access struct fields directly
         (bytes32 questionId, bytes32 conditionId,,) = icsm.ctParams();
         console.log("Question ID:", vm.toString(questionId));
