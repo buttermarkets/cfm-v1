@@ -53,7 +53,7 @@ contract SplitAndAddLiquidity is Script {
 
         // Check if depositAmount is set (greater than 0)
         if (config.depositAmount == 0) {
-            console.log("\n⚠️  Deposit amount is 0 or not set");
+            console.log(unicode"\n⚠️  Deposit amount is 0 or not set");
             console.log("    No liquidity operations will be performed.");
             console.log("\n=== Market Information ===");
             console.log("Short Token:", address(existingShort));
@@ -82,7 +82,7 @@ contract SplitAndAddLiquidity is Script {
                 uint256 totalSupply = pair.totalSupply();
                 console.log("  LP Total Supply:", totalSupply);
             } else {
-                console.log("⚠️  No liquidity pair exists yet");
+                console.log(unicode"⚠️  No liquidity pair exists yet");
             }
 
             return;

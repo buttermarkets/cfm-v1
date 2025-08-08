@@ -158,7 +158,7 @@ contract SplitAndWrapICSMCheck is Script {
         console.log("Collateral:");
         console.log("  Balance:", collateralBalance);
         console.log("  Allowance:", collateralAllowance);
-        console.log(collateralAllowance >= amount ? "  ✅ Sufficient allowance" : "  ❌ Insufficient allowance");
+        console.log(collateralAllowance >= amount ? unicode"  ✅ Sufficient allowance" : unicode"  ❌ Insufficient allowance");
 
         // Check ERC1155 balances
         IConditionalTokens ct = IConditionalTokens(conditionalTokens);
