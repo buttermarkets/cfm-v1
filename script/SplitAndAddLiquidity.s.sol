@@ -27,69 +27,32 @@ contract SplitAndAddLiquidity is Script {
 
     function run() external {
         // Read config file path from environment variable
-        string memory configPath = vm.envString("LIQUIDITY_CONFIG_PATH");
-        require(bytes(configPath).length > 0, "LIQUIDITY_CONFIG_PATH environment variable must be set");
+        require(
+            bytes(vm.envString("LIQUIDITY_CONFIG_PATH")).length > 0,
+            "LIQUIDITY_CONFIG_PATH environment variable must be set"
+        );
 
         // Read and parse config file
-        Config memory config = parseConfig(vm.readFile(configPath));
+        Config memory config = parseConfig(vm.readFile(vm.envString("LIQUIDITY_CONFIG_PATH")));
 
         // Validate configuration
         _validateConfig(config);
 
-        // Get market parameters from ICSM
-        InvalidlessConditionalScalarMarket icsm = InvalidlessConditionalScalarMarket(config.icsmAddress);
         // ctParams returns a tuple when accessed as a public variable
-        (bytes32 questionId, bytes32 conditionId,,) = icsm.ctParams();
-
-        // Get wrapped token metadata and addresses from ICSM
-        (bytes memory shortData, bytes memory longData,,, IERC20 existingShort, IERC20 existingLong) =
-            icsm.wrappedCTData();
+        (, bytes32 conditionId,,) = InvalidlessConditionalScalarMarket(config.icsmAddress).ctParams();
 
         console.log("=== Split and Add Liquidity ===");
         console.log("ICSM Address:", config.icsmAddress);
-        console.log("Question ID:", vm.toString(questionId));
         console.log("Condition ID:", vm.toString(conditionId));
         console.log("Deposit Amount:", config.depositAmount);
 
-        // Check if depositAmount is set (greater than 0)
-        if (config.depositAmount == 0) {
-            console.log(unicode"\n⚠️  Deposit amount is 0 or not set");
-            console.log("    No liquidity operations will be performed.");
-            console.log("\n=== Market Information ===");
-            console.log("Short Token:", address(existingShort));
-            console.log("Long Token:", address(existingLong));
-
-            // Check if pair exists
-            IUniswapV2Factory factory = IUniswapV2Factory(config.uniswapV2Factory);
-            address pairAddress = factory.getPair(address(existingShort), address(existingLong));
-
-            if (pairAddress != address(0)) {
-                console.log("Pair Address:", pairAddress);
-
-                // Get pair reserves
-                IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
-                (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
-                address token0 = pair.token0();
-
-                if (token0 == address(existingShort)) {
-                    console.log("  Short Reserve:", uint256(reserve0));
-                    console.log("  Long Reserve:", uint256(reserve1));
-                } else {
-                    console.log("  Short Reserve:", uint256(reserve1));
-                    console.log("  Long Reserve:", uint256(reserve0));
-                }
-
-                uint256 totalSupply = pair.totalSupply();
-                console.log("  LP Total Supply:", totalSupply);
-            } else {
-                console.log(unicode"⚠️  No liquidity pair exists yet");
-            }
-
+        // Check if we should only display info
+        if (_handleZeroDeposit(config)) {
             return;
         }
 
         // If depositAmount is set, proceed with liquidity operations
-        console.log("\n✓ Deposit amount is set, proceeding with liquidity operations...\n");
+        console.log(unicode"\n✓ Deposit amount is set, proceeding with liquidity operations...\n");
 
         vm.startBroadcast();
 
@@ -111,57 +74,35 @@ contract SplitAndAddLiquidity is Script {
         );
         console.log(unicode"✓ Split collateral into conditional tokens");
 
-        // Step 3: Calculate position IDs
-        (uint256 shortPositionId, uint256 longPositionId) = _calculatePositionIds(config, conditionId, partition);
-
-        // Step 4: Approve Wrapped1155Factory
-        IConditionalTokens(config.conditionalTokens).setApprovalForAll(config.wrapped1155Factory, true);
-        console.log(unicode"✓ Approved Wrapped1155Factory");
-
-        // Step 5: Use existing wrapped tokens from ICSM
-        address shortToken = address(existingShort);
-        address longToken = address(existingLong);
-        console.log("  Using wrapped short token:", shortToken);
-        console.log("  Using wrapped long token:", longToken);
-
-        // Step 6: Wrap the ERC1155 tokens into ERC20
-        _wrapTokens(config, shortPositionId, longPositionId, shortToken, longToken, shortData, longData);
-
-        // Step 7: Create Uniswap pair if it doesn't exist
-        address pairAddress = _getOrCreatePair(config, shortToken, longToken);
-
-        // Step 8: Approve router to spend tokens
-        IERC20(shortToken).approve(config.uniswapV2Router, config.depositAmount);
-        IERC20(longToken).approve(config.uniswapV2Router, config.depositAmount);
-        console.log(unicode"✓ Approved router to spend tokens");
-
-        // Step 9: Add liquidity
-        uint256 deadline = config.deadline > 0 ? config.deadline : block.timestamp + 30 minutes;
-
-        // Call addLiquidity without storing all return values to avoid stack too deep
-        (,, uint256 liquidity) = IUniswapV2Router02(config.uniswapV2Router).addLiquidity(
-            shortToken,
-            longToken,
-            config.depositAmount,
-            config.depositAmount,
-            config.amountAMin,
-            config.amountBMin,
-            msg.sender,
-            deadline
-        );
-
-        console.log(unicode"✓ Added liquidity to Uniswap V2 pool");
-        console.log(unicode"  LP tokens received:", liquidity);
+        // Step 3: Wrap tokens and add liquidity
+        uint256 liquidity = _wrapAndAddLiquidity(config, conditionId, partition);
 
         vm.stopBroadcast();
 
         // Log summary
         console.log(unicode"\n=== Summary ===");
         console.log("ICSM Address:", config.icsmAddress);
-        console.log("Short Token:", shortToken);
-        console.log("Long Token:", longToken);
-        console.log("Pair Address:", pairAddress);
         console.log("LP Tokens:", liquidity);
+    }
+
+    function _handleZeroDeposit(Config memory config) internal view returns (bool) {
+        if (config.depositAmount == 0) {
+            console.log(unicode"\n⚠️  Deposit amount is 0 or not set");
+            console.log("    No liquidity operations will be performed.");
+            console.log("\n=== Market Information ===");
+
+            // Get token addresses for display only
+            (,,,, IERC20 existingShort, IERC20 existingLong) =
+                InvalidlessConditionalScalarMarket(config.icsmAddress).wrappedCTData();
+
+            console.log("Short Token:", address(existingShort));
+            console.log("Long Token:", address(existingLong));
+
+            _displayPairInfo(config, address(existingShort), address(existingLong));
+
+            return true;
+        }
+        return false;
     }
 
     function _validateConfig(Config memory config) internal pure {
@@ -190,6 +131,72 @@ contract SplitAndAddLiquidity is Script {
         console.log("Position IDs:");
         console.log("  Short:", shortPositionId);
         console.log("  Long:", longPositionId);
+    }
+
+    function _wrapAndAddLiquidity(Config memory config, bytes32 conditionId, uint256[] memory partition)
+        internal
+        returns (uint256 liquidity)
+    {
+        // Calculate position IDs
+        (uint256 shortPositionId, uint256 longPositionId) = _calculatePositionIds(config, conditionId, partition);
+
+        // Approve Wrapped1155Factory
+        IConditionalTokens(config.conditionalTokens).setApprovalForAll(config.wrapped1155Factory, true);
+        console.log(unicode"✓ Approved Wrapped1155Factory");
+
+        // Wrap tokens and get addresses
+        (address shortToken, address longToken) = _performWrapping(config, shortPositionId, longPositionId);
+
+        // Add liquidity
+        liquidity = _addLiquidity(config, shortToken, longToken);
+
+        // Log pair info
+        console.log("Short Token:", shortToken);
+        console.log("Long Token:", longToken);
+        console.log("Pair Address:", _getOrCreatePair(config, shortToken, longToken));
+    }
+
+    function _performWrapping(Config memory config, uint256 shortPositionId, uint256 longPositionId)
+        internal
+        returns (address shortToken, address longToken)
+    {
+        // Get wrapped token data from ICSM
+        (bytes memory shortData, bytes memory longData,,, IERC20 existingShort, IERC20 existingLong) =
+            InvalidlessConditionalScalarMarket(config.icsmAddress).wrappedCTData();
+
+        shortToken = address(existingShort);
+        longToken = address(existingLong);
+
+        console.log("  Using wrapped short token:", shortToken);
+        console.log("  Using wrapped long token:", longToken);
+
+        // Wrap the tokens
+        _wrapTokens(config, shortPositionId, longPositionId, shortToken, longToken, shortData, longData);
+    }
+
+    function _addLiquidity(Config memory config, address shortToken, address longToken)
+        internal
+        returns (uint256 liquidity)
+    {
+        // Approve router to spend tokens
+        IERC20(shortToken).approve(config.uniswapV2Router, config.depositAmount);
+        IERC20(longToken).approve(config.uniswapV2Router, config.depositAmount);
+        console.log(unicode"✓ Approved router to spend tokens");
+
+        // Add liquidity
+        (,, liquidity) = IUniswapV2Router02(config.uniswapV2Router).addLiquidity(
+            shortToken,
+            longToken,
+            config.depositAmount,
+            config.depositAmount,
+            config.amountAMin,
+            config.amountBMin,
+            msg.sender,
+            config.deadline > 0 ? config.deadline : block.timestamp + 30 minutes
+        );
+
+        console.log(unicode"✓ Added liquidity to Uniswap V2 pool");
+        console.log(unicode"  LP tokens received:", liquidity);
     }
 
     function _wrapTokens(
@@ -237,6 +244,31 @@ contract SplitAndAddLiquidity is Script {
             console.log(unicode"✓ Created new Uniswap pair:", pairAddress);
         } else {
             console.log(unicode"  Using existing pair:", pairAddress);
+        }
+    }
+
+    function _displayPairInfo(Config memory config, address shortToken, address longToken) internal view {
+        address pairAddress = IUniswapV2Factory(config.uniswapV2Factory).getPair(shortToken, longToken);
+
+        if (pairAddress != address(0)) {
+            console.log("Pair Address:", pairAddress);
+
+            // Get pair reserves
+            IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
+            (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
+
+            if (pair.token0() == shortToken) {
+                console.log("  Short Reserve:", uint256(reserve0));
+                console.log("  Long Reserve:", uint256(reserve1));
+            } else {
+                console.log("  Short Reserve:", uint256(reserve1));
+                console.log("  Long Reserve:", uint256(reserve0));
+            }
+
+            uint256 totalSupply = pair.totalSupply();
+            console.log("  LP Total Supply:", totalSupply);
+        } else {
+            console.log(unicode"⚠️  No liquidity pair exists yet");
         }
     }
 

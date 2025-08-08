@@ -24,18 +24,10 @@ contract SplitAndWrapICSM is Script {
         Config memory config = parseConfig(vm.readFile(configPath));
 
         // Validate inputs
-        require(config.icsmAddress != address(0), "Invalid ICSM address");
-        require(config.amount > 0, "Amount must be greater than 0");
-        require(config.collateralToken != address(0), "Invalid collateral address");
-        require(config.conditionalTokens != address(0), "Invalid conditional tokens address");
-        require(config.wrapped1155Factory != address(0), "Invalid wrapped1155 factory address");
+        _validateConfig(config);
 
-        // Get ICSM contract
-        InvalidlessConditionalScalarMarket icsm = InvalidlessConditionalScalarMarket(config.icsmAddress);
-
-        // Get condition ID and wrapped token data from ICSM
-        (, bytes32 conditionId,,) = icsm.ctParams();
-        (bytes memory shortData, bytes memory longData,,, IERC20 shortToken, IERC20 longToken) = icsm.wrappedCTData();
+        // Get condition ID from ICSM
+        (, bytes32 conditionId,,) = InvalidlessConditionalScalarMarket(config.icsmAddress).ctParams();
 
         console.log("Splitting and wrapping for ICSM:");
         console.log("  ICSM Address:", config.icsmAddress);
@@ -64,31 +56,86 @@ contract SplitAndWrapICSM is Script {
         );
         console.log("Split position completed");
 
-        // Calculate position IDs
+        // Perform wrapping
+        (address shortToken, address longToken) = _performWrapping(config, conditionId, partition);
+
+        vm.stopBroadcast();
+
+        // Show final balances
+        _displayFinalBalances(shortToken, longToken);
+    }
+
+    function _validateConfig(Config memory config) internal pure {
+        require(config.icsmAddress != address(0), "Invalid ICSM address");
+        require(config.amount > 0, "Amount must be greater than 0");
+        require(config.collateralToken != address(0), "Invalid collateral address");
+        require(config.conditionalTokens != address(0), "Invalid conditional tokens address");
+        require(config.wrapped1155Factory != address(0), "Invalid wrapped1155 factory address");
+    }
+
+    function _calculatePositionIds(Config memory config, bytes32 conditionId, uint256[] memory partition)
+        internal
+        view
+        returns (uint256 shortPositionId, uint256 longPositionId)
+    {
         IConditionalTokens ct = IConditionalTokens(config.conditionalTokens);
+
         bytes32 shortCollectionId = ct.getCollectionId(bytes32(0), conditionId, partition[0]);
         bytes32 longCollectionId = ct.getCollectionId(bytes32(0), conditionId, partition[1]);
-        uint256 shortPositionId = ct.getPositionId(IERC20(config.collateralToken), shortCollectionId);
-        uint256 longPositionId = ct.getPositionId(IERC20(config.collateralToken), longCollectionId);
+
+        shortPositionId = ct.getPositionId(IERC20(config.collateralToken), shortCollectionId);
+        longPositionId = ct.getPositionId(IERC20(config.collateralToken), longCollectionId);
 
         console.log("Position IDs:");
         console.log("  Short:", shortPositionId);
         console.log("  Long:", longPositionId);
+    }
+
+    function _performWrapping(Config memory config, bytes32 conditionId, uint256[] memory partition)
+        internal
+        returns (address shortToken, address longToken)
+    {
+        // Calculate position IDs
+        (uint256 shortPositionId, uint256 longPositionId) = _calculatePositionIds(config, conditionId, partition);
 
         // Approve wrapped1155Factory to transfer the position tokens
-        ct.setApprovalForAll(config.wrapped1155Factory, true);
+        IConditionalTokens(config.conditionalTokens).setApprovalForAll(config.wrapped1155Factory, true);
         console.log("Approved Wrapped1155Factory for all tokens");
 
+        // Get wrapped token data from ICSM
+        (bytes memory shortData, bytes memory longData,,, IERC20 existingShort, IERC20 existingLong) =
+            InvalidlessConditionalScalarMarket(config.icsmAddress).wrappedCTData();
+
+        shortToken = address(existingShort);
+        longToken = address(existingLong);
+
+        // Wrap the tokens
+        _wrapTokens(config, shortPositionId, longPositionId, shortToken, longToken, shortData, longData);
+
+        return (shortToken, longToken);
+    }
+
+    function _wrapTokens(
+        Config memory config,
+        uint256 shortPositionId,
+        uint256 longPositionId,
+        address shortToken,
+        address longToken,
+        bytes memory shortData,
+        bytes memory longData
+    ) internal {
+        IConditionalTokens ct = IConditionalTokens(config.conditionalTokens);
+
         // Check current wrapped balances
-        uint256 shortWrappedBalance = shortToken.balanceOf(msg.sender);
-        uint256 longWrappedBalance = longToken.balanceOf(msg.sender);
+        uint256 shortWrappedBalance = IERC20(shortToken).balanceOf(msg.sender);
+        uint256 longWrappedBalance = IERC20(longToken).balanceOf(msg.sender);
 
         // Wrap short tokens if needed
         if (shortWrappedBalance < config.amount) {
             uint256 toWrap = config.amount - shortWrappedBalance;
             ct.safeTransferFrom(msg.sender, config.wrapped1155Factory, shortPositionId, toWrap, shortData);
             console.log("Wrapped short tokens:", toWrap);
-            console.log("  Short token address:", address(shortToken));
+            console.log("  Short token address:", shortToken);
         }
 
         // Wrap long tokens if needed
@@ -96,14 +143,13 @@ contract SplitAndWrapICSM is Script {
             uint256 toWrap = config.amount - longWrappedBalance;
             ct.safeTransferFrom(msg.sender, config.wrapped1155Factory, longPositionId, toWrap, longData);
             console.log("Wrapped long tokens:", toWrap);
-            console.log("  Long token address:", address(longToken));
+            console.log("  Long token address:", longToken);
         }
+    }
 
-        vm.stopBroadcast();
-
-        // Show final balances
-        uint256 finalShortBalance = shortToken.balanceOf(msg.sender);
-        uint256 finalLongBalance = longToken.balanceOf(msg.sender);
+    function _displayFinalBalances(address shortToken, address longToken) internal view {
+        uint256 finalShortBalance = IERC20(shortToken).balanceOf(msg.sender);
+        uint256 finalLongBalance = IERC20(longToken).balanceOf(msg.sender);
 
         console.log("\nSplit and wrap completed successfully!");
         console.log("Final wrapped token balances:");
@@ -126,6 +172,15 @@ contract SplitAndWrapICSM is Script {
 }
 
 contract SplitAndWrapICSMCheck is Script {
+    struct CheckConfig {
+        address icsmAddress;
+        uint256 amount;
+        address collateralToken;
+        address conditionalTokens;
+        address wrapped1155Factory;
+        address user;
+    }
+
     function run() external view {
         // Read config file
         string memory configPath = vm.envString("CONFIG_PATH");
@@ -133,35 +188,57 @@ contract SplitAndWrapICSMCheck is Script {
 
         string memory json = vm.readFile(configPath);
 
-        address icsmAddress = abi.decode(vm.parseJson(json, ".icsmAddress"), (address));
-        uint256 amount = abi.decode(vm.parseJson(json, ".amount"), (uint256));
-        address collateralToken = abi.decode(vm.parseJson(json, ".collateralToken"), (address));
-        address conditionalTokens = abi.decode(vm.parseJson(json, ".conditionalTokens"), (address));
-
-        // Get ICSM data
-        InvalidlessConditionalScalarMarket icsm = InvalidlessConditionalScalarMarket(icsmAddress);
-        (, bytes32 conditionId,,) = icsm.ctParams();
-        (,,,, IERC20 shortToken, IERC20 longToken) = icsm.wrappedCTData();
-
-        address user = vm.envOr("USER", msg.sender);
+        CheckConfig memory config;
+        config.icsmAddress = abi.decode(vm.parseJson(json, ".icsmAddress"), (address));
+        config.amount = abi.decode(vm.parseJson(json, ".amount"), (uint256));
+        config.collateralToken = abi.decode(vm.parseJson(json, ".collateralToken"), (address));
+        config.conditionalTokens = abi.decode(vm.parseJson(json, ".conditionalTokens"), (address));
+        config.wrapped1155Factory = abi.decode(vm.parseJson(json, ".wrapped1155Factory"), (address));
+        config.user = vm.envOr("USER", msg.sender);
 
         console.log("Checking split and wrap status for ICSM:");
-        console.log("  User:", user);
-        console.log("  ICSM:", icsmAddress);
+        console.log("  User:", config.user);
+        console.log("  ICSM:", config.icsmAddress);
         console.log("========================================");
 
-        // Check collateral balance and allowance
-        IERC20 collateral = IERC20(collateralToken);
-        uint256 collateralBalance = collateral.balanceOf(user);
-        uint256 collateralAllowance = collateral.allowance(user, conditionalTokens);
+        // Check collateral
+        _checkCollateral(config);
+
+        // Check positions and wrapped tokens
+        _checkPositionsAndTokens(config);
+    }
+
+    function _checkCollateral(CheckConfig memory config) internal view {
+        IERC20 collateral = IERC20(config.collateralToken);
+        uint256 collateralBalance = collateral.balanceOf(config.user);
+        uint256 collateralAllowance = collateral.allowance(config.user, config.conditionalTokens);
 
         console.log("Collateral:");
         console.log("  Balance:", collateralBalance);
         console.log("  Allowance:", collateralAllowance);
-        console.log(collateralAllowance >= amount ? unicode"  ✅ Sufficient allowance" : unicode"  ❌ Insufficient allowance");
+        console.log(
+            collateralAllowance >= config.amount
+                ? unicode"  ✅ Sufficient allowance"
+                : unicode"  ❌ Insufficient allowance"
+        );
+    }
+
+    function _checkPositionsAndTokens(CheckConfig memory config) internal view {
+        // Get ICSM data
+        (, bytes32 conditionId,,) = InvalidlessConditionalScalarMarket(config.icsmAddress).ctParams();
 
         // Check ERC1155 balances
-        IConditionalTokens ct = IConditionalTokens(conditionalTokens);
+        _checkERC1155Balances(config, conditionId);
+
+        // Check wrapped tokens
+        _checkWrappedTokens(config);
+
+        // Check approval status
+        _checkApproval(config);
+    }
+
+    function _checkERC1155Balances(CheckConfig memory config, bytes32 conditionId) internal view {
+        IConditionalTokens ct = IConditionalTokens(config.conditionalTokens);
 
         uint256[] memory partition = new uint256[](2);
         partition[0] = 1;
@@ -169,28 +246,35 @@ contract SplitAndWrapICSMCheck is Script {
 
         bytes32 shortCollectionId = ct.getCollectionId(bytes32(0), conditionId, partition[0]);
         bytes32 longCollectionId = ct.getCollectionId(bytes32(0), conditionId, partition[1]);
-        uint256 shortPositionId = ct.getPositionId(collateral, shortCollectionId);
-        uint256 longPositionId = ct.getPositionId(collateral, longCollectionId);
 
-        uint256 shortERC1155Balance = ct.balanceOf(user, shortPositionId);
-        uint256 longERC1155Balance = ct.balanceOf(user, longPositionId);
+        uint256 shortPositionId = ct.getPositionId(IERC20(config.collateralToken), shortCollectionId);
+        uint256 longPositionId = ct.getPositionId(IERC20(config.collateralToken), longCollectionId);
+
+        uint256 shortERC1155Balance = ct.balanceOf(config.user, shortPositionId);
+        uint256 longERC1155Balance = ct.balanceOf(config.user, longPositionId);
 
         console.log("\nERC1155 Positions:");
         console.log("  Short balance:", shortERC1155Balance);
         console.log("  Long balance:", longERC1155Balance);
+    }
 
-        // Check wrapped token balances
-        uint256 shortWrappedBalance = shortToken.balanceOf(user);
-        uint256 longWrappedBalance = longToken.balanceOf(user);
+    function _checkWrappedTokens(CheckConfig memory config) internal view {
+        (,,,, IERC20 shortToken, IERC20 longToken) =
+            InvalidlessConditionalScalarMarket(config.icsmAddress).wrappedCTData();
+
+        uint256 shortWrappedBalance = shortToken.balanceOf(config.user);
+        uint256 longWrappedBalance = longToken.balanceOf(config.user);
 
         console.log("\nWrapped ERC20 Tokens:");
         console.log("  Short token:", address(shortToken));
         console.log("  Short balance:", shortWrappedBalance);
         console.log("  Long token:", address(longToken));
         console.log("  Long balance:", longWrappedBalance);
+    }
 
-        // Check approval status
-        bool isApproved = ct.isApprovedForAll(user, abi.decode(vm.parseJson(json, ".wrapped1155Factory"), (address)));
-        console.log("\nWrapped1155Factory approval:", isApproved ? "✅ Approved" : "❌ Not approved");
+    function _checkApproval(CheckConfig memory config) internal view {
+        IConditionalTokens ct = IConditionalTokens(config.conditionalTokens);
+        bool isApproved = ct.isApprovedForAll(config.user, config.wrapped1155Factory);
+        console.log("\nWrapped1155Factory approval:", isApproved ? unicode"✅ Approved" : unicode"❌ Not approved");
     }
 }

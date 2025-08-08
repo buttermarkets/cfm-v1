@@ -68,7 +68,7 @@ abstract contract ConditionalScalarMarketJsonParser is Script {
     }
 
     /// @dev Parse parent collection ID for nested markets (optional)
-    function _parseParentCollectionId(string memory json) public returns (bytes32) {
+    function _parseParentCollectionId(string memory json) public pure returns (bytes32) {
         try vm.parseJsonBytes32(json, ".parentCollectionId") returns (bytes32 parentCollectionId) {
             return parentCollectionId;
         } catch {
@@ -77,7 +77,7 @@ abstract contract ConditionalScalarMarketJsonParser is Script {
     }
 
     /// @dev Parse whether to include invalid outcome (for standard ConditionalScalarMarket)
-    function _parseIncludeInvalid(string memory json) public returns (bool) {
+    function _parseIncludeInvalid(string memory json) public pure returns (bool) {
         try vm.parseJsonBool(json, ".includeInvalid") returns (bool includeInvalid) {
             return includeInvalid;
         } catch {
