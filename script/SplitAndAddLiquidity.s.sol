@@ -50,6 +50,46 @@ contract SplitAndAddLiquidity is Script {
         console.log("Condition ID:", vm.toString(conditionId));
         console.log("Deposit Amount:", config.depositAmount);
 
+        // Check if depositAmount is set (greater than 0)
+        if (config.depositAmount == 0) {
+            console.log("\n⚠️  Deposit amount is 0 or not set");
+            console.log("    No liquidity operations will be performed.");
+            console.log("\n=== Market Information ===");
+            console.log("Short Token:", address(existingShort));
+            console.log("Long Token:", address(existingLong));
+            
+            // Check if pair exists
+            IUniswapV2Factory factory = IUniswapV2Factory(config.uniswapV2Factory);
+            address pairAddress = factory.getPair(address(existingShort), address(existingLong));
+            
+            if (pairAddress != address(0)) {
+                console.log("Pair Address:", pairAddress);
+                
+                // Get pair reserves
+                IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
+                (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
+                address token0 = pair.token0();
+                
+                if (token0 == address(existingShort)) {
+                    console.log("  Short Reserve:", uint256(reserve0));
+                    console.log("  Long Reserve:", uint256(reserve1));
+                } else {
+                    console.log("  Short Reserve:", uint256(reserve1));
+                    console.log("  Long Reserve:", uint256(reserve0));
+                }
+                
+                uint256 totalSupply = pair.totalSupply();
+                console.log("  LP Total Supply:", totalSupply);
+            } else {
+                console.log("⚠️  No liquidity pair exists yet");
+            }
+            
+            return;
+        }
+
+        // If depositAmount is set, proceed with liquidity operations
+        console.log("\n✓ Deposit amount is set, proceeding with liquidity operations...\n");
+
         vm.startBroadcast();
 
         // Step 1: Approve ConditionalTokens to spend collateral
@@ -125,7 +165,7 @@ contract SplitAndAddLiquidity is Script {
 
     function _validateConfig(Config memory config) internal pure {
         require(config.icsmAddress != address(0), "Invalid ICSM address");
-        require(config.depositAmount > 0, "Deposit amount must be > 0");
+        // Note: depositAmount can be 0 to just check market info
         require(config.collateralToken != address(0), "Invalid collateral token");
         require(config.conditionalTokens != address(0), "Invalid conditional tokens");
         require(config.wrapped1155Factory != address(0), "Invalid wrapped1155 factory");
@@ -213,7 +253,14 @@ contract SplitAndAddLiquidity is Script {
 
         // Required fields
         config.icsmAddress = vm.parseJsonAddress(json, ".icsmAddress");
-        config.depositAmount = vm.parseJsonUint(json, ".depositAmount");
+        
+        // depositAmount is optional - defaults to 0 if not provided
+        try vm.parseJsonUint(json, ".depositAmount") returns (uint256 depositAmount) {
+            config.depositAmount = depositAmount;
+        } catch {
+            config.depositAmount = 0;
+        }
+        
         config.collateralToken = vm.parseJsonAddress(json, ".collateralToken");
         config.conditionalTokens = vm.parseJsonAddress(json, ".conditionalTokens");
         config.wrapped1155Factory = vm.parseJsonAddress(json, ".wrapped1155Factory");
