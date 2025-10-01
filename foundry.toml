@@ -14,6 +14,16 @@ extra_output_files = ["metadata"]
 allowed_paths = ["./flatcfm-config.json"]
 fs_permissions = [{ access = "read", path = "/"}, { access = "read-write", path = "./"}]
 allow_internal_expect_revert = true
+remappings = [
+    # Preferred Uniswap import style
+    "@uniswap/v4-core/=dependencies/uniswap-v4-core-main/",
+    "@uniswap/v4-periphery/=dependencies/uniswap-v4-periphery-main/",
+    "@uniswap/permit2/=dependencies/uniswap-permit2-0x000000000022D473030F116dDEE9F6B43aC78BA3/",
+    # Back-compat for existing imports
+    "permit2/=dependencies/uniswap-permit2-0x000000000022D473030F116dDEE9F6B43aC78BA3/",
+    # OZ alias used by some upstream packages (v4 periphery)
+    "@openzeppelin/contracts/=dependencies/@openzeppelin-contracts-5.0.2/",
+]
 
 [profile.itest]
 test = "test/integration"
@@ -33,3 +43,7 @@ remappings_location = "txt"
 "@openzeppelin-contracts" = "5.0.2"
 "@realityeth" = { version = "3.0.61", git = "https://github.com/RealityETH/reality-eth-monorepo.git", rev = "c5abe9c19fc6217e9636838e3cf0087e93bb6621" }
 forge-std = "1.9.5"
+uniswap-v4-core = { version = "main", git = "https://github.com/Uniswap/v4-core.git", branch = "main" }
+uniswap-v4-periphery = { version = "main", git = "https://github.com/Uniswap/v4-periphery.git", branch = "main" }
+uniswap-permit2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+solmate = { version = "main", git = "https://github.com/transmissions11/solmate.git", branch = "main" }

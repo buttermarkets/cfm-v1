@@ -1,3 +1,7 @@
 @openzeppelin-contracts/=dependencies/@openzeppelin-contracts-5.0.2/
 @realityeth/=dependencies/@realityeth-3.0.61/
 forge-std/=dependencies/forge-std-1.9.5/
+solmate/=dependencies/solmate-main/
+uniswap-permit2/=dependencies/uniswap-permit2-0x000000000022D473030F116dDEE9F6B43aC78BA3/
+uniswap-v4-core/=dependencies/uniswap-v4-core-main/
+uniswap-v4-periphery/=dependencies/uniswap-v4-periphery-main/

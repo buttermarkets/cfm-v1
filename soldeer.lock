@@ -17,3 +17,28 @@ version = "1.9.5"
 url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_5_21-12-2024_15:04:05_forge-std-1.9.zip"
 checksum = "57ada736f383289db77fac4472d48f820e7c98172cf9b01681b0c37065ce043f"
 integrity = "4753ffdfa0dde40878372b6a4d8e8fd1648b190b33996896c8b92f6f1680850f"
+
+[[dependencies]]
+name = "solmate"
+version = "main"
+git = "https://github.com/transmissions11/solmate.git"
+rev = "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+
+[[dependencies]]
+name = "uniswap-permit2"
+version = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+url = "https://soldeer-revisions.s3.amazonaws.com/uniswap-permit2/0x000000000022D473030F116dDEE9F6B43aC78BA3_11-11-2024_08:00:23_permit2.zip"
+checksum = "d4fb59a5d0b9bb91c6800b55a0fa4037dcf4d2a17e55750ffb369572a4dd5906"
+integrity = "0557449748fa1d64e1e0caa3928c16a06932a16f16bc14cb37023526ed5228cc"
+
+[[dependencies]]
+name = "uniswap-v4-core"
+version = "main"
+git = "https://github.com/Uniswap/v4-core.git"
+rev = "59d3ecf53afa9264a16bba0e38f4c5d2231f80bc"
+
+[[dependencies]]
+name = "uniswap-v4-periphery"
+version = "main"
+git = "https://github.com/Uniswap/v4-periphery.git"
+rev = "60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5"
