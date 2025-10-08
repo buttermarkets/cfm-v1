@@ -29,6 +29,7 @@ abstract contract V4AddLiq is Script {
         uint24 fee;
         int24 tickSpacing;
         address hook;
+        // Optional price band; when zero, treat as full range
         uint256 minQ1e18; // short per long
         uint256 maxQ1e18; // short per long
     }
@@ -47,7 +48,7 @@ abstract contract V4AddLiq is Script {
         return vm.envString("MARKET_CONFIG_FILE");
     }
 
-    function _parseV4Cfg(string memory json) internal pure returns (Cfg memory cfg) {
+    function _parseV4Cfg(string memory json) internal returns (Cfg memory cfg) {
         cfg.positionManager = payable(vm.parseJsonAddress(json, ".positionManager"));
         cfg.stateView = vm.parseJsonAddress(json, ".stateView");
         cfg.permit2 = vm.parseJsonAddress(json, ".permit2");
@@ -58,9 +59,29 @@ abstract contract V4AddLiq is Script {
         require(spacing <= type(int24).max && spacing >= type(int24).min, "spacing oob");
         cfg.tickSpacing = int24(spacing);
         cfg.hook = vm.parseJsonAddress(json, ".hook");
-        cfg.minQ1e18 = vm.parseJsonUint(json, ".minQ1e18");
-        cfg.maxQ1e18 = vm.parseJsonUint(json, ".maxQ1e18");
-        require(cfg.minQ1e18 > 0 && cfg.maxQ1e18 > 0 && cfg.minQ1e18 < cfg.maxQ1e18, "bad band");
+        // min/max are optional; when absent, we use full range (extreme ticks)
+        (bool hasMin, uint256 minVal) = _tryParseUint(json, ".minQ1e18");
+        (bool hasMax, uint256 maxVal) = _tryParseUint(json, ".maxQ1e18");
+        if (hasMin && hasMax) {
+            require(minVal > 0 && maxVal > 0 && minVal < maxVal, "bad band");
+            cfg.minQ1e18 = minVal;
+            cfg.maxQ1e18 = maxVal;
+        } else {
+            cfg.minQ1e18 = 0;
+            cfg.maxQ1e18 = 0;
+        }
+    }
+
+    function _tryParseUint(string memory json, string memory key)
+        internal
+        returns (bool ok, uint256 value)
+    {
+        // vm.parseJsonUint reverts when key is missing or not a uint; catch and return (false,0)
+        try vm.parseJsonUint(json, key) returns (uint256 v) {
+            return (true, v);
+        } catch {
+            return (false, 0);
+        }
     }
 
     function _parseDepositAmount(string memory json) internal pure returns (uint256) {
@@ -263,7 +284,16 @@ abstract contract V4AddLiq is Script {
             L.minP = cfg.minQ1e18;
             L.maxP = cfg.maxQ1e18;
         }
-        (L.tl, L.tu) = _computeAlignedTicks(L.token0, L.token1, L.minP, L.maxP, cfg.tickSpacing);
+        if (cfg.minQ1e18 == 0 || cfg.maxQ1e18 == 0) {
+            // Full-range: align protocol min/max ticks to spacing
+            int24 minTick = _floorToSpacing(TickMath.MIN_TICK, cfg.tickSpacing);
+            int24 maxTick = _ceilToSpacing(TickMath.MAX_TICK, cfg.tickSpacing);
+            if (minTick == maxTick) maxTick += cfg.tickSpacing;
+            L.tl = minTick;
+            L.tu = maxTick;
+        } else {
+            (L.tl, L.tu) = _computeAlignedTicks(L.token0, L.token1, L.minP, L.maxP, cfg.tickSpacing);
+        }
         console.log("ticks lower/upper:");
         console.logInt(L.tl);
         console.logInt(L.tu);
