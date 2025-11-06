@@ -7,6 +7,7 @@ import {IERC20Metadata} from "@openzeppelin-contracts/token/ERC20/extensions/IER
 import {IConditionalTokens} from "src/interfaces/IConditionalTokens.sol";
 import {IWrapped1155Factory} from "src/interfaces/IWrapped1155Factory.sol";
 import {String31} from "src/libs/String31.sol";
+import {WrappedOutcome} from "./lib/WrappedOutcome.sol";
 
 contract SplitAndWrap is Script {
     using String31 for string;
@@ -113,21 +114,21 @@ contract SplitAndWrap is Script {
         );
         uint256 positionId = conditionalTokens.getPositionId(collateral, collectionId);
 
-        // Encode the data for wrapped token
+        // Generate token name for logging
         string memory tokenName = string.concat("IF-", config.outcomeNames[i]);
-
-        // Token names are guaranteed to fit in String31 since outcome names are max 25 chars
-        // "IF-" (3 chars) + outcome name (max 25 chars) = max 28 chars < 31
-
-        bytes memory data = abi.encodePacked(tokenName.toString31(), tokenName.toString31(), decimals);
 
         console.log(string.concat("  Outcome ", vm.toString(i), " (", config.outcomeNames[i], "):"));
         console.log("    Position ID:", positionId);
         console.log("    Token name:", tokenName);
 
-        // Wrap the position tokens
-        // The requireWrapped1155 function will create the wrapped token if it doesn't exist
-        IERC20 wrappedToken = wrapped1155Factory.requireWrapped1155(conditionalTokens, positionId, data);
+        // Wrap the position tokens using library
+        // The requireWrappedOutcome function will create the wrapped token if it doesn't exist
+        IERC20 wrappedToken = WrappedOutcome.requireWrappedOutcome(
+            wrapped1155Factory, conditionalTokens, positionId, config.outcomeNames[i], collateral
+        );
+
+        // Generate data for safeTransferFrom
+        bytes memory data = WrappedOutcome.outcomeErc20Data(config.outcomeNames[i], decimals);
 
         // Transfer the ERC1155 tokens to the factory to get wrapped tokens
         conditionalTokens.safeTransferFrom(
@@ -195,11 +196,9 @@ contract SplitAndWrapCheck is SplitAndWrap {
             uint256 erc1155Balance = conditionalTokens.balanceOf(vm.envOr("USER", tx.origin), positionId);
             console.log("    ERC1155 balance:", erc1155Balance);
 
-            // Reconstruct the data to check for wrapped token
-            string memory tokenName = string.concat("IF-", config.outcomeNames[i]);
-
+            // Use library to generate data for wrapped token check
             uint8 decimals = IERC20Metadata(config.collateralToken).decimals();
-            bytes memory data = abi.encodePacked(tokenName.toString31(), tokenName.toString31(), decimals);
+            bytes memory data = WrappedOutcome.outcomeErc20Data(config.outcomeNames[i], decimals);
 
             // Check if wrapped token exists
             try wrapped1155Factory.requireWrapped1155(conditionalTokens, positionId, data) returns (IERC20 wrappedToken)

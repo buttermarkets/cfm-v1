@@ -1,0 +1,11 @@
+{
+  "cfmAddress": "0x1234567890123456789012345678901234567890",
+  "collateralToken": "0x078d782b760474a361dda0af3839290b0ef57ad6",
+  "conditionalTokens": "0xc8E244eB32200e6274E7737238AFa60eC6cf2511",
+  "wrapped1155Factory": "0x87bc2f26DF5D72B3e45b298127e702ba7ED459ea",
+  "outcomeNames": [
+    "Team A",
+    "Team B",
+    "Team C"
+  ]
+}
