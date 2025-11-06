@@ -20,7 +20,7 @@ abstract contract V4CreatePool is Script {
         uint24 fee;
         int24 tickSpacing;
         address hook;
-        uint256 initQ1e18; // short per long
+        uint256 initP1e18; // probability of LONG token (0 to 1e18)
     }
 
     function _getConfigFilePath() internal view returns (string memory) {
@@ -36,8 +36,8 @@ abstract contract V4CreatePool is Script {
         require(spacing <= type(int24).max && spacing >= type(int24).min, "spacing oob");
         cfg.tickSpacing = int24(spacing);
         cfg.hook = vm.parseJsonAddress(json, ".hook");
-        cfg.initQ1e18 = vm.parseJsonUint(json, ".initQ1e18");
-        require(cfg.initQ1e18 > 0, "initQ1e18 bad");
+        cfg.initP1e18 = vm.parseJsonUint(json, ".univ4.initP1e18");
+        require(cfg.initP1e18 > 0 && cfg.initP1e18 < 1e18, "initP1e18 out of bounds");
     }
 
     function _abs(int256 x) internal pure returns (uint256) {
@@ -60,26 +60,6 @@ abstract contract V4CreatePool is Script {
     {
         if (uint160(shortToken) < uint160(longToken)) return (shortToken, longToken, false);
         return (longToken, shortToken, true);
-    }
-
-    /// Map a single Q price (short/long) into pool P price (token1/token0)
-    function _poolPriceFromShortLong(
-        address token0,
-        address token1,
-        address shortToken,
-        address longToken,
-        uint256 Q1e18
-    ) internal pure returns (uint256 P1e18) {
-        require(Q1e18 != 0, "Q=0");
-        if (token0 == shortToken && token1 == longToken) {
-            // P = long/short = 1/Q
-            P1e18 = (1e36) / Q1e18;
-        } else if (token0 == longToken && token1 == shortToken) {
-            // P = short/long = Q
-            P1e18 = Q1e18;
-        } else {
-            revert("tokens mismatch");
-        }
     }
 
     function _sqrtPriceX96FromPrice1e18(address token0, address token1, uint256 price1e18)
