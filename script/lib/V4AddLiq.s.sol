@@ -30,8 +30,8 @@ abstract contract V4AddLiq is Script {
         int24 tickSpacing;
         address hook;
         // Optional price band; when zero, treat as full range
-        uint256 minQ1e18; // short per long
-        uint256 maxQ1e18; // short per long
+        uint256 minP1e18; // min probability for long outcome (0 to 1e18)
+        uint256 maxP1e18; // max probability for long outcome (0 to 1e18)
     }
 
     struct _MintTmp {
@@ -60,15 +60,17 @@ abstract contract V4AddLiq is Script {
         cfg.tickSpacing = int24(spacing);
         cfg.hook = vm.parseJsonAddress(json, ".hook");
         // min/max are optional; when absent, we use full range (extreme ticks)
-        (bool hasMin, uint256 minVal) = _tryParseUint(json, ".minQ1e18");
-        (bool hasMax, uint256 maxVal) = _tryParseUint(json, ".maxQ1e18");
+        (bool hasMin, uint256 minVal) = _tryParseUint(json, ".minP1e18");
+        (bool hasMax, uint256 maxVal) = _tryParseUint(json, ".maxP1e18");
         if (hasMin && hasMax) {
-            require(minVal > 0 && maxVal > 0 && minVal < maxVal, "bad band");
-            cfg.minQ1e18 = minVal;
-            cfg.maxQ1e18 = maxVal;
+            require(minVal > 0 && minVal < 1e18, "minP out of bounds");
+            require(maxVal > 0 && maxVal <= 1e18, "maxP out of bounds");
+            require(minVal < maxVal, "minP must be < maxP");
+            cfg.minP1e18 = minVal;
+            cfg.maxP1e18 = maxVal;
         } else {
-            cfg.minQ1e18 = 0;
-            cfg.maxQ1e18 = 0;
+            cfg.minP1e18 = 0;
+            cfg.maxP1e18 = 0;
         }
     }
 
@@ -180,19 +182,6 @@ abstract contract V4AddLiq is Script {
         require(tickLower < tickUpper, "ticks collapsed");
     }
 
-    function _poolBandFromShortLong(uint256 minQ1e18, uint256 maxQ1e18)
-        internal
-        pure
-        returns (uint256 minP1e18, uint256 maxP1e18)
-    {
-        // token0 is the lower address; token1 is the higher
-        // If short < long in address order, P = 1/Q; else P = Q
-        // The caller ensures (short,long) were passed to _order
-        // so token0==short means invert, token0==long means pass-through
-        // When token0 is short (short<long): P = long/short = 1/Q
-        minP1e18 = (1e36) / maxQ1e18;
-        maxP1e18 = (1e36) / minQ1e18;
-    }
 
     function _computeL(address stateView, PoolKey memory key, int24 tl, int24 tu, uint256 deposit)
         internal
@@ -259,32 +248,88 @@ abstract contract V4AddLiq is Script {
     }
 
     // ===== High level helpers =====
-    function _approvePermit2(Cfg memory cfg, address shortToken, address longToken, uint256 amount, uint48 expiration)
-        internal
-    {
+    function _approvePermit2(
+        Cfg memory cfg,
+        address outcomeToken,
+        address shortToken,
+        address longToken,
+        uint256 amount,
+        uint48 expiration
+    ) internal {
+        // Approve outcomeToken, shortToken, and longToken for both pools
+        IERC20(outcomeToken).approve(cfg.permit2, amount);
         IERC20(shortToken).approve(cfg.permit2, amount);
         IERC20(longToken).approve(cfg.permit2, amount);
+        IAllowanceTransfer(cfg.permit2).approve(outcomeToken, cfg.positionManager, uint160(amount), expiration);
         IAllowanceTransfer(cfg.permit2).approve(shortToken, cfg.positionManager, uint160(amount), expiration);
         IAllowanceTransfer(cfg.permit2).approve(longToken, cfg.positionManager, uint160(amount), expiration);
     }
 
     function _mintForPair(
         Cfg memory cfg,
+        address outcomeToken,
         address shortToken,
         address longToken,
         uint256 deposit,
         address recipient,
         uint256 deadline
     ) internal {
+        // Split deposit 50/50 between two pools
+        uint256 depositPerPool = deposit / 2;
+
+        console.log("=== Adding liquidity to 2 pools ===");
+        console.log("Total deposit:", deposit);
+        console.log("Per pool:", depositPerPool);
+
+        // Pool 1: outcome <> long with [minP, maxP]
+        console.log("\n--- Pool 1: outcome <> long ---");
+        _mintSinglePool(
+            cfg,
+            outcomeToken,
+            longToken,
+            cfg.minP1e18,
+            cfg.maxP1e18,
+            depositPerPool,
+            recipient,
+            deadline
+        );
+
+        // Pool 2: outcome <> short with complementary [1-maxP, 1-minP]
+        console.log("\n--- Pool 2: outcome <> short ---");
+        uint256 minPForShort = (cfg.minP1e18 == 0 && cfg.maxP1e18 == 0)
+            ? 0
+            : 1e18 - cfg.maxP1e18;
+        uint256 maxPForShort = (cfg.minP1e18 == 0 && cfg.maxP1e18 == 0)
+            ? 0
+            : 1e18 - cfg.minP1e18;
+        _mintSinglePool(
+            cfg,
+            outcomeToken,
+            shortToken,
+            minPForShort,
+            maxPForShort,
+            depositPerPool,
+            recipient,
+            deadline
+        );
+    }
+
+    function _mintSinglePool(
+        Cfg memory cfg,
+        address token0Addr,
+        address token1Addr,
+        uint256 minP,
+        uint256 maxP,
+        uint256 deposit,
+        address recipient,
+        uint256 deadline
+    ) internal {
         _MintTmp memory L;
-        (L.token0, L.token1,) = _order(shortToken, longToken);
-        if (L.token0 == shortToken) {
-            (L.minP, L.maxP) = _poolBandFromShortLong(cfg.minQ1e18, cfg.maxQ1e18);
-        } else {
-            L.minP = cfg.minQ1e18;
-            L.maxP = cfg.maxQ1e18;
-        }
-        if (cfg.minQ1e18 == 0 || cfg.maxQ1e18 == 0) {
+        (L.token0, L.token1,) = _order(token0Addr, token1Addr);
+
+        // Determine price range - P values represent long probability in outcome<>long pool
+        // When tokens are ordered, we may need to adjust interpretation
+        if (minP == 0 && maxP == 0) {
             // Full-range: align protocol min/max ticks to spacing
             int24 minTick = _floorToSpacing(TickMath.MIN_TICK, cfg.tickSpacing);
             int24 maxTick = _ceilToSpacing(TickMath.MAX_TICK, cfg.tickSpacing);
@@ -292,9 +337,17 @@ abstract contract V4AddLiq is Script {
             L.tl = minTick;
             L.tu = maxTick;
         } else {
+            // Use P values directly for tick calculation
+            L.minP = minP;
+            L.maxP = maxP;
             (L.tl, L.tu) = _computeAlignedTicks(L.token0, L.token1, L.minP, L.maxP, cfg.tickSpacing);
         }
-        console.log("ticks lower/upper:");
+
+        console.log("Token pair:");
+        console.logAddress(L.token0);
+        console.logAddress(L.token1);
+        console.log("Price range (P):", minP, maxP);
+        console.log("Ticks lower/upper:");
         console.logInt(L.tl);
         console.logInt(L.tu);
 

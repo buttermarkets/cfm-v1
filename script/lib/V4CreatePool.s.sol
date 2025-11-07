@@ -36,7 +36,7 @@ abstract contract V4CreatePool is Script {
         require(spacing <= type(int24).max && spacing >= type(int24).min, "spacing oob");
         cfg.tickSpacing = int24(spacing);
         cfg.hook = vm.parseJsonAddress(json, ".hook");
-        cfg.initP1e18 = vm.parseJsonUint(json, ".univ4.initP1e18");
+        cfg.initP1e18 = vm.parseJsonUint(json, ".initP1e18");
         require(cfg.initP1e18 > 0 && cfg.initP1e18 < 1e18, "initP1e18 out of bounds");
     }
 
@@ -93,6 +93,7 @@ abstract contract V4CreatePool is Script {
     }
 }
 
+// Check contract for 2-pool system - verifies both pools exist per CSM
 contract V4CreatePoolCheck is Script, V4CreatePool {
     function run() external view {
         string memory configPath = _getConfigFilePath();
@@ -101,46 +102,71 @@ contract V4CreatePoolCheck is Script, V4CreatePool {
         Cfg memory cfg = _parseV4Cfg(jsonContent);
         require(cfg.poolManager != address(0), "poolManager unset");
 
-        string memory pairsJson = vm.envString("SHORT_LONG_PAIRS");
-        address[][] memory shortLongPairs = abi.decode(vm.parseJson(pairsJson), (address[][]));
+        // Parse OUTCOME_TOKEN_POOLS format: [[wrappedOutcomeToken, shortToken, longToken], ...]
+        string memory poolsJson = vm.envString("OUTCOME_TOKEN_POOLS");
+        address[][] memory pools = abi.decode(vm.parseJson(poolsJson), (address[][]));
 
         IPoolManager manager = IPoolManager(cfg.poolManager);
 
-        for (uint256 i = 0; i < shortLongPairs.length; i++) {
-            require(shortLongPairs[i].length == 2, "pair length != 2");
-            address shortToken = shortLongPairs[i][0];
-            address longToken = shortLongPairs[i][1];
-            require(shortToken != address(0) && longToken != address(0), "zero token address");
-            require(shortToken != longToken, "duplicate token addresses");
+        for (uint256 i = 0; i < pools.length; i++) {
+            require(pools[i].length == 3, "pool entry must have 3 addresses");
+            address outcomeToken = pools[i][0];
+            address shortToken = pools[i][1];
+            address longToken = pools[i][2];
+            require(
+                outcomeToken != address(0) && shortToken != address(0) && longToken != address(0),
+                "zero token address"
+            );
+            require(
+                outcomeToken != shortToken && outcomeToken != longToken && shortToken != longToken,
+                "duplicate token addresses"
+            );
 
-            (address token0, address token1,) = _order(shortToken, longToken);
+            console.log("\n=== CSM #", i, "===");
+            console.log("Outcome token:", outcomeToken);
+            console.log("Short token:", shortToken);
+            console.log("Long token:", longToken);
 
-            PoolKey memory key = PoolKey({
-                currency0: Currency.wrap(token0),
-                currency1: Currency.wrap(token1),
-                fee: cfg.fee,
-                tickSpacing: cfg.tickSpacing,
-                hooks: IHooks(cfg.hook)
-            });
-            PoolId poolId = PoolIdLibrary.toId(key);
+            // Check Pool 1: outcome <> long
+            console.log("\n--- Pool 1: outcome <> long ---");
+            _checkPool(manager, cfg, outcomeToken, longToken);
 
-            (uint160 sqrtPriceX96, int24 tick,, uint24 lpFee) = StateLibrary.getSlot0(manager, poolId);
+            // Check Pool 2: outcome <> short
+            console.log("\n--- Pool 2: outcome <> short ---");
+            _checkPool(manager, cfg, outcomeToken, shortToken);
+        }
+    }
 
-            if (sqrtPriceX96 == 0) {
-                console.log("Pool missing for token order:");
-                console.logAddress(token0);
-                console.logAddress(token1);
-            } else {
-                console.log("Pool initialized for token order:");
-                console.logAddress(token0);
-                console.logAddress(token1);
-                console.log("sqrtPriceX96:");
-                console.logUint(sqrtPriceX96);
-                console.log("tick:");
-                console.logInt(tick);
-                console.log("lpFee bps:");
-                console.logUint(lpFee);
-            }
+    function _checkPool(
+        IPoolManager manager,
+        Cfg memory cfg,
+        address tokenA,
+        address tokenB
+    ) internal view {
+        (address token0, address token1,) = _order(tokenA, tokenB);
+
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(token0),
+            currency1: Currency.wrap(token1),
+            fee: cfg.fee,
+            tickSpacing: cfg.tickSpacing,
+            hooks: IHooks(cfg.hook)
+        });
+        PoolId poolId = PoolIdLibrary.toId(key);
+
+        (uint160 sqrtPriceX96, int24 tick,, uint24 lpFee) = StateLibrary.getSlot0(manager, poolId);
+
+        if (sqrtPriceX96 == 0) {
+            console.log("Pool MISSING for token order:");
+            console.logAddress(token0);
+            console.logAddress(token1);
+        } else {
+            console.log("Pool initialized for token order:");
+            console.logAddress(token0);
+            console.logAddress(token1);
+            console.log("sqrtPriceX96:", sqrtPriceX96);
+            console.log("tick:", tick);
+            console.log("lpFee bps:", lpFee);
         }
     }
 }
