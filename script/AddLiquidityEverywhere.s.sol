@@ -28,6 +28,8 @@ contract AddLiquidityEverywhere is Script, FlatCFMJsonParser {
         string memory configPath = _getJsonFilePath();
         string memory jsonContent = vm.readFile(configPath);
 
+        // [DEPRECATED] - Uses old 1-pool system (SHORT<>LONG pairs)
+        // TODO: Update to use OUTCOME_TOKEN_POOLS for 2-pool system
         address[][] memory shortLongPairs = abi.decode(vm.parseJson(vm.envString("SHORT_LONG_PAIRS")), (address[][]));
         uint256 minAmount = (_parseDepositAmount(jsonContent) * (100 - _parseSlippagePct(jsonContent))) / 100;
 

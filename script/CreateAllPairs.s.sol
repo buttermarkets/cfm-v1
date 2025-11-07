@@ -15,6 +15,8 @@ contract CreateAllPairs is Script, FlatCFMJsonParser {
         string memory jsonContent = vm.readFile(configPath);
 
         address factoryAddr = _parseUniswapV2Factory(jsonContent);
+        // [DEPRECATED] - Uses old 1-pool system (SHORT<>LONG pairs)
+        // NOTE: This script creates V2 pairs. Use CreateAllPools.s.sol for V4 two-pool system
         string memory pairsJson = vm.envString("SHORT_LONG_PAIRS");
 
         address[][] memory shortLongPairs = abi.decode(vm.parseJson(pairsJson), (address[][]));
