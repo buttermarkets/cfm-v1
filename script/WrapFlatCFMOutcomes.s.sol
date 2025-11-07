@@ -15,6 +15,10 @@ interface IFlatCFM {
     function outcomeCount() external view returns (uint256);
 }
 
+interface IFlatCFMFactory {
+    function wrapped1155Factory() external view returns (address);
+}
+
 contract WrapFlatCFMOutcomes is Script {
     using String31 for string;
 
@@ -33,9 +37,8 @@ contract WrapFlatCFMOutcomes is Script {
         // Validate inputs
         require(config.cfmAddress != address(0), "Invalid CFM address");
         require(config.collateralToken != address(0), "Invalid collateral address");
-        require(config.conditionalTokens != address(0), "Invalid conditional tokens address");
-        require(config.wrapped1155Factory != address(0), "Invalid wrapped1155 factory address");
         require(config.outcomeNames.length > 0 && config.outcomeNames.length < 256, "Invalid outcome names count");
+        // conditionalTokens and wrapped1155Factory are derived from chain, so they're guaranteed to be valid
 
         // Get on-chain data and validate
         uint256 outcomeCount = IFlatCFM(config.cfmAddress).outcomeCount();
@@ -111,15 +114,22 @@ contract WrapFlatCFMOutcomes is Script {
         console.log("");
     }
 
-    function parseConfig(string memory json) internal pure virtual returns (Config memory) {
+    function parseConfig(string memory json) internal view virtual returns (Config memory) {
         Config memory config;
 
-        // Parse each field individually
+        // Parse required fields
         config.cfmAddress = abi.decode(vm.parseJson(json, ".cfmAddress"), (address));
         config.collateralToken = abi.decode(vm.parseJson(json, ".collateralToken"), (address));
-        config.conditionalTokens = abi.decode(vm.parseJson(json, ".conditionalTokens"), (address));
-        config.wrapped1155Factory = abi.decode(vm.parseJson(json, ".wrapped1155Factory"), (address));
         config.outcomeNames = abi.decode(vm.parseJson(json, ".outcomeNames"), (string[]));
+
+        // Derive from chain
+        config.conditionalTokens = address(IFlatCFM(config.cfmAddress).conditionalTokens());
+        console.log("Derived conditionalTokens from chain:", config.conditionalTokens);
+
+        // Get factoryAddress from config to derive wrapped1155Factory
+        address factoryAddress = abi.decode(vm.parseJson(json, ".factoryAddress"), (address));
+        config.wrapped1155Factory = IFlatCFMFactory(factoryAddress).wrapped1155Factory();
+        console.log("Derived wrapped1155Factory from factory:", config.wrapped1155Factory);
 
         return config;
     }
