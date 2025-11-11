@@ -23,6 +23,7 @@ abstract contract V4AddLiq is Script {
     uint256 internal constant Q192 = 1 << 192;
 
     struct Cfg {
+        address poolManager;
         address payable positionManager;
         address stateView;
         address permit2;
@@ -49,6 +50,7 @@ abstract contract V4AddLiq is Script {
     }
 
     function _parseV4Cfg(string memory json) internal returns (Cfg memory cfg) {
+        cfg.poolManager = vm.parseJsonAddress(json, ".poolManager");
         cfg.positionManager = payable(vm.parseJsonAddress(json, ".positionManager"));
         cfg.stateView = vm.parseJsonAddress(json, ".stateView");
         cfg.permit2 = vm.parseJsonAddress(json, ".permit2");
@@ -214,19 +216,18 @@ abstract contract V4AddLiq is Script {
         address recipient,
         uint256 deadline
     ) internal {
-        Currency c0 = Currency.wrap(token0);
-        Currency c1 = Currency.wrap(token1);
-        PoolKey memory key = PoolKey(c0, c1, cfg.fee, cfg.tickSpacing, IHooks(cfg.hook));
-
-        uint128 L = _computeL(cfg.stateView, key, tickLower, tickUpper, deposit);
-        require(L > 0, "zero L");
+        PoolKey memory key = PoolKey(Currency.wrap(token0), Currency.wrap(token1), cfg.fee, cfg.tickSpacing, IHooks(cfg.hook));
+        uint128 liq = _computeL(cfg.stateView, key, tickLower, tickUpper, deposit);
+        require(liq > 0, "zero L");
 
         bytes[] memory params = new bytes[](2);
-        params[0] = abi.encode(key, tickLower, tickUpper, uint256(L), uint128(deposit), uint128(deposit), recipient, "");
-        params[1] = abi.encode(c0, c1);
+        params[0] = abi.encode(key, tickLower, tickUpper, uint256(liq), uint128(deposit), uint128(deposit), recipient, "");
+        params[1] = abi.encode(Currency.wrap(token0), Currency.wrap(token1));
 
+        console.log("calling posm.modifyLiquidities (MINT_POSITION, SETTLE_PAIR)...");
         try PositionManager(cfg.positionManager).modifyLiquidities(
-            abi.encode(abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR)), params), deadline
+            abi.encode(abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR)), params),
+            deadline
         ) {
             console.log("posm.modifyLiquidities: OK");
         } catch (bytes memory err) {
@@ -260,9 +261,24 @@ abstract contract V4AddLiq is Script {
         IERC20(outcomeToken).approve(cfg.permit2, amount);
         IERC20(shortToken).approve(cfg.permit2, amount);
         IERC20(longToken).approve(cfg.permit2, amount);
+        // Permit2 spender must be the PositionManager (caller of transferFrom)
         IAllowanceTransfer(cfg.permit2).approve(outcomeToken, cfg.positionManager, uint160(amount), expiration);
         IAllowanceTransfer(cfg.permit2).approve(shortToken, cfg.positionManager, uint160(amount), expiration);
         IAllowanceTransfer(cfg.permit2).approve(longToken, cfg.positionManager, uint160(amount), expiration);
+    }
+
+    // Backward-compatible overload for 2-token flows (legacy 1-pool script)
+    function _approvePermit2(
+        Cfg memory cfg,
+        address tokenA,
+        address tokenB,
+        uint256 amount,
+        uint48 expiration
+    ) internal {
+        IERC20(tokenA).approve(cfg.permit2, amount);
+        IERC20(tokenB).approve(cfg.permit2, amount);
+        IAllowanceTransfer(cfg.permit2).approve(tokenA, cfg.positionManager, uint160(amount), expiration);
+        IAllowanceTransfer(cfg.permit2).approve(tokenB, cfg.positionManager, uint160(amount), expiration);
     }
 
     function _mintForPair(
@@ -330,12 +346,10 @@ abstract contract V4AddLiq is Script {
         // Determine price range - P values represent long probability in outcome<>long pool
         // When tokens are ordered, we may need to adjust interpretation
         if (minP == 0 && maxP == 0) {
-            // Full-range: align protocol min/max ticks to spacing
-            int24 minTick = _floorToSpacing(TickMath.MIN_TICK, cfg.tickSpacing);
-            int24 maxTick = _ceilToSpacing(TickMath.MAX_TICK, cfg.tickSpacing);
-            if (minTick == maxTick) maxTick += cfg.tickSpacing;
-            L.tl = minTick;
-            L.tu = maxTick;
+            // Full-range: use protocol min/max ticks, aligned inward to spacing
+            L.tl = _ceilToSpacing(TickMath.MIN_TICK, cfg.tickSpacing);
+            L.tu = _floorToSpacing(TickMath.MAX_TICK, cfg.tickSpacing);
+            if (L.tl >= L.tu) L.tu = L.tl + cfg.tickSpacing;
         } else {
             // Use P values directly for tick calculation
             L.minP = minP;

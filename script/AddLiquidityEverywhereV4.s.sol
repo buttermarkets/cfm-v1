@@ -39,7 +39,9 @@ contract AddLiquidityEverywhereV4 is Script, V4AddLiq {
             );
 
             // Approvals via Permit2 then mint liquidity to both pools using V4 periphery
-            _approvePermit2(cfg, outcomeTok, shortTok, longTok, deposit, uint48(block.timestamp + 30 days));
+            // Use explicit seconds to avoid any toolchain quirks with time units
+            uint48 exp = uint48(block.timestamp + 2_592_000); // ~30 days
+            _approvePermit2(cfg, outcomeTok, shortTok, longTok, deposit, exp);
             _mintForPair(cfg, outcomeTok, shortTok, longTok, deposit, recipient, block.timestamp + 600);
 
             console.log("liquidity added for CSM:");
