@@ -29,13 +29,9 @@ contract AddLiquidityEverywhereV4 is Script, V4AddLiq {
             address outcomeTok = pools[i][0];
             address shortTok = pools[i][1];
             address longTok = pools[i][2];
+            require(outcomeTok != address(0) && shortTok != address(0) && longTok != address(0), "zero address in pool");
             require(
-                outcomeTok != address(0) && shortTok != address(0) && longTok != address(0),
-                "zero address in pool"
-            );
-            require(
-                outcomeTok != shortTok && outcomeTok != longTok && shortTok != longTok,
-                "duplicate addresses in pool"
+                outcomeTok != shortTok && outcomeTok != longTok && shortTok != longTok, "duplicate addresses in pool"
             );
 
             // Approvals via Permit2 then mint liquidity to both pools using V4 periphery

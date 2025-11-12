@@ -57,7 +57,10 @@ contract UnwrapAndRedeem is Script {
 
         // Determine outcome index and payout information
         (uint256 indexSet, uint256 payoutNumerator) = _locateIndexAndPayout(
-            IConditionalTokens(config.conditionalTokens), IERC20(config.collateralToken), config.positionId, config.conditionId
+            IConditionalTokens(config.conditionalTokens),
+            IERC20(config.collateralToken),
+            config.positionId,
+            config.conditionId
         );
         console.log("  Index set:", indexSet);
         console.log("  Payout numerator:", payoutNumerator);
@@ -105,10 +108,7 @@ contract UnwrapAndRedeem is Script {
         factory.unwrap(ct, config.positionId, config.amount, msg.sender, config.tokenData);
         console.log("  Unwrapped tokens back to ERC1155");
 
-        console.log(
-            "  ERC1155 balance after unwrap:",
-            ct.balanceOf(msg.sender, config.positionId)
-        );
+        console.log("  ERC1155 balance after unwrap:", ct.balanceOf(msg.sender, config.positionId));
     }
 
     function _getCollectionIdFromPosition(
@@ -134,12 +134,11 @@ contract UnwrapAndRedeem is Script {
         revert("Could not find collection ID for position");
     }
 
-    function _locateIndexAndPayout(
-        IConditionalTokens ct,
-        IERC20 collateral,
-        uint256 positionId,
-        bytes32 conditionId
-    ) internal view returns (uint256 indexSet, uint256 payoutNumerator) {
+    function _locateIndexAndPayout(IConditionalTokens ct, IERC20 collateral, uint256 positionId, bytes32 conditionId)
+        internal
+        view
+        returns (uint256 indexSet, uint256 payoutNumerator)
+    {
         bytes32 collectionId = _getCollectionIdFromPosition(ct, collateral, positionId, conditionId);
         for (uint256 i = 0; i < 256; i++) {
             uint256 tryIndexSet = 1 << i;
@@ -187,10 +186,7 @@ contract UnwrapAndRedeemCheck is UnwrapAndRedeem {
         );
 
         // Check ERC1155 balance
-        console.log(
-            "ERC1155 balance:",
-            IConditionalTokens(config.conditionalTokens).balanceOf(user, config.positionId)
-        );
+        console.log("ERC1155 balance:", IConditionalTokens(config.conditionalTokens).balanceOf(user, config.positionId));
 
         // Check if condition is resolved
         uint256 payoutDenominator = IConditionalTokens(config.conditionalTokens).payoutDenominator(config.conditionId);
@@ -226,9 +222,6 @@ contract UnwrapAndRedeemCheck is UnwrapAndRedeem {
         }
 
         // Check collateral balance
-        console.log(
-            "\nCurrent collateral balance:",
-            IERC20(config.collateralToken).balanceOf(user)
-        );
+        console.log("\nCurrent collateral balance:", IERC20(config.collateralToken).balanceOf(user));
     }
 }

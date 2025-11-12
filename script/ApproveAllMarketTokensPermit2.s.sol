@@ -30,10 +30,22 @@ contract ApproveAllMarketTokensPermit2 is CSMJsonParser, FlatCFMJsonParser {
         for (uint256 i = 0; i < markets.length; i++) {
             address s = markets[i].shortToken.id;
             address l = markets[i].longToken.id;
-            bool seenS = false; bool seenL = false;
-            for (uint256 j = 0; j < count; j++) { if (approved[j] == s) { seenS = true; } if (approved[j] == l) { seenL = true; } }
-            if (!seenS) { IERC20(s).approve(permit2, type(uint256).max); approved[count++] = s; console.log("Approved via Permit2:", s); }
-            if (!seenL) { IERC20(l).approve(permit2, type(uint256).max); approved[count++] = l; console.log("Approved via Permit2:", l); }
+            bool seenS = false;
+            bool seenL = false;
+            for (uint256 j = 0; j < count; j++) {
+                if (approved[j] == s) seenS = true;
+                if (approved[j] == l) seenL = true;
+            }
+            if (!seenS) {
+                IERC20(s).approve(permit2, type(uint256).max);
+                approved[count++] = s;
+                console.log("Approved via Permit2:", s);
+            }
+            if (!seenL) {
+                IERC20(l).approve(permit2, type(uint256).max);
+                approved[count++] = l;
+                console.log("Approved via Permit2:", l);
+            }
         }
         console.log("Total unique tokens approved to Permit2:", count);
         vm.stopBroadcast();
@@ -50,26 +62,37 @@ contract ApproveAllMarketTokensPermit2Check is CSMJsonParser, FlatCFMJsonParser 
 
         address depositor = vm.envAddress("DEPOSITOR");
         address permit2;
-        try vm.parseJsonAddress(jsonContent, ".permit2") returns (address p2) { permit2 = p2; } catch { permit2 = vm.envAddress("PERMIT2"); }
+        try vm.parseJsonAddress(jsonContent, ".permit2") returns (address p2) {
+            permit2 = p2;
+        } catch {
+            permit2 = vm.envAddress("PERMIT2");
+        }
 
         address[] memory seen = new address[](markets.length * 2);
         uint256 seenCount = 0;
-        uint256 ok = 0; uint256 miss = 0;
+        uint256 ok = 0;
+        uint256 miss = 0;
         for (uint256 i = 0; i < markets.length; i++) {
             address s = markets[i].shortToken.id;
             address l = markets[i].longToken.id;
 
-            bool checkedS = false; bool checkedL = false;
-            for (uint256 j = 0; j < seenCount; j++) { if (seen[j] == s) checkedS = true; if (seen[j] == l) checkedL = true; }
+            bool checkedS = false;
+            bool checkedL = false;
+            for (uint256 j = 0; j < seenCount; j++) {
+                if (seen[j] == s) checkedS = true;
+                if (seen[j] == l) checkedL = true;
+            }
             if (!checkedS) {
                 uint256 allowanceS = IERC20(s).allowance(depositor, permit2);
-                if (allowanceS > 0) ok++; else miss++;
+                if (allowanceS > 0) ok++;
+                else miss++;
                 seen[seenCount++] = s;
                 console.log("Short token:", s, "Allowance:", allowanceS);
             }
             if (!checkedL) {
                 uint256 allowanceL = IERC20(l).allowance(depositor, permit2);
-                if (allowanceL > 0) ok++; else miss++;
+                if (allowanceL > 0) ok++;
+                else miss++;
                 seen[seenCount++] = l;
                 console.log("Long token:", l, "Allowance:", allowanceL);
             }

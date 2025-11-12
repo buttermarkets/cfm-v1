@@ -20,7 +20,8 @@ abstract contract V4CreatePool is Script {
         uint24 fee;
         int24 tickSpacing;
         address hook;
-        uint256 initP1e18; // probability of LONG token (0 to 1e18)
+        // P is a price ratio in 1e18 fixed-point (second token / first token in semantic order)
+        uint256 initP1e18; // initial price ratio for the semantic pair (0 to 1e18)
     }
 
     function _getConfigFilePath() internal view returns (string memory) {
@@ -62,17 +63,20 @@ abstract contract V4CreatePool is Script {
         return (longToken, shortToken, true);
     }
 
-    function _sqrtPriceX96FromPrice1e18(address token0, address token1, uint256 price1e18)
+    /// @dev Convert a price ratio (token1/token0) in 1e18 fixed-point to sqrtPriceX96.
+    ///      poolPrice1e18 must already reflect the pool's token order (token1/token0), not semantic order.
+    function _sqrtPriceX96FromPrice1e18(address token0, address token1, uint256 poolPrice1e18)
         internal
         view
         returns (uint160)
     {
-        require(price1e18 != 0, "price 0");
+        require(poolPrice1e18 != 0, "price 0");
         uint8 d0 = IERC20Metadata(token0).decimals();
         uint8 d1 = IERC20Metadata(token1).decimals();
         int256 diff = int256(uint256(d1)) - int256(uint256(d0));
 
-        uint256 num = price1e18;
+        require(diff == 0, "different token scales (not yet tested)");
+        uint256 num = poolPrice1e18;
         uint256 den = 1e18;
         if (diff >= 0) {
             uint256 f = _pow10(uint256(diff));
@@ -114,8 +118,7 @@ contract V4CreatePoolCheck is Script, V4CreatePool {
             address shortToken = pools[i][1];
             address longToken = pools[i][2];
             require(
-                outcomeToken != address(0) && shortToken != address(0) && longToken != address(0),
-                "zero token address"
+                outcomeToken != address(0) && shortToken != address(0) && longToken != address(0), "zero token address"
             );
             require(
                 outcomeToken != shortToken && outcomeToken != longToken && shortToken != longToken,
@@ -137,12 +140,7 @@ contract V4CreatePoolCheck is Script, V4CreatePool {
         }
     }
 
-    function _checkPool(
-        IPoolManager manager,
-        Cfg memory cfg,
-        address tokenA,
-        address tokenB
-    ) internal view {
+    function _checkPool(IPoolManager manager, Cfg memory cfg, address tokenA, address tokenB) internal view {
         (address token0, address token1,) = _order(tokenA, tokenB);
 
         PoolKey memory key = PoolKey({

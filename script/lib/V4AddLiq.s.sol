@@ -21,6 +21,7 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 abstract contract V4AddLiq is Script {
     uint256 internal constant Q96 = 1 << 96;
     uint256 internal constant Q192 = 1 << 192;
+    uint256 internal constant ONE_E36 = 1e36;
 
     struct Cfg {
         address poolManager;
@@ -31,8 +32,9 @@ abstract contract V4AddLiq is Script {
         int24 tickSpacing;
         address hook;
         // Optional price band; when zero, treat as full range
-        uint256 minP1e18; // min probability for long outcome (0 to 1e18)
-        uint256 maxP1e18; // max probability for long outcome (0 to 1e18)
+        // P is a price ratio in 1e18 fixed-point (second token / first token in semantic order)
+        uint256 minP1e18; // min price ratio for the semantic pair (0 to 1e18)
+        uint256 maxP1e18; // max price ratio for the semantic pair (0 to 1e18)
     }
 
     struct _MintTmp {
@@ -76,10 +78,7 @@ abstract contract V4AddLiq is Script {
         }
     }
 
-    function _tryParseUint(string memory json, string memory key)
-        internal
-        returns (bool ok, uint256 value)
-    {
+    function _tryParseUint(string memory json, string memory key) internal returns (bool ok, uint256 value) {
         // vm.parseJsonUint reverts when key is missing or not a uint; catch and return (false,0)
         try vm.parseJsonUint(json, key) returns (uint256 v) {
             return (true, v);
@@ -104,6 +103,28 @@ abstract contract V4AddLiq is Script {
     {
         if (uint160(shortToken) < uint160(longToken)) return (shortToken, longToken, false);
         return (longToken, shortToken, true);
+    }
+
+    /// @dev Map a semantic range [minP, maxP] expressed as (B/A) for the call (A,B)
+    ///      to the pool's (token1/token0) price range after address ordering.
+    ///      Returns a range with min' < max'.
+    ///      P is a price ratio in 1e18 fixed-point, not an abstract probability.
+    function _mapRangeToPoolOrder(
+        address outcomeToken,
+        address scalarToken, // semantic order passed by caller
+        address token0,
+        address token1, // pool order after _order()
+        uint256 minP,
+        uint256 maxP
+    ) internal pure returns (uint256 minOut, uint256 maxOut) {
+        require(minP > 0 && maxP > 0 && minP < maxP, "bad P");
+        // If pool order = (scalarToken,outcomeToken), price is already in the right direction ("ARB/USDC case")
+        if (token0 == scalarToken && token1 == outcomeToken) return (minP, maxP);
+        // Else pool order = (outcomeToken,scalarToken), price is inversed ("HYPE/USDC case")
+        // Invert and swap to keep min < max
+        uint256 invMin = ONE_E36 / maxP; // 1 / maxP
+        uint256 invMax = ONE_E36 / minP; // 1 / minP
+        return (invMin, invMax);
     }
 
     function _abs(int256 x) internal pure returns (uint256) {
@@ -184,7 +205,6 @@ abstract contract V4AddLiq is Script {
         require(tickLower < tickUpper, "ticks collapsed");
     }
 
-
     function _computeL(address stateView, PoolKey memory key, int24 tl, int24 tu, uint256 deposit)
         internal
         view
@@ -216,18 +236,19 @@ abstract contract V4AddLiq is Script {
         address recipient,
         uint256 deadline
     ) internal {
-        PoolKey memory key = PoolKey(Currency.wrap(token0), Currency.wrap(token1), cfg.fee, cfg.tickSpacing, IHooks(cfg.hook));
+        PoolKey memory key =
+            PoolKey(Currency.wrap(token0), Currency.wrap(token1), cfg.fee, cfg.tickSpacing, IHooks(cfg.hook));
         uint128 liq = _computeL(cfg.stateView, key, tickLower, tickUpper, deposit);
         require(liq > 0, "zero L");
 
         bytes[] memory params = new bytes[](2);
-        params[0] = abi.encode(key, tickLower, tickUpper, uint256(liq), uint128(deposit), uint128(deposit), recipient, "");
+        params[0] =
+            abi.encode(key, tickLower, tickUpper, uint256(liq), uint128(deposit), uint128(deposit), recipient, "");
         params[1] = abi.encode(Currency.wrap(token0), Currency.wrap(token1));
 
         console.log("calling posm.modifyLiquidities (MINT_POSITION, SETTLE_PAIR)...");
         try PositionManager(cfg.positionManager).modifyLiquidities(
-            abi.encode(abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR)), params),
-            deadline
+            abi.encode(abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR)), params), deadline
         ) {
             console.log("posm.modifyLiquidities: OK");
         } catch (bytes memory err) {
@@ -270,15 +291,15 @@ abstract contract V4AddLiq is Script {
     // Backward-compatible overload for 2-token flows (legacy 1-pool script)
     function _approvePermit2(
         Cfg memory cfg,
-        address tokenA,
-        address tokenB,
+        address outcomeToken,
+        address scalarToken,
         uint256 amount,
         uint48 expiration
     ) internal {
-        IERC20(tokenA).approve(cfg.permit2, amount);
-        IERC20(tokenB).approve(cfg.permit2, amount);
-        IAllowanceTransfer(cfg.permit2).approve(tokenA, cfg.positionManager, uint160(amount), expiration);
-        IAllowanceTransfer(cfg.permit2).approve(tokenB, cfg.positionManager, uint160(amount), expiration);
+        IERC20(outcomeToken).approve(cfg.permit2, amount);
+        IERC20(scalarToken).approve(cfg.permit2, amount);
+        IAllowanceTransfer(cfg.permit2).approve(outcomeToken, cfg.positionManager, uint160(amount), expiration);
+        IAllowanceTransfer(cfg.permit2).approve(scalarToken, cfg.positionManager, uint160(amount), expiration);
     }
 
     function _mintForPair(
@@ -299,41 +320,19 @@ abstract contract V4AddLiq is Script {
 
         // Pool 1: outcome <> long with [minP, maxP]
         console.log("\n--- Pool 1: outcome <> long ---");
-        _mintSinglePool(
-            cfg,
-            outcomeToken,
-            longToken,
-            cfg.minP1e18,
-            cfg.maxP1e18,
-            depositPerPool,
-            recipient,
-            deadline
-        );
+        _mintSinglePool(cfg, outcomeToken, longToken, cfg.minP1e18, cfg.maxP1e18, depositPerPool, recipient, deadline);
 
         // Pool 2: outcome <> short with complementary [1-maxP, 1-minP]
         console.log("\n--- Pool 2: outcome <> short ---");
-        uint256 minPForShort = (cfg.minP1e18 == 0 && cfg.maxP1e18 == 0)
-            ? 0
-            : 1e18 - cfg.maxP1e18;
-        uint256 maxPForShort = (cfg.minP1e18 == 0 && cfg.maxP1e18 == 0)
-            ? 0
-            : 1e18 - cfg.minP1e18;
-        _mintSinglePool(
-            cfg,
-            outcomeToken,
-            shortToken,
-            minPForShort,
-            maxPForShort,
-            depositPerPool,
-            recipient,
-            deadline
-        );
+        uint256 minPForShort = (cfg.minP1e18 == 0 && cfg.maxP1e18 == 0) ? 0 : 1e18 - cfg.maxP1e18;
+        uint256 maxPForShort = (cfg.minP1e18 == 0 && cfg.maxP1e18 == 0) ? 0 : 1e18 - cfg.minP1e18;
+        _mintSinglePool(cfg, outcomeToken, shortToken, minPForShort, maxPForShort, depositPerPool, recipient, deadline);
     }
 
     function _mintSinglePool(
         Cfg memory cfg,
-        address token0Addr,
-        address token1Addr,
+        address outcomeToken, // semantic first (e.g., IF)
+        address scalarToken, // semantic second (e.g., LONG or SHORT)
         uint256 minP,
         uint256 maxP,
         uint256 deposit,
@@ -341,26 +340,29 @@ abstract contract V4AddLiq is Script {
         uint256 deadline
     ) internal {
         _MintTmp memory L;
-        (L.token0, L.token1,) = _order(token0Addr, token1Addr);
+        (L.token0, L.token1,) = _order(outcomeToken, scalarToken);
 
-        // Determine price range - P values represent long probability in outcome<>long pool
-        // When tokens are ordered, we may need to adjust interpretation
         if (minP == 0 && maxP == 0) {
             // Full-range: use protocol min/max ticks, aligned inward to spacing
             L.tl = _ceilToSpacing(TickMath.MIN_TICK, cfg.tickSpacing);
             L.tu = _floorToSpacing(TickMath.MAX_TICK, cfg.tickSpacing);
             if (L.tl >= L.tu) L.tu = L.tl + cfg.tickSpacing;
         } else {
-            // Use P values directly for tick calculation
-            L.minP = minP;
-            L.maxP = maxP;
+            // Map semantic [minP,maxP] to pool-order price range
+            // minP and maxP represent the price ratio (scalarToken/outcomeToken) in semantic order
+            (L.minP, L.maxP) = _mapRangeToPoolOrder(outcomeToken, scalarToken, L.token0, L.token1, minP, maxP);
+            // _computeAlignedTicks expects price = token1/token0
             (L.tl, L.tu) = _computeAlignedTicks(L.token0, L.token1, L.minP, L.maxP, cfg.tickSpacing);
         }
 
-        console.log("Token pair:");
+        console.log("Token pair (semantic A, B):");
+        console.logAddress(outcomeToken);
+        console.logAddress(scalarToken);
+        console.log("Semantic price range (B/A):", minP, maxP);
+        console.log("Pool order (token0, token1):");
         console.logAddress(L.token0);
         console.logAddress(L.token1);
-        console.log("Price range (P):", minP, maxP);
+        console.log("Mapped pool price range (token1/token0):", L.minP, L.maxP);
         console.log("Ticks lower/upper:");
         console.logInt(L.tl);
         console.logInt(L.tu);

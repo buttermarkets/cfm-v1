@@ -54,11 +54,11 @@ contract CreateAllPools is Script, V4CreatePool {
         vm.stopBroadcast();
     }
 
-    function _createPool(Cfg memory cfg, address tokenA, address tokenB, uint256 price1e18) internal {
-        require(tokenA != address(0) && tokenB != address(0), "zero token");
-        require(tokenA != tokenB, "duplicate tokens");
+    function _createPool(Cfg memory cfg, address outcomeToken, address scalarToken, uint256 price1e18) internal {
+        require(outcomeToken != address(0) && scalarToken != address(0), "zero token");
+        require(outcomeToken != scalarToken, "duplicate tokens");
 
-        (address token0, address token1,) = _order(tokenA, tokenB);
+        (address token0, address token1,) = _order(outcomeToken, scalarToken);
 
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(token0),
@@ -70,12 +70,14 @@ contract CreateAllPools is Script, V4CreatePool {
 
         // Calculate price based on token ordering
         uint256 poolPrice1e18;
-        if (token0 == tokenA) {
-            // token1/token0 = tokenB/tokenA
-            poolPrice1e18 = price1e18;
-        } else {
-            // token1/token0 = tokenA/tokenB = 1/price
+        if (token0 == outcomeToken) {
+            // HYPE/USDC ex: price1e18 ~ 1/(price of HYPE in USDC) = 1/p
+            // token1/token0 = scalarToken/outcomeToken
             poolPrice1e18 = (1e36) / price1e18;
+        } else {
+            // ARB/USDC ex: price1e18 ~ 0.277 price of ARB in USDC = our p
+            // token1/token0 = outcomeToken/scalarToken = 1/price
+            poolPrice1e18 = price1e18;
         }
 
         uint160 sqrtPriceX96 = _sqrtPriceX96FromPrice1e18(token0, token1, poolPrice1e18);

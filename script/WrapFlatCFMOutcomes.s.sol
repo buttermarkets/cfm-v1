@@ -62,9 +62,7 @@ contract WrapFlatCFMOutcomes is Script {
 
         // Calculate condition ID
         bytes32 conditionId = IConditionalTokens(config.conditionalTokens).getConditionId(
-            config.cfmAddress,
-            IFlatCFM(config.cfmAddress).questionId(),
-            outcomeCount + 1
+            config.cfmAddress, IFlatCFM(config.cfmAddress).questionId(), outcomeCount + 1
         );
 
         console.log(unicode"🔨 Wrapping FlatCFM outcomes");
@@ -141,9 +139,7 @@ contract WrapFlatCFMOutcomesCheck is WrapFlatCFMOutcomes {
 
         uint256 outcomeCount = IFlatCFM(config.cfmAddress).outcomeCount();
         bytes32 conditionId = IConditionalTokens(config.conditionalTokens).getConditionId(
-            config.cfmAddress,
-            IFlatCFM(config.cfmAddress).questionId(),
-            outcomeCount + 1
+            config.cfmAddress, IFlatCFM(config.cfmAddress).questionId(), outcomeCount + 1
         );
 
         console.log("Checking wrapped token status for FlatCFM:", config.cfmAddress);
@@ -166,10 +162,8 @@ contract WrapFlatCFMOutcomesCheck is WrapFlatCFMOutcomes {
         console.log(string.concat("  Outcome ", vm.toString(i), " (", config.outcomeNames[i], "):"));
         console.log("    Position ID:", positionId);
 
-        bytes memory data = WrappedOutcome.outcomeErc20Data(
-            config.outcomeNames[i],
-            IERC20Metadata(config.collateralToken).decimals()
-        );
+        bytes memory data =
+            WrappedOutcome.outcomeErc20Data(config.outcomeNames[i], IERC20Metadata(config.collateralToken).decimals());
 
         try IWrapped1155Factory(config.wrapped1155Factory).requireWrapped1155(ct, positionId, data) returns (
             IERC20 wrappedToken
