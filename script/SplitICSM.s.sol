@@ -25,7 +25,7 @@ abstract contract SplitICSMScriptBase is Script {
         cfg = _parseConfig(rawJson);
     }
 
-    function _parseConfig(string memory json) internal view returns (Config memory cfg) {
+    function _parseConfig(string memory json) internal pure returns (Config memory cfg) {
         cfg.icsmAddress = vm.parseJsonAddress(json, ".icsmAddress");
         cfg.depositAmount = vm.parseJsonUint(json, ".depositAmount");
         cfg.collateralToken = vm.parseJsonAddress(json, ".collateralToken");

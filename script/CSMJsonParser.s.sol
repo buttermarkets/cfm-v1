@@ -40,12 +40,14 @@ abstract contract CSMJsonParser is Script {
                 m.shortToken.id = vm.parseJsonAddress(json, string.concat(base, ".shortToken.id"));
                 m.longToken.id = vm.parseJsonAddress(json, string.concat(base, ".longToken.id"));
 
-                // invalidToken and pair are **optional** in invalid-less CFMs
+                // invalidToken and pair are optional in invalid-less CFMs / newer subgraphs
                 try vm.parseJsonAddress(json, string.concat(base, ".invalidToken.id")) returns (address invTok) {
                     m.invalidToken.id = invTok;
                 } catch { /* leave as address(0) */ }
 
-                m.pair.id = vm.parseJsonAddress(json, string.concat(base, ".pair.id"));
+                try vm.parseJsonAddress(json, string.concat(base, ".pair.id")) returns (address pairId) {
+                    m.pair.id = pairId;
+                } catch { /* leave as address(0) */ }
                 temp[count++] = m;
             } catch {
                 break;

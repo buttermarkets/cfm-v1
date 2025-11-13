@@ -78,7 +78,7 @@ abstract contract V4AddLiq is Script {
         }
     }
 
-    function _tryParseUint(string memory json, string memory key) internal returns (bool ok, uint256 value) {
+    function _tryParseUint(string memory json, string memory key) internal pure returns (bool ok, uint256 value) {
         // vm.parseJsonUint reverts when key is missing or not a uint; catch and return (false,0)
         try vm.parseJsonUint(json, key) returns (uint256 v) {
             return (true, v);
@@ -329,6 +329,20 @@ abstract contract V4AddLiq is Script {
         _mintSinglePool(cfg, outcomeToken, shortToken, minPForShort, maxPForShort, depositPerPool, recipient, deadline);
     }
 
+    // Backward-compatible overload for legacy 2-token single-pool scripts.
+    // Mints a single pool for the provided pair using [minP1e18, maxP1e18] from config.
+    // This preserves older AddLiquidityV4.s.sol usage.
+    function _mintForPair(
+        Cfg memory cfg,
+        address outcomeToken,
+        address scalarToken,
+        uint256 deposit,
+        address recipient,
+        uint256 deadline
+    ) internal {
+        _mintSinglePool(cfg, outcomeToken, scalarToken, cfg.minP1e18, cfg.maxP1e18, deposit, recipient, deadline);
+    }
+
     function _mintSinglePool(
         Cfg memory cfg,
         address outcomeToken, // semantic first (e.g., IF)
@@ -348,6 +362,14 @@ abstract contract V4AddLiq is Script {
             L.tu = _floorToSpacing(TickMath.MAX_TICK, cfg.tickSpacing);
             if (L.tl >= L.tu) L.tu = L.tl + cfg.tickSpacing;
         } else {
+            // Clamp boundary values: allow 0..1e18 by nudging away from zero when only one bound is zero
+            if (minP == 0 && maxP > 0) {
+                minP = 1; // epsilon to avoid price==0 in tick math
+            }
+            if (maxP <= minP) {
+                // ensure a non-collapsed band
+                maxP = minP + 1;
+            }
             // Map semantic [minP,maxP] to pool-order price range
             // minP and maxP represent the price ratio (scalarToken/outcomeToken) in semantic order
             (L.minP, L.maxP) = _mapRangeToPoolOrder(outcomeToken, scalarToken, L.token0, L.token1, minP, maxP);
@@ -371,7 +393,7 @@ abstract contract V4AddLiq is Script {
         _executeMint(cfg, L.token0, L.token1, L.tl, L.tu, deposit, recipient, deadline);
     }
 
-    function _debugPreflight(Cfg memory cfg, address owner, address token0, address token1, uint256 deposit)
+    function _debugPreflight(Cfg memory cfg, address owner, address token0, address token1, uint256 /*deposit*/ )
         internal
         view
     {

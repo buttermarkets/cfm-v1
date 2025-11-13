@@ -166,7 +166,7 @@ contract UnwrapAndRedeem is Script {
 }
 
 contract UnwrapAndRedeemCheck is UnwrapAndRedeem {
-    function run() external override {
+    function run() external view override {
         // Read config file
         string memory configPath = vm.envString("CONFIG_PATH");
         require(bytes(configPath).length > 0, "CONFIG_PATH environment variable must be set");

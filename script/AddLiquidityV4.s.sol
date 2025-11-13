@@ -16,23 +16,23 @@ contract AddLiquidityV4 is Script, V4AddLiq {
         uint256 deposit = _parseDepositAmount(json);
         require(deposit > 0 && deposit <= type(uint128).max, "bad deposit");
 
-        // Caller provides semantic tokens (short, long); helper maps to pool order
-        address a = vm.envAddress("SHORT_TOKEN");
-        address b = vm.envAddress("LONG_TOKEN");
-        require(a != address(0) && b != address(0) && a != b, "bad pair");
+        // Caller provides tokens (outcomeToken, scalarToken). Env var names kept for compatibility.
+        address outcomeToken = vm.envAddress("SHORT_TOKEN");
+        address scalarToken = vm.envAddress("LONG_TOKEN");
+        require(outcomeToken != address(0) && scalarToken != address(0) && outcomeToken != scalarToken, "bad pair");
         address recipient = vm.envAddress("MY_ADDRESS");
 
         vm.startBroadcast();
 
         // Approve via Permit2 (both raw approve and allowance to PM)
-        _approvePermit2(cfg, a, b, deposit, uint48(block.timestamp + 30 days));
+        _approvePermit2(cfg, outcomeToken, scalarToken, deposit, uint48(block.timestamp + 30 days));
 
-        _mintForPair(cfg, a, b, deposit, recipient, block.timestamp + 600);
+        _mintForPair(cfg, outcomeToken, scalarToken, deposit, recipient, block.timestamp + 600);
 
         vm.stopBroadcast();
 
         console.log(unicode"✓ v4 liquidity added");
-        console.logAddress(a);
-        console.logAddress(b);
+        console.logAddress(outcomeToken);
+        console.logAddress(scalarToken);
     }
 }
