@@ -7,9 +7,12 @@ pragma solidity ^0.8.20;
 import "forge-std/src/Script.sol";
 import "./lib/V4CreatePool.s.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {Pool} from "@uniswap/v4-core/src/libraries/Pool.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 contract CreateIfCollateralPools is Script, V4CreatePool {
     function run() external {
@@ -60,6 +63,11 @@ contract CreateIfCollateralPools is Script, V4CreatePool {
             hooks: IHooks(cfg.hook)
         });
 
+        if (_poolInitialized(IPoolManager(cfg.poolManager), key)) {
+            console.log("Pool already initialized, skipping:", token0, token1);
+            return;
+        }
+
         // Calculate price based on token ordering
         // price1e18 is semantic: collateral per 1 IF
         // Pool price is token1/token0
@@ -76,8 +84,23 @@ contract CreateIfCollateralPools is Script, V4CreatePool {
 
         try IPoolManager(cfg.poolManager).initialize(key, sqrtPriceX96) {
             console.log("Initialized collateral<>IF pool:", token0, token1);
+        } catch (bytes memory data) {
+            if (data.length >= 4 && bytes4(data) == Pool.PoolAlreadyInitialized.selector) {
+                console.log("Pool already initialized, skipping:", token0, token1);
+                return;
+            }
+            console.log("initialize reverted (bytes):");
+            console.logBytes(data);
+            revert("initialize failed");
         } catch Error(string memory reason) {
             console.log("initialize reverted:", reason);
+            revert(reason);
         }
+    }
+
+    function _poolInitialized(IPoolManager manager, PoolKey memory key) internal view returns (bool) {
+        PoolId poolId = PoolIdLibrary.toId(key);
+        (uint160 sqrtPriceX96,,,) = StateLibrary.getSlot0(manager, poolId);
+        return sqrtPriceX96 != 0;
     }
 }
