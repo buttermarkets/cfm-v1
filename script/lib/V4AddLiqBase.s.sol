@@ -121,6 +121,33 @@ abstract contract V4AddLiqBase is Script {
         return (tokenB, tokenA, true);
     }
 
+    // ===== Pool key construction =====
+
+    /// @notice Build a PoolKey from base config and two token addresses.
+    /// @dev Tokens are automatically ordered by address (token0 < token1).
+    ///      Useful for checking pool state before minting or other pool operations.
+    /// @param cfg Base configuration containing fee, tickSpacing, and hook
+    /// @param tokenA First token address (order doesn't matter)
+    /// @param tokenB Second token address (order doesn't matter)
+    /// @return key The constructed PoolKey with tokens properly ordered
+    function _buildPoolKey(
+        BaseCfg memory cfg,
+        address tokenA,
+        address tokenB
+    ) internal pure returns (PoolKey memory) {
+        (address token0, address token1) = tokenA < tokenB
+            ? (tokenA, tokenB)
+            : (tokenB, tokenA);
+
+        return PoolKey(
+            Currency.wrap(token0),
+            Currency.wrap(token1),
+            cfg.fee,
+            cfg.tickSpacing,
+            IHooks(cfg.hook)
+        );
+    }
+
     // ===== Price utilities =====
 
     function _abs(int256 x) internal pure returns (uint256) {
