@@ -16,6 +16,7 @@ abstract contract V4AddLiqOutcome is V4AddLiqBase {
         uint256 maxP1e18; // max price (numeraire/quoted), 0 for full range
         uint256 ifPerPool; // IF token amount per pool
         uint256 collateralPerPool; // Collateral amount per pool
+        bool skipIfExists; // skip pools that already have liquidity
     }
 
     // ===== Config parsing =====
@@ -32,6 +33,13 @@ abstract contract V4AddLiqOutcome is V4AddLiqBase {
 
         // Parse optional price band from .ifPools.{minP1e18,maxP1e18}
         (cfg.minP1e18, cfg.maxP1e18) = _parseOptionalBand(json, ".ifPools.minP1e18", ".ifPools.maxP1e18");
+
+        // Parse optional skipIfExists flag (defaults to false)
+        if (vm.keyExistsJson(json, ".ifPools.skipIfExists")) {
+            cfg.skipIfExists = vm.parseJsonBool(json, ".ifPools.skipIfExists");
+        } else {
+            cfg.skipIfExists = false;
+        }
     }
 
     // ===== High level helper =====
