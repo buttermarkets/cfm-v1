@@ -35,6 +35,18 @@ contract AddLiquidityIfCollateralV4 is Script, V4AddLiqOutcome {
             require(ifToken != address(0), "zero IF token");
             require(ifToken != collateralToken, "IF token == collateral");
 
+            if (cfg.skipIfExists) {
+                PoolKey memory key = _buildPoolKey(cfg.base, ifToken, collateralToken);
+                PoolId poolId = PoolIdLibrary.toId(key);
+                uint128 existingLiquidity = IStateView(cfg.base.stateView).getLiquidity(poolId);
+
+                if (existingLiquidity > 0) {
+                    console.log("Skipping pool (liquidity exists):", existingLiquidity);
+                    console.log("IF token:", ifToken);
+                    continue;
+                }
+            }
+
             console.log("=== Adding liquidity to collateral<>IF pool ===");
             console.log("IF token:", ifToken);
             console.log("Collateral:", collateralToken);
