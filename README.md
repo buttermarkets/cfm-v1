@@ -94,8 +94,7 @@ then run
 forge script script/CreateFlatCFMFromConfig.s.sol \
     --rpc-url $RPC_URL \
     --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+    --sender $ADDRESS
 ```
 
 ## deploy an InvalidlessConditionalScalarMarket independently
@@ -125,8 +124,7 @@ Then run:
 forge script script/DeployInvalidlessConditionalScalarMarket.s.sol \
     --rpc-url $RPC_URL \
     --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+    --sender $ADDRESS
 ```
 
 Optionally, specify a custom config file:
@@ -136,8 +134,7 @@ MARKET_CONFIG_FILE=./my-icsm-config.json \
 forge script script/DeployInvalidlessConditionalScalarMarket.s.sol \
     --rpc-url $RPC_URL \
     --broadcast \
-    --sender $ADDRESS \
-    --private-key $PRIVATE_KEY
+    --sender $ADDRESS
 ```
 
 # documentation
